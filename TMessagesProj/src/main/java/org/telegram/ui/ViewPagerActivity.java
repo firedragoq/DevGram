@@ -211,6 +211,23 @@ public abstract class ViewPagerActivity extends BaseFragment {
         }
     }
 
+    // DevGram: пересобрать пейджер при изменении числа/состава страниц (напр. скрытие таба).
+    // Уничтожаем кэш фрагментов (позиции меняются) и пересоздаём страницы с текущим getFragmentsCount().
+    public void rebuildTabs() {
+        for (int a = 0, N = fragmentsArr.size(); a < N; a++) {
+            final FragmentState state = fragmentsArr.valueAt(a);
+            if (state != null && state.onCreateCalled) {
+                state.fragment.onFragmentDestroy();
+                state.fragment.setParentLayout(null);
+            }
+        }
+        fragmentsArr.clear();
+        if (viewPager != null) {
+            viewPager.setPosition(getStartPosition());
+            viewPager.rebuild(false);
+        }
+    }
+
     @Override
     public boolean isLightStatusBar() {
         final BaseFragment fragment = getCurrentVisibleFragment();
