@@ -1785,7 +1785,7 @@ public class PushListenerController {
                         UnifiedPush.register(
                                 ApplicationLoader.applicationContext,
                                 "default",
-                                "Telegram Simple Push",
+                                "DevGram Simple Push",
                                 null);
                     } catch (Throwable e) {
                         FileLog.e(e);
