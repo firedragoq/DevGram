@@ -64,6 +64,7 @@ public class UserConfig extends BaseController {
     public boolean syncContacts = false;
     public boolean suggestContacts = true;
     public boolean showCallsTab;
+    public boolean showContactsTab = true;
     public boolean mainTabsHiddenFork = false;
     public boolean hasSecureData;
     public int loginTime;
@@ -179,6 +180,7 @@ public class UserConfig extends BaseController {
                     editor.putInt("loginTime", loginTime);
                     editor.putBoolean("syncContacts", syncContacts);
                     editor.putBoolean("showCallsTab", showCallsTab);
+                    editor.putBoolean("showContactsTab", showContactsTab);
                     editor.putBoolean("mainTabsHiddenFork", mainTabsHiddenFork);
                     editor.putBoolean("suggestContacts", suggestContacts);
                     editor.putBoolean("hasSecureData", hasSecureData);
@@ -332,6 +334,7 @@ public class UserConfig extends BaseController {
             loginTime = preferences.getInt("loginTime", currentAccount);
             syncContacts = preferences.getBoolean("syncContacts", false);
             showCallsTab = preferences.getBoolean("showCallsTab", false);
+            showContactsTab = preferences.getBoolean("showContactsTab", true);
             mainTabsHiddenFork = preferences.getBoolean("mainTabsHiddenFork", false);
             suggestContacts = preferences.getBoolean("suggestContacts", true);
             hasSecureData = preferences.getBoolean("hasSecureData", false);
@@ -507,6 +510,7 @@ public class UserConfig extends BaseController {
         contactsReimported = true;
         syncContacts = false;
         showCallsTab = false;
+        showContactsTab = true;
         mainTabsHiddenFork = false;
         suggestContacts = true;
         unreadDialogsLoaded = true;
@@ -590,6 +594,13 @@ public class UserConfig extends BaseController {
     public void setShowCallsTab(boolean show) {
         if (showCallsTab != show) {
             showCallsTab = show;
+            saveConfig(false);
+        }
+    }
+
+    public void setShowContactsTab(boolean show) {
+        if (showContactsTab != show) {
+            showContactsTab = show;
             saveConfig(false);
         }
     }

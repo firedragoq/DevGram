@@ -331,6 +331,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             tabsView.setViewVisible(view, true, false);
         }
         checkUi_callTabVisible(getUserConfig().showCallsTab, false);
+        checkUi_contactsTabVisible(getUserConfig().showContactsTab, false);
 
         selectTab(viewPager.getCurrentPosition(), false);
 
@@ -402,6 +403,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             presentFragment(new CallLogActivity(args));
         });
         o.addChecked(UserConfig.getInstance(currentAccount).syncContacts, getString(R.string.SyncContacts), this::forkToggleSyncContacts);
+        o.add(R.drawable.msg_archive_hide, "Скрыть кнопку", () -> {
+            getUserConfig().setShowContactsTab(false);
+            checkUi_contactsTabVisible(false, true);
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+        });
         o.setBlur(true);
         o.translate(0, -dp(4));
         o.setGravity(Gravity.LEFT);
@@ -891,6 +897,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             }
         } else if (id == NotificationCenter.needSetDayNightTheme) {
             clearAllHiddenFragments();
+        } else if (id == NotificationCenter.contactsTabVisibleToggled) {
+            checkUi_contactsTabVisible(getUserConfig().showContactsTab, true);
         } else if (id == NotificationCenter.callTabsVisibleToggled) {
             final boolean callTabsVisible = getUserConfig().showCallsTab;
             checkUi_callTabVisible(callTabsVisible, true);
@@ -923,6 +931,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             .add(NotificationCenter.notificationsCountUpdated)
             .add(NotificationCenter.updateInterfaces)
             .add(NotificationCenter.callTabsVisibleToggled)
+            .add(NotificationCenter.contactsTabVisibleToggled)
             .add(NotificationCenter.mainUserInfoChanged)
             .add(NotificationCenter.contactsPermissionBadgeCheck);
 
@@ -999,6 +1008,12 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         if (tabsView != null) {
             tabsView.setViewVisible(tabs[INDEX_SETTINGS], !callTabsVisible, animated);
             tabsView.setViewVisible(tabs[INDEX_CALLS], callTabsVisible, animated);
+        }
+    }
+
+    private void checkUi_contactsTabVisible(boolean visible, boolean animated) {
+        if (tabsView != null && tabs[INDEX_CONTACTS] != null) {
+            tabsView.setViewVisible(tabs[INDEX_CONTACTS], visible, animated);
         }
     }
 

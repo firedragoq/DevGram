@@ -371,6 +371,7 @@ public class NotificationCenter {
     public static final int tlSchemeParseException = totalEvents++;
     public static final int memoryLeakFoundException = totalEvents++;
     public static final int callTabsVisibleToggled = totalEvents++;
+    public static final int contactsTabVisibleToggled = totalEvents++;
     public static final int contactsPermissionBadgeCheck = totalEvents++;
     public static final int guardBotDecisionResult = totalEvents++;
     public static final int webBrowserSettingsUpdate = totalEvents++;
