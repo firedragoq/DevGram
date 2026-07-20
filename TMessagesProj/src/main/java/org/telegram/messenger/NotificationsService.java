@@ -34,23 +34,28 @@ public class NotificationsService extends Service {
             } else {
                 pendingIntentFlags = PendingIntent.FLAG_MUTABLE;
             }
-            String CHANNEL_ID = "push_service_channel";
+            // DevGram: канал минимальной важности -> уведомление скрыто из статус-бара,
+            // свёрнуто внизу шторки (как у ExteraGram). Сервис держит фон, не мозолит глаза.
+            String CHANNEL_ID = "devgram_keepalive";
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID,"Push Notifications Service",NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "DevGram", NotificationManager.IMPORTANCE_MIN);
+            channel.setShowBadge(false);
+            channel.setSound(null, null);
+            channel.enableVibration(false);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_SECRET);
             notificationManager.createNotificationChannel(channel);
-            Intent explainIntent = new Intent("android.intent.action.VIEW");
-            explainIntent.setData(Uri.parse("https://github.com/forkgram/TelegramAndroid"));
             try {
-            PendingIntent explainPendingIntent = PendingIntent.getActivity(this, 0, explainIntent, pendingIntentFlags);
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentIntent(explainPendingIntent)
                     .setShowWhen(false)
                     .setOngoing(true)
+                    .setPriority(NotificationCompat.PRIORITY_MIN)
+                    .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                    .setVisibility(NotificationCompat.VISIBILITY_SECRET)
                     .setSmallIcon(R.drawable.notification)
-                    .setContentText("Push service: tap to learn more").build();
-            startForeground(9999,notification);
+                    .setContentTitle("DevGram").build();
+            startForeground(9999, notification);
             } catch (Throwable ignore) {
-                Log.d("DevGram", "Failed to set intent");
+                Log.d("DevGram", "Failed to start foreground");
             }
         }
         ApplicationLoader.postInitApplication();
