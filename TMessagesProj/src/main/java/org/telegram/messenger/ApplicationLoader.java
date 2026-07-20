@@ -424,31 +424,10 @@ public class ApplicationLoader extends Application {
             pendingIntentFlags = PendingIntent.FLAG_MUTABLE;
         }
         if (enabled) {
-            boolean unifiedPushActive = false;
-            try {
-                unifiedPushActive = org.unifiedpush.android.connector.UnifiedPush.getAckDistributor(applicationContext) != null;
-            } catch (Throwable ignore) {
-            }
-            boolean fcmActive = false;
-            try {
-                // DevGram: с FCM watchdog-соединение не нужно (FCM сам будит приложение)
-                fcmActive = PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices();
-            } catch (Throwable ignore) {
-            }
-            if (unifiedPushActive || fcmActive) {
-                Log.d("DevGram", "FCM/UnifiedPush is active, skipping push service watchdog");
-                try {
-                    applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
-                    AlarmManager alarm = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
-                    if (pendingIntent != null) {
-                        alarm.cancel(pendingIntent);
-                    }
-                } catch (Throwable ignore) {
-                }
-                return;
-            }
+            // DevGram: решает тумблер «Keep-Alive Service» (как в оф. Telegram/ExteraGram).
+            // Вкл -> foreground-сервис держит соединение и фоновые загрузки (с уведомлением).
+            // Выкл -> сервиса нет (пуши через FCM/UnifiedPush, фоновая загрузка встаёт).
             Log.d("TFOSS", "Trying to start push service every minute");
-            // Telegram-FOSS: unconditionally enable push service
             AlarmManager am = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
             Intent i = new Intent(applicationContext, NotificationsService.class);
             try {
