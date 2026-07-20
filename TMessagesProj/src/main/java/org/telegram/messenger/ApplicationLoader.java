@@ -359,6 +359,8 @@ public class ApplicationLoader extends Application {
             applicationContext = getApplicationContext();
         }
 
+        DevGramConfig.loadConfig(); // DevGram: гарантируем загрузку конфига с готовым контекстом
+
         NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
 
         try {

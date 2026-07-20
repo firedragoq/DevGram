@@ -21076,6 +21076,48 @@ public class ChatActivity extends BaseFragment implements
         }
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
 
+        // --- DevGram: подмешиваем сохранённые удалёнки, чтобы они не пропадали при перезагрузке чата ---
+        if (DevGramConfig.saveDeletedMessages && mode == MODE_DEFAULT && dialog_id != 0) {
+            try {
+                java.util.List<TLRPC.Message> devgramSaved = DevGramMessagesController.getInstance().getDeletedMessages(currentUserId, dialog_id, 0);
+                if (!devgramSaved.isEmpty()) {
+                    int devMinId = Integer.MAX_VALUE;
+                    boolean devHasWindow = false;
+                    java.util.HashSet<Integer> devPresent = new java.util.HashSet<>();
+                    for (MessageObject mo : messArr) {
+                        int mid = mo.getId();
+                        devPresent.add(mid);
+                        if (mid > 0) {
+                            devHasWindow = true;
+                            if (mid < devMinId) devMinId = mid;
+                        }
+                    }
+                    // порядок messArr (по возрастанию или убыванию id) — вставляем, сохраняя его
+                    boolean devDescending = messArr.size() < 2 || messArr.get(0).getId() >= messArr.get(messArr.size() - 1).getId();
+                    for (TLRPC.Message dm : devgramSaved) {
+                        if (dm == null || dm.id <= 0 || devPresent.contains(dm.id)) continue;
+                        if (messagesDict[0].indexOfKey(dm.id) >= 0) continue;
+                        if (devHasWindow && dm.id < devMinId) continue; // не тащим старые удалёнки в свежую страницу
+                        dm.devgramDeleted = true;
+                        MessageObject dmo = new MessageObject(currentAccount, dm, true, true);
+                        int ins = messArr.size();
+                        for (int i = 0; i < messArr.size(); i++) {
+                            int cur = messArr.get(i).getId();
+                            if (devDescending ? (cur < dm.id) : (cur > dm.id)) {
+                                ins = i;
+                                break;
+                            }
+                        }
+                        messArr.add(ins, dmo);
+                        devPresent.add(dm.id);
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }
+        // --- DevGram end ---
+
         boolean universalNotify = false;
         HashMap<Integer, MessageObject> oldMessages = null;
         if (clearOnLoad && (mode == MODE_DEFAULT || mode == MODE_SUGGESTIONS)) {
@@ -39838,6 +39880,61 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
             undoView.showWithAction(dialog_id, UndoView.ACTION_IMPORT_INFO, null);
+        }
+
+        @Override
+        public void didPressDevGramEditHistory(ChatMessageCell cell, float x, float y) {
+            // DevGram: тап по метке «изменено» → всплывает кнопка «История изменений» → открывает страницу
+            if (cell == null || getParentActivity() == null) {
+                return;
+            }
+            MessageObject msg = cell.getMessageObject();
+            if (msg == null || msg.messageOwner == null) {
+                return;
+            }
+            long selfId = getUserConfig().getClientUserId();
+            if (!DevGramMessagesController.getInstance().hasAnyRevisions(selfId, getDialogId(), msg.getId())) {
+                android.widget.Toast.makeText(getParentActivity(), "История изменений пуста", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            final int msgId = msg.getId();
+            final CharSequence curText = msg.messageOwner.message;
+
+            ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout =
+                    new ActionBarPopupWindow.ActionBarPopupWindowLayout(getParentActivity(), R.drawable.popup_fixed_alert4, themeDelegate, 0);
+            ActionBarMenuSubItem item = new ActionBarMenuSubItem(getParentActivity(), true, true, themeDelegate);
+            item.setTextAndIcon("История изменений", R.drawable.msg_edit);
+            popupLayout.addView(item, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
+
+            ActionBarPopupWindow popupWindow = new ActionBarPopupWindow(popupLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
+            popupWindow.setPauseNotifications(true);
+            popupWindow.setDismissAnimationDuration(220);
+            popupWindow.setOutsideTouchable(true);
+            popupWindow.setClippingEnabled(true);
+            popupWindow.setFocusable(true);
+            popupWindow.setInputMethodMode(ActionBarPopupWindow.INPUT_METHOD_NOT_NEEDED);
+            popupWindow.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
+
+            item.setOnClickListener(v -> {
+                popupWindow.dismiss();
+                presentFragment(new DevGramMessageHistoryActivity(getDialogId(), msgId, curText));
+            });
+
+            popupLayout.measure(
+                    View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST),
+                    View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST));
+
+            int[] loc = new int[2];
+            cell.getLocationInWindow(loc);
+            int px = loc[0] + (int) x - popupLayout.getMeasuredWidth() / 2;
+            int py = loc[1] + (int) y - popupLayout.getMeasuredHeight() - AndroidUtilities.dp(8);
+            if (px < AndroidUtilities.dp(8)) {
+                px = AndroidUtilities.dp(8);
+            }
+            if (px + popupLayout.getMeasuredWidth() > AndroidUtilities.displaySize.x - AndroidUtilities.dp(8)) {
+                px = AndroidUtilities.displaySize.x - AndroidUtilities.dp(8) - popupLayout.getMeasuredWidth();
+            }
+            popupWindow.showAtLocation(getParentActivity().getWindow().getDecorView(), Gravity.LEFT | Gravity.TOP, px, py);
         }
 
         @Override

@@ -15,15 +15,18 @@ public class DevGramConfig {
 
     public static SharedPreferences preferences;
 
+    // ВАЖНО: значения по умолчанию заданы прямо в полях, чтобы поведение было корректным
+    // даже если loadConfig() ещё не отработал (иначе булины были бы false = ghost включён,
+    // сохранение выключено). loadConfig() лишь перезаписывает их из SharedPreferences.
     // true  = вести себя как обычный клиент (отправлять пакеты);
     // false = скрывать активность (режим призрака).
-    public static boolean sendReadPackets;   // статусы прочтения
-    public static boolean sendOnlinePackets; // статус «в сети»
-    public static boolean sendUploadTyping;  // «печатает…» / «загружает…»
+    public static boolean sendReadPackets = true;   // статусы прочтения
+    public static boolean sendOnlinePackets = true; // статус «в сети»
+    public static boolean sendUploadTyping = true;  // «печатает…» / «загружает…»
 
     // --- сохранение истории ---
-    public static boolean saveDeletedMessages; // сохранять удалённые сообщения
-    public static boolean saveMessagesHistory; // сохранять историю правок
+    public static boolean saveDeletedMessages = true; // сохранять удалённые сообщения
+    public static boolean saveMessagesHistory = true; // сохранять историю правок
 
     // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
     private static final Object readSync = new Object();
@@ -38,6 +41,9 @@ public class DevGramConfig {
         synchronized (sync) {
             if (loaded) {
                 return;
+            }
+            if (ApplicationLoader.applicationContext == null) {
+                return; // контекст ещё не готов — попробуем позже, поля пока держат дефолты
             }
             preferences = ApplicationLoader.applicationContext.getSharedPreferences("devgram_ghost", Activity.MODE_PRIVATE);
             sendReadPackets = preferences.getBoolean("sendReadPackets", true);

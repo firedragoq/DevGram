@@ -679,6 +679,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         default void didPressTime(ChatMessageCell cell) {
         }
 
+        // DevGram: тап по метке «изменено» — показать кнопку истории изменений
+        default void didPressDevGramEditHistory(ChatMessageCell cell, float x, float y) {
+        }
+
         default void didPressBotButton(ChatMessageCell cell, TLRPC.KeyboardButton button) {
         }
 
@@ -1332,6 +1336,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private int foreverDrawableColor = 0xFFFFFFFF;
 
     private boolean timePressed;
+    private boolean devgramEditPressed; // DevGram: нажатие на метку «изменено»
 
     private float timeAlpha = 1.0f;
     private float actionAlpha = 1.0f;
@@ -4166,6 +4171,41 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return result;
     }
 
+    // DevGram: тап по метке «изменено» → открыть историю изменений
+    private boolean checkDevGramEditedMotionEvent(MotionEvent event) {
+        if (currentMessageObject == null || currentMessageObject.messageOwner == null) {
+            return false;
+        }
+        if (!DevGramConfig.saveMessagesHistory) {
+            return false;
+        }
+        boolean isEdited = (currentMessageObject.messageOwner.flags & TLRPC.MESSAGE_FLAG_EDITED) != 0;
+        if (!isEdited || currentMessageObject.messageOwner.devgramDeleted) {
+            return false;
+        }
+        int x = (int) getEventX(event);
+        int y = (int) getEventY(event);
+        boolean result = false;
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            if (x >= drawTimeX && x <= drawTimeX + timeWidth && y >= drawTimeY && y <= drawTimeY + dp(20)) {
+                devgramEditPressed = true;
+                result = true;
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_UP) {
+            if (devgramEditPressed) {
+                devgramEditPressed = false;
+                playSoundEffect(SoundEffectConstants.CLICK);
+                if (delegate != null) {
+                    delegate.didPressDevGramEditHistory(this, getEventX(event), getEventY(event));
+                }
+                result = true;
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+            devgramEditPressed = false;
+        }
+        return result;
+    }
+
     private boolean checkRoundSeekbar(MotionEvent event) {
         if (!MediaController.getInstance().isPlayingMessage(currentMessageObject) || !MediaController.getInstance().isMessagePaused()) {
             return false;
@@ -4945,6 +4985,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         if (!result) {
             result = checkPinchToZoom(event);
+        }
+        if (!result) {
+            result = checkDevGramEditedMotionEvent(event);
         }
         if (!result) {
             result = checkDateMotionEvent(event);
