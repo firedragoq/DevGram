@@ -429,8 +429,14 @@ public class ApplicationLoader extends Application {
                 unifiedPushActive = org.unifiedpush.android.connector.UnifiedPush.getAckDistributor(applicationContext) != null;
             } catch (Throwable ignore) {
             }
-            if (unifiedPushActive) {
-                Log.d("DevGram", "UnifiedPush is active, skipping push service watchdog");
+            boolean fcmActive = false;
+            try {
+                // DevGram: с FCM watchdog-соединение не нужно (FCM сам будит приложение)
+                fcmActive = PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices();
+            } catch (Throwable ignore) {
+            }
+            if (unifiedPushActive || fcmActive) {
+                Log.d("DevGram", "FCM/UnifiedPush is active, skipping push service watchdog");
                 try {
                     applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
                     AlarmManager alarm = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
