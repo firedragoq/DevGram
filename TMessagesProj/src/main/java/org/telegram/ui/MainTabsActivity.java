@@ -907,7 +907,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         } else if (id == NotificationCenter.needSetDayNightTheme) {
             clearAllHiddenFragments();
         } else if (id == NotificationCenter.contactsTabVisibleToggled) {
-            // DevGram: остаёмся на текущем табе (его позиция сдвигается при скрытии контактов)
+            // DevGram: остаёмся на текущем табе и сохраняем его состояние/скролл
+            final boolean nowShown = getUserConfig().showContactsTab;
             final BaseFragment cur = getCurrentVisibleFragment();
             final int target;
             if (cur instanceof ProfileActivity) {
@@ -917,8 +918,17 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             } else {
                 target = POSITION_CHATS;
             }
-            checkUi_contactsTabVisible(getUserConfig().showContactsTab, false);
-            rebuildTabs(target);
+            checkUi_contactsTabVisible(nowShown, false);
+            // переставляем существующие фрагменты по новым позициям (не пересоздаём -> скролл сохраняется)
+            if (nowShown) {
+                moveFragment(2, 3); // профиль 2->3
+                moveFragment(1, 2); // звонки/настройки 1->2, позиция 1 (контакты) освобождается
+            } else {
+                destroyFragmentAt(POSITION_CONTACTS); // убрать контакты
+                moveFragment(2, 1); // звонки/настройки 2->1
+                moveFragment(3, 2); // профиль 3->2
+            }
+            rebuildPagerAt(target);
             selectTab(target, false);
         } else if (id == NotificationCenter.callTabsVisibleToggled) {
             final boolean callTabsVisible = getUserConfig().showCallsTab;
