@@ -4,6 +4,11 @@ import static org.telegram.messenger.LocaleController.getString;
 
 import android.os.SystemClock;
 import android.text.TextUtils;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.messaging.FirebaseMessaging;
 import android.util.Base64;
 import android.util.SparseBooleanArray;
 
@@ -1679,7 +1684,7 @@ public class PushListenerController {
 
         @Override
         public int getPushType() {
-            return PUSH_TYPE_FIREBASE;
+            return PUSH_TYPE_SIMPLE;
         }
 
         @Override
@@ -1693,7 +1698,7 @@ public class PushListenerController {
                 if (BuildVars.LOGS_ENABLED) {
                     FileLog.d("FCM Registration not found.");
                 }
-            }/*
+            }
             Utilities.globalQueue.postRunnable(() -> {
                 try {
                     SharedConfig.pushStringGetTimeStart = SystemClock.elapsedRealtime();
@@ -1706,23 +1711,23 @@ public class PushListenerController {
                                         FileLog.d("Failed to get regid");
                                     }
                                     SharedConfig.pushStringStatus = "__FIREBASE_FAILED__";
-                                    PushListenerController.sendRegistrationToServer(getPushType(), null);
+                                    PushListenerController.sendRegistrationToServer(PushListenerController.PUSH_TYPE_SIMPLE, null);
                                     return;
                                 }
                                 String token = task.getResult();
                                 if (!TextUtils.isEmpty(token)) {
-                                    PushListenerController.sendRegistrationToServer(getPushType(), token);
+                                    // DevGram: FCM-токен регистрируем через свой rewrite-шлюз (token_type=SIMPLE)
+                                    PushListenerController.sendRegistrationToServer(PushListenerController.PUSH_TYPE_SIMPLE, DevGramFcmService.GATEWAY + token);
                                 }
                             });
                 } catch (Throwable e) {
                     FileLog.e(e);
                 }
-            });*/
+            });
         }
 
         @Override
         public boolean hasServices() {
-        	return false;/*
             if (hasServices == null) {
                 try {
                     int resultCode = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ApplicationLoader.applicationContext);
@@ -1732,7 +1737,7 @@ public class PushListenerController {
                     hasServices = false;
                 }
             }
-            return hasServices;*/
+            return hasServices;
         }
     }
     public final static class UnifiedPushListenerServiceProvider implements IPushListenerServiceProvider {

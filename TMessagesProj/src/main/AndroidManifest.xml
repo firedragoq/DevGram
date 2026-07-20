@@ -665,6 +665,12 @@
             </intent-filter>
         </service>
 
+        <service android:exported="false" android:name="org.telegram.messenger.DevGramFcmService">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+
         <service
             android:name=".ContactsWidgetService"
             android:permission="android.permission.BIND_REMOTEVIEWS"

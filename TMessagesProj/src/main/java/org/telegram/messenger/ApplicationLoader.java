@@ -93,6 +93,11 @@ public class ApplicationLoader extends Application {
     }
 
     protected PushListenerController.IPushListenerServiceProvider onCreatePushProvider() {
+        // DevGram: есть Google Play Services -> FCM (через свой шлюз), иначе UnifiedPush (ntfy)
+        PushListenerController.IPushListenerServiceProvider fcm = PushListenerController.GooglePushListenerServiceProvider.INSTANCE;
+        if (fcm.hasServices()) {
+            return fcm;
+        }
         return PushListenerController.UnifiedPushListenerServiceProvider.INSTANCE;
     }
 

@@ -10,6 +10,7 @@ buildscript {
         // This is needed since android-connector:2.2.0 is built with Java 17
         classpath 'com.android.tools:r8:8.2.33'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'com.google.gms:google-services:4.4.2'
     }
 }
 repositories {
