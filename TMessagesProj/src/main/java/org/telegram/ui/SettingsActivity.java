@@ -696,6 +696,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(UItem.asShadow(null));
         }
 
+        // DevGram: настройки мода — первым пунктом (как в exteraGram)
+        items.add(SettingCell.Factory.of(250, 0xFF2AABEE, 0xFF229ED9, R.drawable.settings_devgram, "DevGram", "Настройки мода"));
+        items.add(UItem.asShadow(null));
+
         items.add(SettingCell.Factory.of(1, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
         items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
         items.add(SettingCell.Factory.of(3, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
@@ -706,11 +710,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
         items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
 
-        // DevGram: настройки мода (аналог «exteraGram Settings»)
-        items.add(SettingCell.Factory.of(250, 0xFF2AABEE, 0xFF229ED9, R.drawable.settings_devgram, "DevGram", "Настройки мода"));
-
-        items.add(UItem.asShadow(null));
-        items.add(UItem.asSwitch(200, "Показывать «Контакты» в нижнем меню").setChecked(getUserConfig().showContactsTab));
         items.add(UItem.asShadow(null));
 
         if (!getMessagesController().premiumFeaturesBlocked()) {
@@ -783,14 +782,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     private void onClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == 200) {
-            getUserConfig().setShowContactsTab(!getUserConfig().showContactsTab);
-            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
-            if (listView != null && listView.adapter != null) {
-                listView.adapter.update(true);
-            }
-            return;
-        }
         if (item.id == 250) {
             presentSettingFragment(new DevGramSettingsActivity());
             return;

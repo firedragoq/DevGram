@@ -4171,7 +4171,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return result;
     }
 
-    // DevGram: тап по метке «изменено» → открыть историю изменений
+    // DevGram: тап по тексту изменённого сообщения → открыть историю изменений
     private boolean checkDevGramEditedMotionEvent(MotionEvent event) {
         if (currentMessageObject == null || currentMessageObject.messageOwner == null) {
             return false;
@@ -4183,11 +4183,18 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (!isEdited || currentMessageObject.messageOwner.devgramDeleted) {
             return false;
         }
+        if (currentMessageObject.textLayoutBlocks == null || currentMessageObject.textLayoutBlocks.isEmpty()) {
+            return false;
+        }
         int x = (int) getEventX(event);
         int y = (int) getEventY(event);
+        // область текста сообщения (там, где он был изменён), как в checkTextBlockMotionEvent
+        boolean inText = x >= textX && y >= textY
+                && x <= textX + currentMessageObject.textWidth
+                && y <= textY + currentMessageObject.textHeight(transitionParams);
         boolean result = false;
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            if (x >= drawTimeX && x <= drawTimeX + timeWidth && y >= drawTimeY && y <= drawTimeY + dp(20)) {
+            if (inText) {
                 devgramEditPressed = true;
                 result = true;
             }

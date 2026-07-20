@@ -26833,6 +26833,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         boolean updated = false;
+        boolean devgramMarkedDeleted = false; // DevGram: пометили удалёнку (обновить видимые ячейки без скролла)
         LongSparseArray<MessageObject.GroupedMessages> newGroups = null;
         LongSparseArray<Integer> newGroupsSizes = null;
         int size = markAsDeletedMessages.size();
@@ -26863,12 +26864,8 @@ public class ChatActivity extends BaseFragment implements
             if (DevGramConfig.saveDeletedMessages && !DevGramMessagesController.getInstance().isDeletePermitted(getDialogId(), mid)) {
                 if (obj != null && obj.messageOwner != null && !obj.messageOwner.devgramDeleted) {
                     obj.messageOwner.devgramDeleted = true;
-                    if (chatAdapter != null) {
-                        int devgramIdx = messages.indexOf(obj);
-                        if (devgramIdx >= 0) {
-                            chatAdapter.notifyItemChanged(chatAdapter.messagesStartRow + devgramIdx);
-                        }
-                    }
+                    // помечаем через updateVisibleRows (без adapter-notify), чтобы список НЕ скроллился вниз
+                    devgramMarkedDeleted = true;
                 }
                 continue;
             }
@@ -27035,6 +27032,10 @@ public class ChatActivity extends BaseFragment implements
                     updated = true;
                 }
             }
+        }
+        // DevGram: если пометили удалёнку, обновляем видимые ячейки БЕЗ adapter-notify (список не скроллится вниз)
+        if (devgramMarkedDeleted) {
+            updateVisibleRows();
         }
         if (updatedReplies) {
             updateReplyMessageHeader(true);
