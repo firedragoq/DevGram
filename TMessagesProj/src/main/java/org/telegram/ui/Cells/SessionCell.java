@@ -407,7 +407,7 @@ public class SessionCell extends FrameLayout {
                 iconId = R.drawable.device_desktop_other;
                 colorKey = Theme.key_avatar_backgroundCyan;
                 colorKey2 = Theme.key_avatar_background2Cyan;
-            } else if (session.app_name.contains("Forkgram")) {
+            } else if (session.app_name.contains("DevGram")) {
                 iconId = R.drawable.menu_fork;
                 colorKey = Theme.key_avatar_backgroundViolet;
                 colorKey2 = Theme.key_avatar_background2Violet;

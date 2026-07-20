@@ -469,7 +469,7 @@ public class ForkSettingsActivity extends BaseFragment {
             items.add(UItem.asButtonCheck(ID_HIDE_BOTTOM_BUTTON, LocaleController.getString(R.string.HideBottomButton), LocaleController.getString(R.string.HideBottomButtonInfo))
                 .setChecked(pref("hideBottomButton", false)).setMultiline(true));
         }
-        items.add(UItem.asSettingsCell(ID_CUSTOM_TITLE, LocaleController.getString(R.string.EditAdminRank), prefs().getString("forkCustomTitle", "Fork Client")));
+        items.add(UItem.asSettingsCell(ID_CUSTOM_TITLE, LocaleController.getString(R.string.EditAdminRank), prefs().getString("forkCustomTitle", "DevGram")));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(LocaleController.getString(R.string.AvatarShape)));
@@ -825,7 +825,7 @@ public class ForkSettingsActivity extends BaseFragment {
     }
 
     private void showCustomTitleDialog(View view) {
-        final String defaultValue = "Fork Client";
+        final String defaultValue = "DevGram";
         org.telegram.messenger.forkgram.ForkDialogs.CreateFieldAlert(
             getContext(),
             LocaleController.getString(R.string.EditAdminRank),

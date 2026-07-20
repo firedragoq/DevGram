@@ -7,7 +7,7 @@
     <string name="ForkSectionBots">봇 및 브라우저</string>
     <string name="ForkSectionSystem">시스템 및 업데이트</string>
     <string name="WebSocketTransport">WebSocket으로 연결</string>
-    <string name="WebSocketTransportInfo">Telegram 트래픽을 암호화된 WebSocket(WSS) 연결을 통해 전달합니다. 일반 연결이 제한되거나 차단될 때 도움이 될 수 있습니다. 도메인을 비워 두면 자동으로 업데이트되는 공용 릴레이를 사용하고, 안정적인 연결을 위해 직접 도메인을 입력할 수도 있습니다. 연결이 작동하지 않으면 끄세요.</string>
+    <string name="WebSocketTransportInfo">DevGram 트래픽을 암호화된 WebSocket(WSS) 연결을 통해 전달합니다. 일반 연결이 제한되거나 차단될 때 도움이 될 수 있습니다. 도메인을 비워 두면 자동으로 업데이트되는 공용 릴레이를 사용하고, 안정적인 연결을 위해 직접 도메인을 입력할 수도 있습니다. 연결이 작동하지 않으면 끄세요.</string>
     <string name="WebSocketDomain">WebSocket 도메인</string>
     <string name="WebSocketDomainAuto">자동</string>
     <string name="ForkSectionBackup">백업</string>
@@ -57,7 +57,7 @@
     <string name="BotSkipFullscreenInfo">미니 앱이 전체 화면 모드로 전환하지 못하게 합니다.</string>
     <string name="DisableParametersFromBotLinksInfo">봇 링크를 열기 전에 시작 매개변수를 제거합니다.</string>
     <string name="DisableDefaultInAppBrowserInfo">링크를 앱 내 브라우저 대신 시스템 브라우저에서 엽니다.</string>
-    <string name="LockPremiumInfo">Telegram Premium 광고와 구독 버튼을 숨깁니다. 재시작 필요.</string>
+    <string name="LockPremiumInfo">DevGram Premium 광고와 구독 버튼을 숨깁니다. 재시작 필요.</string>
     <string name="DisableTabletModeInfo">태블릿에서 휴대폰 레이아웃을 사용합니다. 앱이 즉시 재시작됩니다.</string>
     <string name="VoiceMessageQuality">음성 메시지 품질</string>
     <string name="UpdateCheckInterval">업데이트 확인 간격</string>
@@ -110,7 +110,7 @@
     <string name="DisableThumbsInDialogList">대화 목록에서 썸네일 비활성화</string>
     <string name="FullRecentStickers">최근 스티커 전체 목록 표시</string>
     <string name="ShowArchivedStickers">보관된 스티커 팩 표시</string>
-    <string name="ShowArchivedStickersInfo">Telegram의 200개 팩 제한으로 보관된 스티커 팩을 스티커 패널에 표시합니다. 팩은 보관된 상태로 유지되며 필요할 때 불러옵니다.</string>
+    <string name="ShowArchivedStickersInfo">DevGram의 200개 팩 제한으로 보관된 스티커 팩을 스티커 패널에 표시합니다. 팩은 보관된 상태로 유지되며 필요할 때 불러옵니다.</string>
     <string name="HideSendAs">"다음으로 보내기" 버튼 숨기기</string>
     <string name="ShowNotificationContent">알림 내용 표시</string>
     <string name="ShowNotificationContentInfo">앱이 잠겨 있을 때. 개인 정보 유출의 원인이 될 수 있습니다.</string>
@@ -159,8 +159,8 @@
     <string name="HideStoriesInArchive">보관함에서 스토리 숨기기</string>
     <string name="ExtractMediaFromPreview">링크 미리보기의 미디어를 첨부 파일로 전송</string>
 
-    <string name="AppName">Fork Client</string>
-    <string name="AppNameBeta">Fork Client</string>
+    <string name="AppName">DevGram</string>
+    <string name="AppNameBeta">DevGram</string>
     <string name="LanguageName">한국어</string>
     <string name="English">영어</string>
     <string name="LanguageNameInEnglish">한국어</string>
@@ -1238,7 +1238,7 @@
     <string name="PermissionNoCameraWithHint">**텔레그램**이 사진 및 동영상을 찍으려면 접근 권한이 필요합니다. 설정 &gt; 권한을 탭하고 **카메라**를 활성화 해주세요.</string>
     <string name="PermissionNoCameraMicVideo">**텔레그램**이 영상 메시지를 보내려면 카메라와 마이크 접근 권한이 필요합니다. 설정 &gt; 권한을 탭하고 **마이크**와 **카메라**를 활성화 해주세요.</string>
     <string name="PermissionNoLocation">회원님의 위치를 친구들과 공유하려면 텔레그램에게 위치 접근 권한이 필요합니다.</string>
-    <string name="PermissionNoLocationStory">Telegram needs access to your location so that you can add the weather widget to your stories.</string>
+    <string name="PermissionNoLocationStory">DevGram needs access to your location so that you can add the weather widget to your stories.</string>
     <string name="PermissionNoLocationFriends">**텔레그램**이 친구들과 위치를 공유하려면 위치 접근 권한이 필요합니다. 설정 &gt; 권한을 탭하고 **위치**를 활성화 해주세요.</string>
     <string name="PermissionNoLocationNavigation">**텔레그램**이 길을 찾으려면 위치 접근 권한이 필요합니다. 설정 &gt; 권한을 탭하고 **위치**를 활성화 해주세요.</string>
     <string name="PermissionNoContactsSharing">**텔레그램**에서 연락처를 친구들에게 공유 하려면 연락처 접근 권한이 필요합니다. 설정 &gt; 권한을 탭하고 **연락처**를 활성화 해주세요.</string>
