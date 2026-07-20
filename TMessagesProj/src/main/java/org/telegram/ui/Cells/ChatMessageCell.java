@@ -112,6 +112,7 @@ import org.telegram.messenger.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
+import org.telegram.messenger.DevGramConfig;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
@@ -18417,6 +18418,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         if (currentMessageObject.messageOwner.video_processing_pending) {
             timeString = formatString(R.string.ScheduledTimeApprox, timeString);
+        }
+        // --- DevGram: пометка удалённого сообщения в строке времени (логика из AyuGram, GPL) ---
+        if (currentMessageObject.messageOwner != null && currentMessageObject.messageOwner.devgramDeleted && !TextUtils.isEmpty(timeString)) {
+            timeString = DevGramConfig.getDeletedMark() + " " + timeString;
         }
         if (signString != null) {
             if (messageObject.messageOwner.via_business_bot_id != 0) {

@@ -93,6 +93,7 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.DevGramMessagesController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
@@ -7815,6 +7816,7 @@ public class AlertsCreator {
                             if (mergeDialogId != 0 && selectedMessage.messageOwner.peer_id != null && selectedMessage.messageOwner.peer_id.chat_id == -mergeDialogId) {
                                 thisDialogId = mergeDialogId;
                             }
+                            DevGramMessagesController.permitDelete(thisDialogId, ids); // DevGram: явное удаление — реально удаляем
                             MessagesController.getInstance(currentAccount).deleteMessages(ids, random_ids, encryptedChat, thisDialogId, topicId, true, mode);
                         } else {
                             for (int a = 1; a >= 0; a--) {
@@ -7832,6 +7834,7 @@ public class AlertsCreator {
                                         }
                                     }
                                 }
+                                DevGramMessagesController.permitDelete((a == 1 && mergeDialogId != 0) ? mergeDialogId : thisDialogId, ids); // DevGram: явное удаление
                                 MessagesController.getInstance(currentAccount).deleteMessages(ids, random_ids, encryptedChat, (a == 1 && mergeDialogId != 0) ? mergeDialogId : thisDialogId, topicId, true, mode);
                                 selectedMessages[a].clear();
                             }
@@ -8148,6 +8151,7 @@ public class AlertsCreator {
                     thisDialogId = mergeDialogId;
                 }
                 if (!ids.isEmpty()) {
+                    DevGramMessagesController.permitDelete(thisDialogId, ids); // DevGram: явное удаление — реально удаляем
                     MessagesController.getInstance(currentAccount).deleteMessages(ids, random_ids, encryptedChat, thisDialogId, topicId, deleteForAll[0], mode);
                 }
                 for (MessageObject msg: ephemeralMessages) {
@@ -8169,6 +8173,7 @@ public class AlertsCreator {
                             }
                         }
                     }
+                    DevGramMessagesController.permitDelete((a == 1 && mergeDialogId != 0) ? mergeDialogId : thisDialogId, ids); // DevGram: явное удаление
                     MessagesController.getInstance(currentAccount).deleteMessages(ids, random_ids, encryptedChat, (a == 1 && mergeDialogId != 0) ? mergeDialogId : thisDialogId, topicId, deleteForAll[0], mode);
                     selectedMessages[a].clear();
                 }

@@ -58185,6 +58185,7 @@ public class TLRPC {
         public Message replyMessage; //custom
         public int reqId; //custom
         public int realId; //custom
+        public boolean devgramDeleted; //custom — DevGram: сообщение удалено, но оставлено в чате
         public int stickerVerified = 1; //custom
         public boolean isThreadMessage; //custom
         public String voiceTranscription; //custom

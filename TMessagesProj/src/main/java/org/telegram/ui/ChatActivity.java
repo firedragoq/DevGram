@@ -152,6 +152,8 @@ import org.telegram.messenger.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
+import org.telegram.messenger.DevGramConfig;
+import org.telegram.messenger.DevGramMessagesController;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.EmojiData;
@@ -1253,6 +1255,8 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_SUGGESTION_ADD_OFFER = 114;
 
     public final static int OPTION_VIEW_STATISTICS = 115;
+
+    public final static int OPTION_DEVGRAM_HISTORY = 990; // DevGram: история изменений сообщения
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -26813,6 +26817,21 @@ public class ChatActivity extends BaseFragment implements
         for (int a = 0; a < size; a++) {
             Integer mid = markAsDeletedMessages.get(a);
             MessageObject obj = chatAdapter != null && chatAdapter.isFiltered ? filteredMessagesDict.get(mid) :  messagesDict[loadIndex].get(mid);
+            // --- DevGram: чужие удаления не убираем из чата, а помечаем «удалено» (логика из AyuGram, GPL) ---
+            if (DevGramConfig.saveDeletedMessages && !DevGramMessagesController.getInstance().isDeletePermitted(getDialogId(), mid)) {
+                if (obj != null && obj.messageOwner != null && !obj.messageOwner.devgramDeleted) {
+                    obj.messageOwner.devgramDeleted = true;
+                    if (chatAdapter != null) {
+                        int devgramIdx = messages.indexOf(obj);
+                        if (devgramIdx >= 0) {
+                            chatAdapter.notifyItemChanged(chatAdapter.messagesStartRow + devgramIdx);
+                        }
+                    }
+                }
+                continue;
+            }
+            DevGramMessagesController.getInstance().consumeDeletePermit(getDialogId(), mid);
+            // --- DevGram end ---
             if (selectedObject != null && obj == selectedObject || obj != null && selectedObjectGroup != null && selectedObjectGroup == groupedMessagesMap.get(obj.getGroupId())) {
                 closeMenu();
             }
@@ -33776,6 +33795,16 @@ public class ChatActivity extends BaseFragment implements
         }
         boolean preserveDim = false;
         switch (option) {
+            case OPTION_DEVGRAM_HISTORY: {
+                // DevGram: открыть историю изменений сообщения
+                MessageObject obj = selectedObject;
+                closeMenu();
+                if (obj != null) {
+                    presentFragment(new DevGramMessageHistoryActivity(getDialogId(), obj.getId(),
+                            obj.messageOwner != null ? obj.messageOwner.message : null));
+                }
+                break;
+            }
             case OPTION_RETRY: {
                 final MessageObject object = selectedObject;
                 final MessageObject.GroupedMessages group = selectedObjectGroup;
@@ -46477,6 +46506,13 @@ public class ChatActivity extends BaseFragment implements
                     items.add(LocaleController.getString(R.string.Copy));
                     options.add(OPTION_COPY);
                     icons.add(R.drawable.msg_copy);
+                }
+                // --- DevGram: история изменений сообщения (если есть сохранённые ревизии) ---
+                if (selectedObject != null && selectedObject.messageOwner != null
+                        && DevGramMessagesController.getInstance().hasAnyRevisions(getUserConfig().getClientUserId(), getDialogId(), selectedObject.getId())) {
+                    items.add("История изменений");
+                    options.add(OPTION_DEVGRAM_HISTORY);
+                    icons.add(R.drawable.msg_edit);
                 }
                 if (!isThreadChat() && chatMode != MODE_SCHEDULED && currentChat != null && primaryMessage != null && (currentChat.has_link || primaryMessage.hasReplies()) && currentChat.megagroup && primaryMessage.canViewThread()) {
                     if (primaryMessage.hasReplies()) {

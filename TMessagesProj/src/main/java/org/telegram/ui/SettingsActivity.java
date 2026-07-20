@@ -706,6 +706,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
         items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
 
+        // DevGram: настройки мода (аналог «exteraGram Settings»)
+        items.add(SettingCell.Factory.of(250, 0xFF2AABEE, 0xFF229ED9, R.drawable.settings_devgram, "DevGram", "Настройки мода"));
+
         items.add(UItem.asShadow(null));
         items.add(UItem.asSwitch(200, "Показывать «Контакты» в нижнем меню").setChecked(getUserConfig().showContactsTab));
         items.add(UItem.asShadow(null));
@@ -786,6 +789,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             if (listView != null && listView.adapter != null) {
                 listView.adapter.update(true);
             }
+            return;
+        }
+        if (item.id == 250) {
+            presentSettingFragment(new DevGramSettingsActivity());
             return;
         }
         if (item.object instanceof TLRPC.TL_attachMenuBot) {

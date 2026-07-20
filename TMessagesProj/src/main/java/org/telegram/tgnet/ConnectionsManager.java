@@ -23,6 +23,8 @@ import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BaseController;
+import org.telegram.messenger.DevGramConfig;
+import org.telegram.tgnet.tl.TL_account;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.CaptchaController;
 import org.telegram.messenger.EmuDetector;
@@ -387,6 +389,45 @@ public class ConnectionsManager extends BaseController {
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("send request " + object + " with token = " + requestToken);
         }
+
+        // --- DevGram: перехват «режима призрака» (логика портирована из AyuGram, GPL) ---
+        {
+            // не отправлять «печатает…» / «загружает…»
+            if (!DevGramConfig.sendUploadTyping &&
+                    (object instanceof TLRPC.TL_messages_setTyping || object instanceof TLRPC.TL_messages_setEncryptedTyping)) {
+                return;
+            }
+
+            // не показывать «в сети» — принудительно ставим offline
+            if (!DevGramConfig.sendOnlinePackets && object instanceof TL_account.updateStatus) {
+                ((TL_account.updateStatus) object).offline = true;
+            }
+
+            // не отправлять статусы прочтения — подделываем успешный ответ, ничего не шлём
+            if (!DevGramConfig.sendReadPackets && (
+                    object instanceof TLRPC.TL_messages_readHistory ||
+                    object instanceof TLRPC.TL_messages_readEncryptedHistory ||
+                    object instanceof TLRPC.TL_messages_readDiscussion ||
+                    object instanceof TLRPC.TL_messages_readMessageContents ||
+                    object instanceof TLRPC.TL_channels_readHistory ||
+                    object instanceof TLRPC.TL_channels_readMessageContents)) {
+                if (!DevGramConfig.getAllowReadPacket()) {
+                    TLRPC.TL_messages_affectedMessages fakeRes = new TLRPC.TL_messages_affectedMessages();
+                    fakeRes.pts = -1;
+                    fakeRes.pts_count = 0;
+                    try {
+                        if (onComplete != null) {
+                            onComplete.run(fakeRes, null);
+                        }
+                    } catch (Exception e) {
+                        FileLog.e(e);
+                    }
+                    return;
+                }
+            }
+        }
+        // --- DevGram end ---
+
         try {
             NativeByteBuffer buffer = new NativeByteBuffer(object.getObjectSize());
             object.serializeToStream(buffer);

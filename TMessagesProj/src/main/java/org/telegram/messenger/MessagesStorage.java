@@ -14150,6 +14150,37 @@ public class MessagesStorage extends BaseController {
                 ArrayList<TopicsController.TopicUpdate> topicUpdatesInUi = null;
                 ArrayList<TLRPC.Message> deletedMessages = currentUser == dialogId || dialogId == 0 ? new ArrayList<>() : null;
 
+                // --- DevGram: сохраняем удаляемые сообщения ДО физического удаления (логика из AyuGram, GPL) ---
+                if (DevGramConfig.saveDeletedMessages && !messages.isEmpty()) {
+                    SQLiteCursor capCursor = null;
+                    try {
+                        String capQuery = dialogId != 0
+                                ? String.format(Locale.US, "SELECT data, mid, uid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", ids, dialogId)
+                                : String.format(Locale.US, "SELECT data, mid, uid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0", ids);
+                        capCursor = database.queryFinalized(capQuery);
+                        int catchTime = (int) (System.currentTimeMillis() / 1000);
+                        while (capCursor.next()) {
+                            NativeByteBuffer capData = capCursor.byteBufferValue(0);
+                            int capMid = capCursor.intValue(1);
+                            long capDid = capCursor.longValue(2);
+                            if (capData != null) {
+                                TLRPC.Message capMsg = TLRPC.Message.TLdeserialize(capData, capData.readInt32(false), false);
+                                if (capMsg != null) {
+                                    DevGramMessagesController.getInstance().onMessageDeleted(currentAccount, capMsg, capDid, 0, capMid, catchTime);
+                                }
+                                capData.reuse();
+                            }
+                        }
+                    } catch (Exception e) {
+                        FileLog.e(e);
+                    } finally {
+                        if (capCursor != null) {
+                            capCursor.dispose();
+                        }
+                    }
+                }
+                // --- DevGram end ---
+
                 if (dialogId != 0) {
                     cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, data, read_state, out, mention, mid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", ids, dialogId));
                 } else {
@@ -15814,6 +15845,12 @@ public class MessagesStorage extends BaseController {
                                     } else if (MessageObject.getDocument(oldMessage) != null && MessageObject.getDocument(message) != null) {
                                         sameMedia = MessageObject.getDocument(oldMessage).id == MessageObject.getDocument(message).id;
                                     }
+                                    // --- DevGram: сохраняем предыдущую версию сообщения при правке (логика из AyuGram, GPL) ---
+                                    if (DevGramConfig.saveMessagesHistory && message.from_id != null
+                                            && (!TextUtils.equals(oldMessage.message, message.message) || !sameMedia)) {
+                                        DevGramMessagesController.getInstance().onMessageEdited(currentAccount, oldMessage, MessageObject.getDialogId(message), 0, message.id);
+                                    }
+                                    // --- DevGram end ---
                                     if (oldMessage.out && !message.out) {
                                         message.out = oldMessage.out;
                                     }
