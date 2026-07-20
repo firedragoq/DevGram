@@ -907,8 +907,19 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         } else if (id == NotificationCenter.needSetDayNightTheme) {
             clearAllHiddenFragments();
         } else if (id == NotificationCenter.contactsTabVisibleToggled) {
+            // DevGram: остаёмся на текущем табе (его позиция сдвигается при скрытии контактов)
+            final BaseFragment cur = getCurrentVisibleFragment();
+            final int target;
+            if (cur instanceof ProfileActivity) {
+                target = posProfile();
+            } else if (cur instanceof CallLogActivity || cur instanceof SettingsActivity) {
+                target = posCallsOrSettings();
+            } else {
+                target = POSITION_CHATS;
+            }
             checkUi_contactsTabVisible(getUserConfig().showContactsTab, false);
-            rebuildTabs();
+            rebuildTabs(target);
+            selectTab(target, false);
         } else if (id == NotificationCenter.callTabsVisibleToggled) {
             final boolean callTabsVisible = getUserConfig().showCallsTab;
             checkUi_callTabVisible(callTabsVisible, true);

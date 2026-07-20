@@ -213,7 +213,7 @@ public abstract class ViewPagerActivity extends BaseFragment {
 
     // DevGram: пересобрать пейджер при изменении числа/состава страниц (напр. скрытие таба).
     // Уничтожаем кэш фрагментов (позиции меняются) и пересоздаём страницы с текущим getFragmentsCount().
-    public void rebuildTabs() {
+    public void rebuildTabs(int newPosition) {
         for (int a = 0, N = fragmentsArr.size(); a < N; a++) {
             final FragmentState state = fragmentsArr.valueAt(a);
             if (state != null && state.onCreateCalled) {
@@ -223,7 +223,13 @@ public abstract class ViewPagerActivity extends BaseFragment {
         }
         fragmentsArr.clear();
         if (viewPager != null) {
-            viewPager.setPosition(getStartPosition());
+            if (newPosition < 0) {
+                newPosition = getStartPosition();
+            }
+            if (newPosition > getFragmentsCount() - 1) {
+                newPosition = getFragmentsCount() - 1;
+            }
+            viewPager.setPosition(newPosition);
             viewPager.rebuild(false);
         }
     }
