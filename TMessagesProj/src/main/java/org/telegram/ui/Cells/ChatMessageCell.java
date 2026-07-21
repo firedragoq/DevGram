@@ -1337,6 +1337,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     private boolean timePressed;
     private boolean devgramEditPressed; // DevGram: нажатие на метку «изменено»
+    private boolean devgramDeletedDrawn; // DevGram: какое состояние «удалено» уже отрисовано
 
     private float timeAlpha = 1.0f;
     private float actionAlpha = 1.0f;
@@ -6875,6 +6876,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             messageChanged = true;
         }
         if (messageObject.updateSideMenuEnabled(isSideMenuEnabled)) {
+            messageChanged = true;
+        }
+        // DevGram: метка «удалено» должна появляться сразу, без перезахода в чат.
+        // Ячейка пересобирает содержимое только при "изменении" сообщения, а смена
+        // одного нашего флага туда не входит — форсим пересборку сами.
+        boolean devgramDeletedNow = messageObject.messageOwner != null && messageObject.messageOwner.devgramDeleted;
+        if (devgramDeletedNow != devgramDeletedDrawn) {
+            devgramDeletedDrawn = devgramDeletedNow;
             messageChanged = true;
         }
         if (messageChanged || dataChanged || groupChanged || pollChanged || widthChanged && messageObject.isPoll() || isPhotoDataChanged(messageObject) || pinnedBottom != bottomNear || pinnedTop != topNear) {
