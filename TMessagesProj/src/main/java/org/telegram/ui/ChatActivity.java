@@ -21101,18 +21101,7 @@ public class ChatActivity extends BaseFragment implements
                     break;
                 }
             }
-            if (devAnchor != null) {
-                final MessageObject fDevAnchor = devAnchor;
-                final int fDevTop = devAnchorTop;
-                AndroidUtilities.runOnUIThread(() -> {
-                    if (chatLayoutManager != null && chatAdapter != null) {
-                        int idx = messages.indexOf(fDevAnchor);
-                        if (idx >= 0) {
-                            chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + idx, fDevTop);
-                        }
-                    }
-                });
-            }
+            devgramRestoreScroll(devAnchor, devAnchorTop);
         }
 
         // --- DevGram: подмешиваем сохранённые удалёнки, чтобы они не пропадали при перезагрузке чата ---
@@ -26849,6 +26838,30 @@ public class ChatActivity extends BaseFragment implements
     private void processDeletedMessages(ArrayList<Integer> markAsDeletedMessages, long channelId, boolean sent) {
         processDeletedMessages(markAsDeletedMessages, channelId, sent, true);
     }
+    // DevGram: вернуть скролл к сообщению-якорю (ищем по id, т.к. после перезагрузки
+    // создаются новые MessageObject и сравнение по ссылке не работает). Две попытки —
+    // сразу и с задержкой, чтобы перебить поздний авто-скролл вниз.
+    private void devgramRestoreScroll(MessageObject anchor, int top) {
+        if (anchor == null) {
+            return;
+        }
+        final int anchorId = anchor.getId();
+        final Runnable r = () -> {
+            if (chatLayoutManager == null || chatAdapter == null || messages == null) {
+                return;
+            }
+            for (int i = 0; i < messages.size(); i++) {
+                MessageObject mo = messages.get(i);
+                if (mo != null && mo.getId() == anchorId) {
+                    chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + i, top);
+                    return;
+                }
+            }
+        };
+        AndroidUtilities.runOnUIThread(r);
+        AndroidUtilities.runOnUIThread(r, 250);
+    }
+
     private void processDeletedMessages(ArrayList<Integer> markAsDeletedMessages, long channelId, boolean sent, boolean thanos) {
         ArrayList<Integer> removedIndexes = new ArrayList<>();
         ArrayList<Integer> thanosMessagesIndexes = new ArrayList<>();
@@ -26920,10 +26933,10 @@ public class ChatActivity extends BaseFragment implements
             if (DevGramConfig.saveDeletedMessages && !DevGramMessagesController.getInstance().isDeletePermitted(getDialogId(), mid)) {
                 if (obj != null && obj.messageOwner != null && !obj.messageOwner.devgramDeleted) {
                     obj.messageOwner.devgramDeleted = true;
-                    // помечаем через updateVisibleRows (без adapter-notify), чтобы список НЕ скроллился вниз
-                    devgramMarkedDeleted = true;
                 }
-                devgramLastKeptDeletion = System.currentTimeMillis(); // держим позицию скролла при перезагрузке
+                // помечаем через updateVisibleRows (без adapter-notify) и держим позицию скролла
+                devgramMarkedDeleted = true;
+                devgramLastKeptDeletion = System.currentTimeMillis();
                 continue;
             }
             DevGramMessagesController.getInstance().consumeDeletePermit(getDialogId(), mid);
@@ -27235,17 +27248,8 @@ public class ChatActivity extends BaseFragment implements
         }
 
         // DevGram: удержали удалёнку — возвращаем скролл на прежнее место (не улетаем вниз)
-        if (devgramMarkedDeleted && devgramAnchor != null) {
-            final MessageObject fDevAnchor = devgramAnchor;
-            final int fDevTop = devgramAnchorTop;
-            AndroidUtilities.runOnUIThread(() -> {
-                if (chatLayoutManager != null && chatAdapter != null) {
-                    int idx = messages.indexOf(fDevAnchor);
-                    if (idx >= 0) {
-                        chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + idx, fDevTop);
-                    }
-                }
-            });
+        if (devgramMarkedDeleted) {
+            devgramRestoreScroll(devgramAnchor, devgramAnchorTop);
         }
     }
 
@@ -46676,15 +46680,6 @@ public class ChatActivity extends BaseFragment implements
                     options.add(OPTION_COPY);
                     icons.add(R.drawable.msg_copy);
                 }
-                // --- DevGram: история изменений — показываем для любого изменённого сообщения ---
-                if (selectedObject != null && selectedObject.messageOwner != null && DevGramConfig.saveMessagesHistory
-                        && ((selectedObject.messageOwner.flags & TLRPC.MESSAGE_FLAG_EDITED) != 0
-                            || selectedObject.messageOwner.edit_date != 0
-                            || DevGramMessagesController.getInstance().hasAnyRevisions(getUserConfig().getClientUserId(), getDialogId(), selectedObject.getId()))) {
-                    items.add("История изменений");
-                    options.add(OPTION_DEVGRAM_HISTORY);
-                    icons.add(R.drawable.msg_edit);
-                }
                 if (!isThreadChat() && chatMode != MODE_SCHEDULED && currentChat != null && primaryMessage != null && (currentChat.has_link || primaryMessage.hasReplies()) && currentChat.megagroup && primaryMessage.canViewThread()) {
                     if (primaryMessage.hasReplies()) {
                         items.add(LocaleController.formatPluralString("ViewReplies", primaryMessage.getRepliesCount()));
@@ -46764,6 +46759,18 @@ public class ChatActivity extends BaseFragment implements
                 options.add(OPTION_DELETE);
                 icons.add(deleteIconRes);
             }
+        }
+
+        // --- DevGram: «История изменений» — в самом конце метода, чтобы пункт попадал в меню
+        // при ЛЮБОЙ ветке (обычные чаты, секретные, каналы), для любого изменённого сообщения ---
+        if (message != null && message.messageOwner != null && DevGramConfig.saveMessagesHistory
+                && !options.contains(OPTION_DEVGRAM_HISTORY)
+                && ((message.messageOwner.flags & TLRPC.MESSAGE_FLAG_EDITED) != 0
+                    || message.messageOwner.edit_date != 0
+                    || DevGramMessagesController.getInstance().hasAnyRevisions(getUserConfig().getClientUserId(), getDialogId(), message.getId()))) {
+            items.add("История изменений");
+            options.add(OPTION_DEVGRAM_HISTORY);
+            icons.add(R.drawable.msg_edit);
         }
     }
 
