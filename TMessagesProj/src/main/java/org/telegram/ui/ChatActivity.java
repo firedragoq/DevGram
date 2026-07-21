@@ -7056,6 +7056,15 @@ public class ChatActivity extends BaseFragment implements
 
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                // DevGram DIAG: непрерывно пишем изменения позиции — так видно ТОЧНЫЙ момент прыжка
+                try {
+                    int p = chatLayoutManager.findFirstVisibleItemPosition();
+                    if (p != devgramLastLoggedPos) {
+                        devgramLastLoggedPos = p;
+                        devgramDiag("scroll first=" + p + " dy=" + dy + (devgramDragging ? " (палец)" : ""));
+                    }
+                } catch (Throwable ignore) {
+                }
                 final ChatActivity chatToUpdate = parentChatActivity != null ? parentChatActivity : ChatActivity.this;
 
                 chatListView.invalidate();
@@ -21101,46 +21110,25 @@ public class ChatActivity extends BaseFragment implements
 
 
         // DevGram DIAG: перезагружается ли чат сразу после удаления (тогда прыжок — от перезагрузки)
-        final boolean devgramJustDeleted = System.currentTimeMillis() - devgramLastKeptDeletion < 5000;
-        if (devgramJustDeleted) {
-            devgramDiag("messagesDidLoad (перезагрузка) isCache=" + isCache + " mode=" + mode + " " + devgramPos());
-        }
-
-        // --- DevGram: подмешиваем сохранённые удалёнки, чтобы они не пропадали при перезагрузке чата ---
-        // Сразу после удаления НЕ подмешиваем: добавление сообщений в загрузку двигает список вниз.
-        if (DevGramConfig.saveDeletedMessages && mode == MODE_DEFAULT && dialog_id != 0 && !devgramJustDeleted) {
+        // --- DevGram: помечаем удалёнки среди загруженных сообщений ---
+        // Сами сообщения мы больше НЕ удаляем из локальной базы (иначе превью диалога
+        // в списке чатов откатывается на предыдущее), поэтому они грузятся обычным путём —
+        // остаётся только проставить им пометку «удалено».
+        if (DevGramConfig.saveDeletedMessages && mode == MODE_DEFAULT && dialog_id != 0 && !messArr.isEmpty()) {
             try {
-                java.util.List<TLRPC.Message> devgramSaved = DevGramMessagesController.getInstance().getDeletedMessages(currentUserId, dialog_id, 0);
+                java.util.List<TLRPC.Message> devgramSaved =
+                        DevGramMessagesController.getInstance().getDeletedMessages(currentUserId, dialog_id, 0);
                 if (!devgramSaved.isEmpty()) {
-                    int devMinId = Integer.MAX_VALUE;
-                    boolean devHasWindow = false;
-                    java.util.HashSet<Integer> devPresent = new java.util.HashSet<>();
-                    for (MessageObject mo : messArr) {
-                        int mid = mo.getId();
-                        devPresent.add(mid);
-                        if (mid > 0) {
-                            devHasWindow = true;
-                            if (mid < devMinId) devMinId = mid;
+                    java.util.HashSet<Integer> devDeletedIds = new java.util.HashSet<>();
+                    for (TLRPC.Message dm : devgramSaved) {
+                        if (dm != null) {
+                            devDeletedIds.add(dm.id);
                         }
                     }
-                    // порядок messArr (по возрастанию или убыванию id) — вставляем, сохраняя его
-                    boolean devDescending = messArr.size() < 2 || messArr.get(0).getId() >= messArr.get(messArr.size() - 1).getId();
-                    for (TLRPC.Message dm : devgramSaved) {
-                        if (dm == null || dm.id <= 0 || devPresent.contains(dm.id)) continue;
-                        if (messagesDict[0].indexOfKey(dm.id) >= 0) continue;
-                        if (devHasWindow && dm.id < devMinId) continue; // не тащим старые удалёнки в свежую страницу
-                        dm.devgramDeleted = true;
-                        MessageObject dmo = new MessageObject(currentAccount, dm, true, true);
-                        int ins = messArr.size();
-                        for (int i = 0; i < messArr.size(); i++) {
-                            int cur = messArr.get(i).getId();
-                            if (devDescending ? (cur < dm.id) : (cur > dm.id)) {
-                                ins = i;
-                                break;
-                            }
+                    for (MessageObject mo : messArr) {
+                        if (mo != null && mo.messageOwner != null && devDeletedIds.contains(mo.getId())) {
+                            mo.messageOwner.devgramDeleted = true;
                         }
-                        messArr.add(ins, dmo);
-                        devPresent.add(dm.id);
                     }
                 }
             } catch (Throwable e) {
@@ -26858,6 +26846,7 @@ public class ChatActivity extends BaseFragment implements
     private int devgramUserFirst = -1;   // позиция, на которой пользователь остановил прокрутку пальцем
     private long devgramUserPosTime;
     private boolean devgramDragging;
+    private int devgramLastLoggedPos = -999;
 
     // Лог живёт в статике — переживает выход из чата и переключение аккаунтов,
     // поэтому его можно скопировать позже кнопкой в настройках мода.
@@ -26866,15 +26855,24 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private void devgramDiagStart() {
-        devgramLog.setLength(0);
-        devgramLogT0 = System.currentTimeMillis();
+        if (devgramLogT0 == 0) {
+            devgramLogT0 = System.currentTimeMillis();
+        }
+        devgramDiag("---- УДАЛЕНИЕ ----");
     }
 
+    // Кольцевой лог: не стирается, старое вытесняется. Так видно всю историю до удаления.
     private void devgramDiag(String s) {
-        if (devgramLog.length() > 4000) {
-            return;
+        if (devgramLogT0 == 0) {
+            devgramLogT0 = System.currentTimeMillis();
         }
         devgramLog.append(System.currentTimeMillis() - devgramLogT0).append("ms ").append(s).append('\n');
+        if (devgramLog.length() > 6000) {
+            int cut = devgramLog.indexOf("\n", devgramLog.length() - 5000);
+            if (cut > 0) {
+                devgramLog.delete(0, cut + 1);
+            }
+        }
     }
 
     private String devgramPos() {

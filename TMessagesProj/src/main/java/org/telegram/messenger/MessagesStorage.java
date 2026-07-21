@@ -14070,6 +14070,42 @@ public class MessagesStorage extends BaseController {
         AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.quickRepliesUpdated));
     }
 
+    // DevGram: сохранить удаляемые сообщения в свою БД («История удалёнок»).
+    // Сами строки в messages_v2 при этом НЕ трогаем — они остаются, чтобы превью
+    // диалога в списке чатов не откатывалось на предыдущее сообщение.
+    private void devgramSaveDeleted(long dialogId, ArrayList<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        SQLiteCursor cur = null;
+        try {
+            String idsStr = TextUtils.join(",", ids);
+            String q = dialogId != 0
+                    ? String.format(Locale.US, "SELECT data, mid, uid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", idsStr, dialogId)
+                    : String.format(Locale.US, "SELECT data, mid, uid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0", idsStr);
+            cur = database.queryFinalized(q);
+            int catchTime = (int) (System.currentTimeMillis() / 1000);
+            while (cur.next()) {
+                NativeByteBuffer data = cur.byteBufferValue(0);
+                int mid = cur.intValue(1);
+                long did = cur.longValue(2);
+                if (data != null) {
+                    TLRPC.Message msg = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false);
+                    if (msg != null) {
+                        DevGramMessagesController.getInstance().onMessageDeleted(currentAccount, msg, did, 0, mid, catchTime);
+                    }
+                    data.reuse();
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        } finally {
+            if (cur != null) {
+                cur.dispose();
+            }
+        }
+    }
+
     private ArrayList<Long> markMessagesAsDeletedInternal(long dialogId, ArrayList<Integer> messages, boolean deleteFiles, int mode, int threadMessageId) {
         SQLiteCursor cursor = null;
         SQLitePreparedStatement state = null;
@@ -14150,36 +14186,6 @@ public class MessagesStorage extends BaseController {
                 ArrayList<TopicsController.TopicUpdate> topicUpdatesInUi = null;
                 ArrayList<TLRPC.Message> deletedMessages = currentUser == dialogId || dialogId == 0 ? new ArrayList<>() : null;
 
-                // --- DevGram: сохраняем удаляемые сообщения ДО физического удаления (логика из AyuGram, GPL) ---
-                if (DevGramConfig.saveDeletedMessages && !messages.isEmpty()) {
-                    SQLiteCursor capCursor = null;
-                    try {
-                        String capQuery = dialogId != 0
-                                ? String.format(Locale.US, "SELECT data, mid, uid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", ids, dialogId)
-                                : String.format(Locale.US, "SELECT data, mid, uid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0", ids);
-                        capCursor = database.queryFinalized(capQuery);
-                        int catchTime = (int) (System.currentTimeMillis() / 1000);
-                        while (capCursor.next()) {
-                            NativeByteBuffer capData = capCursor.byteBufferValue(0);
-                            int capMid = capCursor.intValue(1);
-                            long capDid = capCursor.longValue(2);
-                            if (capData != null) {
-                                TLRPC.Message capMsg = TLRPC.Message.TLdeserialize(capData, capData.readInt32(false), false);
-                                if (capMsg != null) {
-                                    DevGramMessagesController.getInstance().onMessageDeleted(currentAccount, capMsg, capDid, 0, capMid, catchTime);
-                                }
-                                capData.reuse();
-                            }
-                        }
-                    } catch (Exception e) {
-                        FileLog.e(e);
-                    } finally {
-                        if (capCursor != null) {
-                            capCursor.dispose();
-                        }
-                    }
-                }
-                // --- DevGram end ---
 
                 if (dialogId != 0) {
                     cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, data, read_state, out, mention, mid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", ids, dialogId));
@@ -14897,10 +14903,36 @@ public class MessagesStorage extends BaseController {
         if (messages.isEmpty()) {
             return null;
         }
+        // --- DevGram: удержанные удалёнки НЕ удаляем из локальной базы ---
+        // Если удалить строку, диалог пересчитает last_mid на предыдущее сообщение: в списке
+        // чатов сменится превью и дата, и чат уедет вниз. Поэтому сохраняем такие сообщения
+        // в свою БД и исключаем их из списка на удаление. Исходный список не трогаем —
+        // по нему UI ставит пометку «удалено».
+        ArrayList<Integer> toDelete = messages;
+        if (DevGramConfig.saveDeletedMessages && mode == 0) {
+            ArrayList<Integer> keep = new ArrayList<>();
+            for (int i = 0; i < messages.size(); i++) {
+                Integer mid = messages.get(i);
+                if (mid != null && !DevGramMessagesController.getInstance().isDeletePermitted(dialogId, mid)) {
+                    keep.add(mid);
+                }
+            }
+            if (!keep.isEmpty()) {
+                final long keepDialogId = dialogId;
+                storageQueue.postRunnable(() -> devgramSaveDeleted(keepDialogId, keep));
+                ArrayList<Integer> rest = new ArrayList<>(messages);
+                rest.removeAll(keep);
+                if (rest.isEmpty()) {
+                    return null; // удалять нечего — всё удержано
+                }
+                toDelete = rest;
+            }
+        }
+        final ArrayList<Integer> finalToDelete = toDelete;
         if (useQueue) {
-            storageQueue.postRunnable(() -> markMessagesAsDeletedInternal(dialogId, messages, deleteFiles, mode, topicId));
+            storageQueue.postRunnable(() -> markMessagesAsDeletedInternal(dialogId, finalToDelete, deleteFiles, mode, topicId));
         } else {
-            return markMessagesAsDeletedInternal(dialogId, messages, deleteFiles, mode, topicId);
+            return markMessagesAsDeletedInternal(dialogId, finalToDelete, deleteFiles, mode, topicId);
         }
         return null;
     }
