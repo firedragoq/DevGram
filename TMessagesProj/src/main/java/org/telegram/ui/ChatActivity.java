@@ -21085,10 +21085,6 @@ public class ChatActivity extends BaseFragment implements
         }
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
 
-        // --- DevGram: если недавно было удаление — держим позицию скролла и после перезагрузки ---
-        if (System.currentTimeMillis() - devgramLastKeptDeletion < 5000 && !messages.isEmpty()) {
-            devgramRestoreScroll(devgramCollectAnchors());
-        }
 
         // --- DevGram: подмешиваем сохранённые удалёнки, чтобы они не пропадали при перезагрузке чата ---
         if (DevGramConfig.saveDeletedMessages && mode == MODE_DEFAULT && dialog_id != 0) {
@@ -22883,12 +22879,7 @@ public class ChatActivity extends BaseFragment implements
                 scheduleNowDialog.dismiss();
                 scheduleNowDialog = null;
             }
-            // DevGram: якоря снимаем ДО processDeletedMessages — внутри него есть ранние return
-            // (по channelId/loadIndex), из-за которых наш код мог не выполняться вовсе.
-            final ArrayList<int[]> devgramDelAnchors = devgramCollectAnchors();
-            devgramLastKeptDeletion = System.currentTimeMillis();
             processDeletedMessages(markAsDeletedMessages, channelId, sent, !movedToScheduled);
-            devgramRestoreScroll(devgramDelAnchors);
             if (movedToScheduled && chatMode != ChatActivity.MODE_SCHEDULED) {
                 getMessagesController().forceNoReload(dialog_id, ChatActivity.MODE_SCHEDULED);
                 openScheduledMessages(scheduledMessageId, true);
@@ -26832,78 +26823,25 @@ public class ChatActivity extends BaseFragment implements
     // DevGram: вернуть скролл к сообщению-якорю (ищем по id, т.к. после перезагрузки
     // создаются новые MessageObject и сравнение по ссылке не работает). Две попытки —
     // сразу и с задержкой, чтобы перебить поздний авто-скролл вниз.
-    // DevGram: собрать «якоря» — id и смещение нескольких верхних видимых сообщений,
-    // чтобы потом вернуть скролл, даже если часть из них удалили.
-    private ArrayList<int[]> devgramCollectAnchors() {
-        ArrayList<int[]> anchors = new ArrayList<>();
-        if (chatListView == null) {
-            return anchors;
-        }
-        for (int i = 0; i < chatListView.getChildCount() && anchors.size() < 4; i++) {
-            View v = chatListView.getChildAt(i);
-            MessageObject mo = null;
-            if (v instanceof ChatMessageCell) {
-                mo = ((ChatMessageCell) v).getMessageObject();
-            } else if (v instanceof ChatActionCell) {
-                mo = ((ChatActionCell) v).getMessageObject();
-            }
-            if (mo != null) {
-                anchors.add(new int[]{mo.getId(), getScrollingOffsetForView(v)});
-            }
-        }
-        return anchors;
-    }
-
-    // Возвращает скролл к первому уцелевшему якорю. Несколько попыток во времени —
-    // чтобы перебить поздний авто-скролл вниз после удаления/перезагрузки.
-    private void devgramRestoreScroll(final ArrayList<int[]> anchors) {
-        // DevGram DIAG (временно): показать, вызывается ли восстановление и что найдено
-        try {
-            android.widget.Toast.makeText(ApplicationLoader.applicationContext,
-                    "DG restore: anchors=" + (anchors == null ? -1 : anchors.size()),
-                    android.widget.Toast.LENGTH_SHORT).show();
-        } catch (Throwable ignore) {}
-        if (anchors == null || anchors.isEmpty()) {
+    // DevGram: точечно перерисовать ОДНУ ячейку (аналог updateRowWithMessageObject у AyuGram).
+    // Важно не трогать остальные ячейки и не дёргать адаптер — иначе список уезжает вниз.
+    private void devgramUpdateCellFor(MessageObject obj) {
+        if (chatListView == null || obj == null) {
             return;
         }
-        final boolean[] diagShown = new boolean[1];
-        final Runnable r = () -> {
-            if (chatLayoutManager == null || chatAdapter == null || messages == null) {
-                return;
-            }
-            for (int a = 0; a < anchors.size(); a++) {
-                final int anchorId = anchors.get(a)[0];
-                final int top = anchors.get(a)[1];
-                for (int i = 0; i < messages.size(); i++) {
-                    MessageObject mo = messages.get(i);
-                    if (mo != null && mo.getId() == anchorId) {
-                        chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + i, top);
-                        if (!diagShown[0]) {
-                            diagShown[0] = true;
-                            try {
-                                android.widget.Toast.makeText(ApplicationLoader.applicationContext,
-                                        "DG scroll -> id=" + anchorId + " idx=" + i + " top=" + top + " startRow=" + chatAdapter.messagesStartRow,
-                                        android.widget.Toast.LENGTH_LONG).show();
-                            } catch (Throwable ignore) {}
-                        }
-                        return;
-                    }
+        for (int i = 0; i < chatListView.getChildCount(); i++) {
+            View v = chatListView.getChildAt(i);
+            if (v instanceof ChatMessageCell) {
+                ChatMessageCell cell = (ChatMessageCell) v;
+                if (cell.getMessageObject() == obj) {
+                    cell.setMessageObject(obj, cell.getCurrentMessagesGroup(), cell.isPinnedBottom(), cell.isPinnedTop(), cell.isFirstInChat(), cell.isLastInChatList());
+                    cell.invalidate();
+                    break;
                 }
             }
-            if (!diagShown[0]) {
-                diagShown[0] = true;
-                try {
-                    android.widget.Toast.makeText(ApplicationLoader.applicationContext,
-                            "DG scroll: ЯКОРЬ НЕ НАЙДЕН (msgs=" + messages.size() + ")",
-                            android.widget.Toast.LENGTH_LONG).show();
-                } catch (Throwable ignore) {}
-            }
-        };
-        AndroidUtilities.runOnUIThread(r);
-        AndroidUtilities.runOnUIThread(r, 120);
-        AndroidUtilities.runOnUIThread(r, 350);
-        AndroidUtilities.runOnUIThread(r, 700);
+        }
     }
+
 
     private void processDeletedMessages(ArrayList<Integer> markAsDeletedMessages, long channelId, boolean sent, boolean thanos) {
         ArrayList<Integer> removedIndexes = new ArrayList<>();
@@ -26928,7 +26866,6 @@ public class ChatActivity extends BaseFragment implements
         }
 
         boolean updated = false;
-        boolean devgramMarkedDeleted = false; // DevGram: пометили удалёнку (обновить видимые ячейки без скролла)
         LongSparseArray<MessageObject.GroupedMessages> newGroups = null;
         LongSparseArray<Integer> newGroupsSizes = null;
         int size = markAsDeletedMessages.size();
@@ -26959,10 +26896,9 @@ public class ChatActivity extends BaseFragment implements
             if (DevGramConfig.saveDeletedMessages && !DevGramMessagesController.getInstance().isDeletePermitted(getDialogId(), mid)) {
                 if (obj != null && obj.messageOwner != null && !obj.messageOwner.devgramDeleted) {
                     obj.messageOwner.devgramDeleted = true;
+                    // точечно перерисовываем ТОЛЬКО эту ячейку — список не двигаем
+                    devgramUpdateCellFor(obj);
                 }
-                // помечаем через updateVisibleRows (без adapter-notify) и держим позицию скролла
-                devgramMarkedDeleted = true;
-                devgramLastKeptDeletion = System.currentTimeMillis();
                 continue;
             }
             DevGramMessagesController.getInstance().consumeDeletePermit(getDialogId(), mid);
@@ -27128,10 +27064,6 @@ public class ChatActivity extends BaseFragment implements
                     updated = true;
                 }
             }
-        }
-        // DevGram: если пометили удалёнку, обновляем видимые ячейки БЕЗ adapter-notify (список не скроллится вниз)
-        if (devgramMarkedDeleted) {
-            updateVisibleRows();
         }
         if (updatedReplies) {
             updateReplyMessageHeader(true);
