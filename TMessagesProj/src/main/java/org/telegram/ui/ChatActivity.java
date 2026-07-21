@@ -22883,7 +22883,12 @@ public class ChatActivity extends BaseFragment implements
                 scheduleNowDialog.dismiss();
                 scheduleNowDialog = null;
             }
+            // DevGram: якоря снимаем ДО processDeletedMessages — внутри него есть ранние return
+            // (по channelId/loadIndex), из-за которых наш код мог не выполняться вовсе.
+            final ArrayList<int[]> devgramDelAnchors = devgramCollectAnchors();
+            devgramLastKeptDeletion = System.currentTimeMillis();
             processDeletedMessages(markAsDeletedMessages, channelId, sent, !movedToScheduled);
+            devgramRestoreScroll(devgramDelAnchors);
             if (movedToScheduled && chatMode != ChatActivity.MODE_SCHEDULED) {
                 getMessagesController().forceNoReload(dialog_id, ChatActivity.MODE_SCHEDULED);
                 openScheduledMessages(scheduledMessageId, true);
@@ -26852,9 +26857,16 @@ public class ChatActivity extends BaseFragment implements
     // Возвращает скролл к первому уцелевшему якорю. Несколько попыток во времени —
     // чтобы перебить поздний авто-скролл вниз после удаления/перезагрузки.
     private void devgramRestoreScroll(final ArrayList<int[]> anchors) {
+        // DevGram DIAG (временно): показать, вызывается ли восстановление и что найдено
+        try {
+            android.widget.Toast.makeText(ApplicationLoader.applicationContext,
+                    "DG restore: anchors=" + (anchors == null ? -1 : anchors.size()),
+                    android.widget.Toast.LENGTH_SHORT).show();
+        } catch (Throwable ignore) {}
         if (anchors == null || anchors.isEmpty()) {
             return;
         }
+        final boolean[] diagShown = new boolean[1];
         final Runnable r = () -> {
             if (chatLayoutManager == null || chatAdapter == null || messages == null) {
                 return;
@@ -26866,9 +26878,25 @@ public class ChatActivity extends BaseFragment implements
                     MessageObject mo = messages.get(i);
                     if (mo != null && mo.getId() == anchorId) {
                         chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + i, top);
+                        if (!diagShown[0]) {
+                            diagShown[0] = true;
+                            try {
+                                android.widget.Toast.makeText(ApplicationLoader.applicationContext,
+                                        "DG scroll -> id=" + anchorId + " idx=" + i + " top=" + top + " startRow=" + chatAdapter.messagesStartRow,
+                                        android.widget.Toast.LENGTH_LONG).show();
+                            } catch (Throwable ignore) {}
+                        }
                         return;
                     }
                 }
+            }
+            if (!diagShown[0]) {
+                diagShown[0] = true;
+                try {
+                    android.widget.Toast.makeText(ApplicationLoader.applicationContext,
+                            "DG scroll: ЯКОРЬ НЕ НАЙДЕН (msgs=" + messages.size() + ")",
+                            android.widget.Toast.LENGTH_LONG).show();
+                } catch (Throwable ignore) {}
             }
         };
         AndroidUtilities.runOnUIThread(r);
@@ -26901,9 +26929,6 @@ public class ChatActivity extends BaseFragment implements
 
         boolean updated = false;
         boolean devgramMarkedDeleted = false; // DevGram: пометили удалёнку (обновить видимые ячейки без скролла)
-        // DevGram: запоминаем видимые сообщения, чтобы удержать позицию скролла при удалении
-        final ArrayList<int[]> devgramAnchors = devgramCollectAnchors();
-        devgramLastKeptDeletion = System.currentTimeMillis();
         LongSparseArray<MessageObject.GroupedMessages> newGroups = null;
         LongSparseArray<Integer> newGroupsSizes = null;
         int size = markAsDeletedMessages.size();
@@ -27248,8 +27273,6 @@ public class ChatActivity extends BaseFragment implements
             threadMessageId = 0;
         }
 
-        // DevGram: после ЛЮБОГО удаления возвращаем скролл на прежнее место (чат не улетает вниз)
-        devgramRestoreScroll(devgramAnchors);
     }
 
     private final BotForumHelper.BotDraftAnimationsPool botDraftAnimationsPool = new BotForumHelper.BotDraftAnimationsPool();

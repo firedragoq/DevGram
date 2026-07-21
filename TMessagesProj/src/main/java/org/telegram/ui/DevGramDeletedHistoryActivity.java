@@ -150,6 +150,9 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             ChatMessageCell cell = (ChatMessageCell) holder.itemView;
             MessageObject message = messages.get(position);
+            // ВАЖНО: без isChat=true ячейка не рисует ни аватарку, ни имя отправителя
+            // (needDrawAvatar() требует именно этот флаг)
+            cell.isChat = true;
             cell.setFullyDraw(true);
             // без группировки: у КАЖДОГО сообщения своя аватарка и имя отправителя,
             // чтобы всегда было понятно, кто прислал удалённое сообщение
