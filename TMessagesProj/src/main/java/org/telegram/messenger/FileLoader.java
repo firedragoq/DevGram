@@ -1422,13 +1422,26 @@ public class FileLoader extends BaseController {
         if (dir == null) {
             return new File("");
         }
+        File result = null;
         if (documentId != 0) {
             String path = getInstance(UserConfig.selectedAccount).getFileDatabase().getPath(documentId, dcId, type, useFileDatabaseQueue);
             if (path != null) {
-                return new File(path);
+                result = new File(path);
             }
         }
-        return new File(dir, getAttachFileName(attach, ext));
+        String attachFileName = getAttachFileName(attach, ext);
+        if (result == null) {
+            result = new File(dir, attachFileName);
+        }
+        // DevGram: если файла на штатном месте больше нет (удалённое сообщение, чистка кеша),
+        // подставляем закреплённую копию из нашей папки — имена файлов те же самые.
+        if (DevGramConfig.saveMedia && !result.exists()) {
+            File saved = DevGramMediaSaver.getSaved(attachFileName);
+            if (saved != null) {
+                return saved;
+            }
+        }
+        return result;
     }
 
     public FilePathDatabase getFileDatabase() {

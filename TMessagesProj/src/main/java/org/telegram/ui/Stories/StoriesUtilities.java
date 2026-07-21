@@ -126,6 +126,24 @@ public class StoriesUtilities {
             animated = false;
         }
 
+        // DevGram: не рисуем кольца историй вокруг аватарок (непрочитанное, просмотренное,
+        // «близкие друзья», эфир) — у аватарки остаётся только индикатор «в сети».
+        // Ленту историй сверху списка чатов (isDialogStoriesCell) не трогаем: там кольцо —
+        // часть самой ленты и от него зависят анимации сворачивания в шапку.
+        if (!params.isDialogStoriesCell) {
+            params.prevState = params.currentState = STATE_EMPTY;
+            params.progressToSate = 1f;
+            params.prevUnreadState = params.unreadState = StoriesController.STATE_READ;
+            params.showProgress = false;
+            float emptyScale = params.buttonBounce != null ? params.buttonBounce.getScale(0.08f) : 1f;
+            avatarImage.setImageCoords(params.originalAvatarRect);
+            canvas.save();
+            canvas.scale(emptyScale, emptyScale, params.originalAvatarRect.centerX(), params.originalAvatarRect.centerY());
+            avatarImage.draw(canvas);
+            canvas.restore();
+            return;
+        }
+
         int state;
         int unreadState = 0;
         boolean showProgress = storiesController.isLoading(dialogId);

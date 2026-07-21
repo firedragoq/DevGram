@@ -24,9 +24,16 @@ public class DevGramConfig {
     public static boolean sendOnlinePackets = true; // статус «в сети»
     public static boolean sendUploadTyping = true;  // «печатает…» / «загружает…»
 
+    // Скрывать рекламу: спонсорские сообщения в каналах и ботах + реклама в видеоплеере.
+    public static boolean disableAds = false;
+
     // --- сохранение истории ---
-    public static boolean saveDeletedMessages = true; // сохранять удалённые сообщения
-    public static boolean saveMessagesHistory = true; // сохранять историю правок
+    // По умолчанию ВЫКЛЮЧЕНЫ, как и режим призрака: мод не должен ничего менять,
+    // пока пользователь сам не включит нужную функцию.
+    public static boolean saveDeletedMessages = false; // сохранять удалённые сообщения
+    public static boolean saveMessagesHistory = false; // сохранять историю правок
+    public static boolean saveMedia = false;           // сохранять вложения удалённых
+    public static boolean saveInBotChats = false;      // сохранять и в диалогах с ботами
 
     // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
     private static final Object readSync = new Object();
@@ -49,8 +56,11 @@ public class DevGramConfig {
             sendReadPackets = preferences.getBoolean("sendReadPackets", true);
             sendOnlinePackets = preferences.getBoolean("sendOnlinePackets", true);
             sendUploadTyping = preferences.getBoolean("sendUploadTyping", true);
-            saveDeletedMessages = preferences.getBoolean("saveDeletedMessages", true);
-            saveMessagesHistory = preferences.getBoolean("saveMessagesHistory", true);
+            disableAds = preferences.getBoolean("disableAds", false);
+            saveDeletedMessages = preferences.getBoolean("saveDeletedMessages", false);
+            saveMessagesHistory = preferences.getBoolean("saveMessagesHistory", false);
+            saveMedia = preferences.getBoolean("saveMedia", false);
+            saveInBotChats = preferences.getBoolean("saveInBotChats", false);
             loaded = true;
         }
     }
@@ -90,6 +100,11 @@ public class DevGramConfig {
         preferences.edit().putBoolean("sendUploadTyping", v).apply();
     }
 
+    public static void setDisableAds(boolean v) {
+        disableAds = v;
+        preferences.edit().putBoolean("disableAds", v).apply();
+    }
+
     public static void setSaveDeletedMessages(boolean v) {
         saveDeletedMessages = v;
         preferences.edit().putBoolean("saveDeletedMessages", v).apply();
@@ -98,6 +113,16 @@ public class DevGramConfig {
     public static void setSaveMessagesHistory(boolean v) {
         saveMessagesHistory = v;
         preferences.edit().putBoolean("saveMessagesHistory", v).apply();
+    }
+
+    public static void setSaveMedia(boolean v) {
+        saveMedia = v;
+        preferences.edit().putBoolean("saveMedia", v).apply();
+    }
+
+    public static void setSaveInBotChats(boolean v) {
+        saveInBotChats = v;
+        preferences.edit().putBoolean("saveInBotChats", v).apply();
     }
 
     // Пометка удалённого/изменённого сообщения в строке времени.

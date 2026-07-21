@@ -72,8 +72,18 @@ public class DevGramMessagesController {
 
     // ================= удалённые =================
 
+    // Диалоги с ботами по умолчанию не сохраняем: там своя лента служебного мусора,
+    // который бот сам же и переписывает, и база разрастается без пользы.
+    public static boolean skipDialog(int accountId, long dialogId) {
+        if (DevGramConfig.saveInBotChats || dialogId <= 0) {
+            return false;
+        }
+        TLRPC.User user = MessagesController.getInstance(accountId).getUser(dialogId);
+        return user != null && user.bot;
+    }
+
     public void onMessageDeleted(int accountId, TLRPC.Message msg, long dialogId, long topicId, int messageId, int catchTime) {
-        if (!DevGramConfig.saveDeletedMessages || msg == null) {
+        if (!DevGramConfig.saveDeletedMessages || msg == null || skipDialog(accountId, dialogId)) {
             return;
         }
         long userId = UserConfig.getInstance(accountId).getClientUserId();
@@ -129,9 +139,10 @@ public class DevGramMessagesController {
     // ================= история правок =================
 
     public void onMessageEdited(int accountId, TLRPC.Message oldMessage, long dialogId, long topicId, int messageId) {
-        if (!DevGramConfig.saveMessagesHistory || oldMessage == null) {
+        if (!DevGramConfig.saveMessagesHistory || oldMessage == null || skipDialog(accountId, dialogId)) {
             return;
         }
+        DevGramMediaSaver.saveMessage(accountId, oldMessage);
         long userId = UserConfig.getInstance(accountId).getClientUserId();
         try {
             SQLiteDatabase db = helper.getWritableDatabase();
@@ -245,6 +256,7 @@ public class DevGramMessagesController {
             SQLiteDatabase db = helper.getWritableDatabase();
             db.execSQL("DELETE FROM deleted_messages");
             db.execSQL("DELETE FROM edited_messages");
+            DevGramMediaSaver.clear();
         } catch (Throwable e) {
             FileLog.e(e);
         }
@@ -254,7 +266,7 @@ public class DevGramMessagesController {
 
     private static class DbHelper extends SQLiteOpenHelper {
         DbHelper(Context context) {
-            super(context, "devgram_messages.db", null, 1);
+            super(context, "devgram_messages.db", null, 2);
         }
 
         @Override
@@ -271,7 +283,8 @@ public class DevGramMessagesController {
 
         @Override
         public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-            // пока миграций нет
+            // Версия 2 заводила таблицы под функции, которые мы убрали. Номер не понижаем:
+            // SQLiteOpenHelper падает на понижении версии, а лишние таблицы вреда не несут.
         }
     }
 }

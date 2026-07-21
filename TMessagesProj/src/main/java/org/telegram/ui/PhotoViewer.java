@@ -161,6 +161,7 @@ import org.telegram.messenger.BringAppForegroundService;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.DevGramConfig;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
@@ -16025,7 +16026,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                     ads.stop();
                     ads = null;
                 }
-                if (newMessageObject != null) {
+                if (newMessageObject != null && !DevGramConfig.disableAds) {
                     ads = VideoAds.make(newMessageObject.currentAccount, newMessageObject.getDialogId(), newMessageObject.getId(), BulletinFactory.of(containerView, resourcesProvider));
                     ads.setWaitingPaused(videoPlayer == null || videoPlayer.isPlaying() && videoPlayer.getPlaybackState() == ExoPlayer.STATE_READY);
                     ads.setPauseOnPopupCallback(() -> {

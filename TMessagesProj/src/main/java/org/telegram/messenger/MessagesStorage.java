@@ -14093,6 +14093,7 @@ public class MessagesStorage extends BaseController {
                     TLRPC.Message msg = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false);
                     if (msg != null) {
                         DevGramMessagesController.getInstance().onMessageDeleted(currentAccount, msg, did, 0, mid, catchTime);
+                        DevGramMediaSaver.saveMessage(currentAccount, msg);
                     }
                     data.reuse();
                 }
@@ -14909,7 +14910,8 @@ public class MessagesStorage extends BaseController {
         // в свою БД и исключаем их из списка на удаление. Исходный список не трогаем —
         // по нему UI ставит пометку «удалено».
         ArrayList<Integer> toDelete = messages;
-        if (DevGramConfig.saveDeletedMessages && mode == 0) {
+        if (DevGramConfig.saveDeletedMessages && mode == 0
+                && !DevGramMessagesController.skipDialog(currentAccount, dialogId)) {
             ArrayList<Integer> keep = new ArrayList<>();
             for (int i = 0; i < messages.size(); i++) {
                 Integer mid = messages.get(i);

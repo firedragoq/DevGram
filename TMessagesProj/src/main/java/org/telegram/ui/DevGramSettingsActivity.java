@@ -12,8 +12,6 @@ import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.DevGramConfig;
-import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -32,18 +30,10 @@ public class DevGramSettingsActivity extends BaseFragment {
     private UniversalRecyclerView listView;
     private View headerView;
 
-    // Режим призрака (как у AyuGram): мастер-переключатель + круглые чекбоксы
-    private static final int ID_GHOST_MASTER = 1;
-    private static final int ID_GHOST_READ = 2;
-    private static final int ID_GHOST_ONLINE = 3;
-    private static final int ID_GHOST_TYPING = 4;
-    // История сообщений
-    private static final int ID_SAVE_DELETED = 5;
-    private static final int ID_SAVE_HISTORY = 6;
-    // Интерфейс
-    private static final int ID_SHOW_CONTACTS = 7;
-    // Диагностика (временно)
-    private static final int ID_COPY_LOG = 8;
+    // Категории (каждая открывает свой экран)
+    private static final int ID_CAT_GENERAL = 1;
+    private static final int ID_CAT_GHOST = 2;
+    private static final int ID_CAT_SPY = 3;
 
     @Override
     public View createView(Context context) {
@@ -110,75 +100,26 @@ public class DevGramSettingsActivity extends BaseFragment {
         }
     }
 
-    private int ghostCount() {
-        int c = 0;
-        if (!DevGramConfig.sendReadPackets) c++;
-        if (!DevGramConfig.sendOnlinePackets) c++;
-        if (!DevGramConfig.sendUploadTyping) c++;
-        return c;
-    }
-
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (headerView != null) {
             items.add(UItem.asCustom(headerView));
         }
 
-        // --- Режим призрака (мастер-переключатель + круглые чекбоксы, как у AyuGram) ---
-        items.add(UItem.asHeader("Режим призрака"));
-        items.add(UItem.asCheck(ID_GHOST_MASTER, "Режим призрака  " + ghostCount() + "/3").setChecked(DevGramConfig.isGhostModeActive()));
-        items.add(UItem.asRoundCheckbox(ID_GHOST_READ, "Не отправлять прочтение").setChecked(!DevGramConfig.sendReadPackets));
-        items.add(UItem.asRoundCheckbox(ID_GHOST_ONLINE, "Не показывать «в сети»").setChecked(!DevGramConfig.sendOnlinePackets));
-        items.add(UItem.asRoundCheckbox(ID_GHOST_TYPING, "Не показывать «печатает»").setChecked(!DevGramConfig.sendUploadTyping));
-        items.add(UItem.asShadow("Собеседники не видят ваше прочтение, статус «в сети» и «печатает…»."));
-
-        // --- История сообщений ---
-        items.add(UItem.asHeader("История сообщений"));
-        items.add(UItem.asCheck(ID_SAVE_DELETED, "Сохранять удалённые").setChecked(DevGramConfig.saveDeletedMessages));
-        items.add(UItem.asCheck(ID_SAVE_HISTORY, "Сохранять историю изменений").setChecked(DevGramConfig.saveMessagesHistory));
-        items.add(UItem.asShadow("Удалённые остаются в чате с пометкой «🗑». У изменённых — история правок по тапу на текст."));
-
-        // --- Интерфейс ---
-        items.add(UItem.asHeader("Интерфейс"));
-        items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню").setChecked(getUserConfig().showContactsTab));
+        // Только список категорий — сами опции живут внутри разделов
+        items.add(UItem.asHeader("Категории"));
+        items.add(UItem.asButton(ID_CAT_GENERAL, R.drawable.devgram_cat_general, "Основные"));
+        items.add(UItem.asButton(ID_CAT_GHOST, R.drawable.devgram_cat_ghost, "Режим призрака"));
+        items.add(UItem.asButton(ID_CAT_SPY, R.drawable.devgram_cat_spy, "Слежка"));
         items.add(UItem.asShadow(null));
-
-        items.add(UItem.asHeader("Диагностика"));
-        items.add(UItem.asButton(ID_COPY_LOG, "Скопировать лог удаления"));
-        items.add(UItem.asShadow("Лог последнего удаления сообщения. Нажми и вставь его разработчику."));
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == ID_GHOST_MASTER) {
-            DevGramConfig.toggleGhostMode();
-        } else if (item.id == ID_GHOST_READ) {
-            DevGramConfig.setSendReadPackets(!DevGramConfig.sendReadPackets);
-        } else if (item.id == ID_GHOST_ONLINE) {
-            DevGramConfig.setSendOnlinePackets(!DevGramConfig.sendOnlinePackets);
-        } else if (item.id == ID_GHOST_TYPING) {
-            DevGramConfig.setSendUploadTyping(!DevGramConfig.sendUploadTyping);
-        } else if (item.id == ID_SAVE_DELETED) {
-            DevGramConfig.setSaveDeletedMessages(!DevGramConfig.saveDeletedMessages);
-        } else if (item.id == ID_SAVE_HISTORY) {
-            DevGramConfig.setSaveMessagesHistory(!DevGramConfig.saveMessagesHistory);
-        } else if (item.id == ID_SHOW_CONTACTS) {
-            getUserConfig().setShowContactsTab(!getUserConfig().showContactsTab);
-            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
-        } else if (item.id == ID_COPY_LOG) {
-            try {
-                android.content.ClipboardManager cm = (android.content.ClipboardManager)
-                        ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("DevGram", ChatActivity.devgramGetLog()));
-                if (getParentActivity() != null) {
-                    android.widget.Toast.makeText(getParentActivity(), "Лог скопирован", android.widget.Toast.LENGTH_SHORT).show();
-                }
-            } catch (Throwable ignore) {
-            }
-            return;
-        } else {
-            return;
-        }
-        if (listView != null && listView.adapter != null) {
-            listView.adapter.update(true);
+        if (item.id == ID_CAT_GENERAL) {
+            presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GENERAL));
+        } else if (item.id == ID_CAT_GHOST) {
+            presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GHOST));
+        } else if (item.id == ID_CAT_SPY) {
+            presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
         }
     }
 }

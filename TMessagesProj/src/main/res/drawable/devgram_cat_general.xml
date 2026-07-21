@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DevGram: категория «Основные» — сетка из четырёх плиток -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.5,3h4C9.33,3 10,3.67 10,4.5v4C10,9.33 9.33,10 8.5,10h-4C3.67,10 3,9.33 3,8.5v-4C3,3.67 3.67,3 4.5,3z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15.5,3h4C20.33,3 21,3.67 21,4.5v4C21,9.33 20.33,10 19.5,10h-4C14.67,10 14,9.33 14,8.5v-4C14,3.67 14.67,3 15.5,3z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.5,14h4C9.33,14 10,14.67 10,15.5v4C10,20.33 9.33,21 8.5,21h-4C3.67,21 3,20.33 3,19.5v-4C3,14.67 3.67,14 4.5,14z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15.5,14h4C20.33,14 21,14.67 21,15.5v4C21,20.33 20.33,21 19.5,21h-4C14.67,21 14,20.33 14,19.5v-4C14,14.67 14.67,14 15.5,14z" />
+</vector>
