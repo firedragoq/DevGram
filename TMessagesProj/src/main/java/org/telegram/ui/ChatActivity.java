@@ -4929,7 +4929,10 @@ public class ChatActivity extends BaseFragment implements
 
             @Override
             protected void onMeasure(int widthSpec, int heightSpec) {
-//                saveScrollPosition();
+                // DevGram: в базе Forkgram этот вызов был закомментирован — из-за этого любой
+                // перезамер списка (в т.ч. при пометке сообщения удалённым) сбрасывал прокрутку
+                // в позицию 0, а при реверсивной раскладке это низ чата. У AyuGram он активен.
+                saveScrollPosition();
                 super.onMeasure(widthSpec, heightSpec);
             }
 
@@ -22905,10 +22908,7 @@ public class ChatActivity extends BaseFragment implements
             devgramDiag("после processDeletedMessages " + devgramPos());
             AndroidUtilities.runOnUIThread(() -> devgramDiag("+100ms " + devgramPos()), 100);
             AndroidUtilities.runOnUIThread(() -> devgramDiag("+400ms " + devgramPos()), 400);
-            AndroidUtilities.runOnUIThread(() -> {
-                devgramDiag("+1200ms " + devgramPos());
-                devgramCopyLog();
-            }, 1200);
+            AndroidUtilities.runOnUIThread(() -> devgramDiag("+1200ms " + devgramPos()), 1200);
             if (movedToScheduled && chatMode != ChatActivity.MODE_SCHEDULED) {
                 getMessagesController().forceNoReload(dialog_id, ChatActivity.MODE_SCHEDULED);
                 openScheduledMessages(scheduledMessageId, true);
