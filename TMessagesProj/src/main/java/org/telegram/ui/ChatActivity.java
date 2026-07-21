@@ -21085,23 +21085,9 @@ public class ChatActivity extends BaseFragment implements
         }
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
 
-        // --- DevGram: если только что удержали удалёнку — сохраняем позицию скролла после перезагрузки ---
-        if (System.currentTimeMillis() - devgramLastKeptDeletion < 3000 && chatListView != null && !messages.isEmpty()) {
-            MessageObject devAnchor = null;
-            int devAnchorTop = 0;
-            for (int i = 0; i < chatListView.getChildCount(); i++) {
-                View v = chatListView.getChildAt(i);
-                if (v instanceof ChatMessageCell) {
-                    devAnchor = ((ChatMessageCell) v).getMessageObject();
-                    devAnchorTop = getScrollingOffsetForView(v);
-                    break;
-                } else if (v instanceof ChatActionCell) {
-                    devAnchor = ((ChatActionCell) v).getMessageObject();
-                    devAnchorTop = getScrollingOffsetForView(v);
-                    break;
-                }
-            }
-            devgramRestoreScroll(devAnchor, devAnchorTop);
+        // --- DevGram: если недавно было удаление — держим позицию скролла и после перезагрузки ---
+        if (System.currentTimeMillis() - devgramLastKeptDeletion < 5000 && !messages.isEmpty()) {
+            devgramRestoreScroll(devgramCollectAnchors());
         }
 
         // --- DevGram: подмешиваем сохранённые удалёнки, чтобы они не пропадали при перезагрузке чата ---
@@ -26841,25 +26827,54 @@ public class ChatActivity extends BaseFragment implements
     // DevGram: вернуть скролл к сообщению-якорю (ищем по id, т.к. после перезагрузки
     // создаются новые MessageObject и сравнение по ссылке не работает). Две попытки —
     // сразу и с задержкой, чтобы перебить поздний авто-скролл вниз.
-    private void devgramRestoreScroll(MessageObject anchor, int top) {
-        if (anchor == null) {
+    // DevGram: собрать «якоря» — id и смещение нескольких верхних видимых сообщений,
+    // чтобы потом вернуть скролл, даже если часть из них удалили.
+    private ArrayList<int[]> devgramCollectAnchors() {
+        ArrayList<int[]> anchors = new ArrayList<>();
+        if (chatListView == null) {
+            return anchors;
+        }
+        for (int i = 0; i < chatListView.getChildCount() && anchors.size() < 4; i++) {
+            View v = chatListView.getChildAt(i);
+            MessageObject mo = null;
+            if (v instanceof ChatMessageCell) {
+                mo = ((ChatMessageCell) v).getMessageObject();
+            } else if (v instanceof ChatActionCell) {
+                mo = ((ChatActionCell) v).getMessageObject();
+            }
+            if (mo != null) {
+                anchors.add(new int[]{mo.getId(), getScrollingOffsetForView(v)});
+            }
+        }
+        return anchors;
+    }
+
+    // Возвращает скролл к первому уцелевшему якорю. Несколько попыток во времени —
+    // чтобы перебить поздний авто-скролл вниз после удаления/перезагрузки.
+    private void devgramRestoreScroll(final ArrayList<int[]> anchors) {
+        if (anchors == null || anchors.isEmpty()) {
             return;
         }
-        final int anchorId = anchor.getId();
         final Runnable r = () -> {
             if (chatLayoutManager == null || chatAdapter == null || messages == null) {
                 return;
             }
-            for (int i = 0; i < messages.size(); i++) {
-                MessageObject mo = messages.get(i);
-                if (mo != null && mo.getId() == anchorId) {
-                    chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + i, top);
-                    return;
+            for (int a = 0; a < anchors.size(); a++) {
+                final int anchorId = anchors.get(a)[0];
+                final int top = anchors.get(a)[1];
+                for (int i = 0; i < messages.size(); i++) {
+                    MessageObject mo = messages.get(i);
+                    if (mo != null && mo.getId() == anchorId) {
+                        chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + i, top);
+                        return;
+                    }
                 }
             }
         };
         AndroidUtilities.runOnUIThread(r);
-        AndroidUtilities.runOnUIThread(r, 250);
+        AndroidUtilities.runOnUIThread(r, 120);
+        AndroidUtilities.runOnUIThread(r, 350);
+        AndroidUtilities.runOnUIThread(r, 700);
     }
 
     private void processDeletedMessages(ArrayList<Integer> markAsDeletedMessages, long channelId, boolean sent, boolean thanos) {
@@ -26886,23 +26901,9 @@ public class ChatActivity extends BaseFragment implements
 
         boolean updated = false;
         boolean devgramMarkedDeleted = false; // DevGram: пометили удалёнку (обновить видимые ячейки без скролла)
-        // DevGram: запоминаем верхнее видимое сообщение, чтобы удержать позицию скролла при удалении
-        MessageObject devgramAnchor = null;
-        int devgramAnchorTop = 0;
-        if (chatListView != null) {
-            for (int devI = 0; devI < chatListView.getChildCount(); devI++) {
-                View devV = chatListView.getChildAt(devI);
-                if (devV instanceof ChatMessageCell) {
-                    devgramAnchor = ((ChatMessageCell) devV).getMessageObject();
-                    devgramAnchorTop = getScrollingOffsetForView(devV);
-                    break;
-                } else if (devV instanceof ChatActionCell) {
-                    devgramAnchor = ((ChatActionCell) devV).getMessageObject();
-                    devgramAnchorTop = getScrollingOffsetForView(devV);
-                    break;
-                }
-            }
-        }
+        // DevGram: запоминаем видимые сообщения, чтобы удержать позицию скролла при удалении
+        final ArrayList<int[]> devgramAnchors = devgramCollectAnchors();
+        devgramLastKeptDeletion = System.currentTimeMillis();
         LongSparseArray<MessageObject.GroupedMessages> newGroups = null;
         LongSparseArray<Integer> newGroupsSizes = null;
         int size = markAsDeletedMessages.size();
@@ -27247,10 +27248,8 @@ public class ChatActivity extends BaseFragment implements
             threadMessageId = 0;
         }
 
-        // DevGram: удержали удалёнку — возвращаем скролл на прежнее место (не улетаем вниз)
-        if (devgramMarkedDeleted) {
-            devgramRestoreScroll(devgramAnchor, devgramAnchorTop);
-        }
+        // DevGram: после ЛЮБОГО удаления возвращаем скролл на прежнее место (чат не улетает вниз)
+        devgramRestoreScroll(devgramAnchors);
     }
 
     private final BotForumHelper.BotDraftAnimationsPool botDraftAnimationsPool = new BotForumHelper.BotDraftAnimationsPool();

@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DevGramMessagesController;
 import org.telegram.messenger.MessageObject;
@@ -95,14 +96,17 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         });
 
         SizeNotifierFrameLayout contentView = new SizeNotifierFrameLayout(context);
+        contentView.setOccupyStatusBar(false);
         contentView.setBackgroundImage(Theme.getCachedWallpaper(), Theme.isWallpaperMotion());
 
         listView = new RecyclerListView(context);
+        // сообщения идут СВЕРХУ вниз (без прижатия книзу — иначе сверху пустая тёмная область)
         LinearLayoutManager layoutManager = new LinearLayoutManager(context);
-        layoutManager.setStackFromEnd(true); // как в чате: контент прижат книзу
         listView.setLayoutManager(layoutManager);
         listView.setAdapter(new Adapter());
         listView.setVerticalScrollBarEnabled(false);
+        listView.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
+        listView.setClipToPadding(false);
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
         if (messages.isEmpty()) {
@@ -146,22 +150,15 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             ChatMessageCell cell = (ChatMessageCell) holder.itemView;
             MessageObject message = messages.get(position);
-            boolean pinnedTop = position > 0 && sameAuthor(messages.get(position - 1), message);
-            boolean pinnedBottom = position < messages.size() - 1 && sameAuthor(message, messages.get(position + 1));
             cell.setFullyDraw(true);
-            cell.setMessageObject(message, null, pinnedBottom, pinnedTop, position == 0);
+            // без группировки: у КАЖДОГО сообщения своя аватарка и имя отправителя,
+            // чтобы всегда было понятно, кто прислал удалённое сообщение
+            cell.setMessageObject(message, null, false, false, position == 0);
         }
 
         @Override
         public int getItemCount() {
             return messages.size();
         }
-    }
-
-    private static boolean sameAuthor(MessageObject a, MessageObject b) {
-        if (a == null || b == null || a.messageOwner == null || b.messageOwner == null) {
-            return false;
-        }
-        return a.getFromChatId() == b.getFromChatId() && a.isOutOwner() == b.isOutOwner();
     }
 }
