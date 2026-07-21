@@ -42,6 +42,8 @@ public class DevGramSettingsActivity extends BaseFragment {
     private static final int ID_SAVE_HISTORY = 6;
     // Интерфейс
     private static final int ID_SHOW_CONTACTS = 7;
+    // Диагностика (временно)
+    private static final int ID_COPY_LOG = 8;
 
     @Override
     public View createView(Context context) {
@@ -139,6 +141,10 @@ public class DevGramSettingsActivity extends BaseFragment {
         items.add(UItem.asHeader("Интерфейс"));
         items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню").setChecked(getUserConfig().showContactsTab));
         items.add(UItem.asShadow(null));
+
+        items.add(UItem.asHeader("Диагностика"));
+        items.add(UItem.asButton(ID_COPY_LOG, "Скопировать лог удаления"));
+        items.add(UItem.asShadow("Лог последнего удаления сообщения. Нажми и вставь его разработчику."));
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
@@ -157,6 +163,17 @@ public class DevGramSettingsActivity extends BaseFragment {
         } else if (item.id == ID_SHOW_CONTACTS) {
             getUserConfig().setShowContactsTab(!getUserConfig().showContactsTab);
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+        } else if (item.id == ID_COPY_LOG) {
+            try {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                        ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("DevGram", ChatActivity.devgramGetLog()));
+                if (getParentActivity() != null) {
+                    android.widget.Toast.makeText(getParentActivity(), "Лог скопирован", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            } catch (Throwable ignore) {
+            }
+            return;
         } else {
             return;
         }

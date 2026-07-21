@@ -6989,6 +6989,17 @@ public class ChatActivity extends BaseFragment implements
 
             @Override
             public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
+                // DevGram DIAG: фиксируем позицию, на которой пользователь остановил прокрутку ПАЛЬЦЕМ
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                    devgramDragging = true;
+                } else if (newState == RecyclerView.SCROLL_STATE_IDLE && devgramDragging) {
+                    devgramDragging = false;
+                    try {
+                        devgramUserFirst = chatLayoutManager.findFirstVisibleItemPosition();
+                        devgramUserPosTime = System.currentTimeMillis();
+                    } catch (Throwable ignore) {
+                    }
+                }
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
                     if (pollHintCell != null) {
                         pollHintView.showForMessageCell(pollHintCell, -1, pollHintX, pollHintY, true);
@@ -21086,8 +21097,15 @@ public class ChatActivity extends BaseFragment implements
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
 
 
+        // DevGram DIAG: перезагружается ли чат сразу после удаления (тогда прыжок — от перезагрузки)
+        final boolean devgramJustDeleted = System.currentTimeMillis() - devgramLastKeptDeletion < 5000;
+        if (devgramJustDeleted) {
+            devgramDiag("messagesDidLoad (перезагрузка) isCache=" + isCache + " mode=" + mode + " " + devgramPos());
+        }
+
         // --- DevGram: подмешиваем сохранённые удалёнки, чтобы они не пропадали при перезагрузке чата ---
-        if (DevGramConfig.saveDeletedMessages && mode == MODE_DEFAULT && dialog_id != 0) {
+        // Сразу после удаления НЕ подмешиваем: добавление сообщений в загрузку двигает список вниз.
+        if (DevGramConfig.saveDeletedMessages && mode == MODE_DEFAULT && dialog_id != 0 && !devgramJustDeleted) {
             try {
                 java.util.List<TLRPC.Message> devgramSaved = DevGramMessagesController.getInstance().getDeletedMessages(currentUserId, dialog_id, 0);
                 if (!devgramSaved.isEmpty()) {
@@ -22879,7 +22897,18 @@ public class ChatActivity extends BaseFragment implements
                 scheduleNowDialog.dismiss();
                 scheduleNowDialog = null;
             }
+            devgramDiagStart();
+            devgramDiag("ПОЗИЦИЯ ПАЛЬЦЕМ: first=" + devgramUserFirst
+                    + " (" + (devgramUserPosTime == 0 ? -1 : System.currentTimeMillis() - devgramUserPosTime) + "ms назад)");
+            devgramDiag("messagesDeleted n=" + markAsDeletedMessages.size() + " channelId=" + channelId + " sent=" + sent + " " + devgramPos());
             processDeletedMessages(markAsDeletedMessages, channelId, sent, !movedToScheduled);
+            devgramDiag("после processDeletedMessages " + devgramPos());
+            AndroidUtilities.runOnUIThread(() -> devgramDiag("+100ms " + devgramPos()), 100);
+            AndroidUtilities.runOnUIThread(() -> devgramDiag("+400ms " + devgramPos()), 400);
+            AndroidUtilities.runOnUIThread(() -> {
+                devgramDiag("+1200ms " + devgramPos());
+                devgramCopyLog();
+            }, 1200);
             if (movedToScheduled && chatMode != ChatActivity.MODE_SCHEDULED) {
                 getMessagesController().forceNoReload(dialog_id, ChatActivity.MODE_SCHEDULED);
                 openScheduledMessages(scheduledMessageId, true);
@@ -26823,6 +26852,55 @@ public class ChatActivity extends BaseFragment implements
     // DevGram: вернуть скролл к сообщению-якорю (ищем по id, т.к. после перезагрузки
     // создаются новые MessageObject и сравнение по ссылке не работает). Две попытки —
     // сразу и с задержкой, чтобы перебить поздний авто-скролл вниз.
+    // ===== DevGram DIAG: лог удаления, автоматически копируется в буфер обмена =====
+    private static final StringBuilder devgramLog = new StringBuilder();
+    private static long devgramLogT0;
+    private int devgramUserFirst = -1;   // позиция, на которой пользователь остановил прокрутку пальцем
+    private long devgramUserPosTime;
+    private boolean devgramDragging;
+
+    // Лог живёт в статике — переживает выход из чата и переключение аккаунтов,
+    // поэтому его можно скопировать позже кнопкой в настройках мода.
+    public static String devgramGetLog() {
+        return devgramLog.length() == 0 ? "(лог пуст — удаление ещё не происходило)" : devgramLog.toString();
+    }
+
+    private void devgramDiagStart() {
+        devgramLog.setLength(0);
+        devgramLogT0 = System.currentTimeMillis();
+    }
+
+    private void devgramDiag(String s) {
+        if (devgramLog.length() > 4000) {
+            return;
+        }
+        devgramLog.append(System.currentTimeMillis() - devgramLogT0).append("ms ").append(s).append('\n');
+    }
+
+    private String devgramPos() {
+        try {
+            if (chatLayoutManager == null) {
+                return "lm=null";
+            }
+            return "first=" + chatLayoutManager.findFirstVisibleItemPosition()
+                    + " last=" + chatLayoutManager.findLastVisibleItemPosition()
+                    + " msgs=" + (messages == null ? -1 : messages.size());
+        } catch (Throwable e) {
+            return "pos?";
+        }
+    }
+
+    private void devgramCopyLog() {
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("DevGram", devgramLog.toString()));
+            android.widget.Toast.makeText(ApplicationLoader.applicationContext,
+                    "DevGram лог скопирован — вставь его в чат", android.widget.Toast.LENGTH_LONG).show();
+        } catch (Throwable ignore) {
+        }
+    }
+
     // DevGram: точечно перерисовать ОДНУ ячейку (аналог updateRowWithMessageObject у AyuGram).
     // Важно не трогать остальные ячейки и не дёргать адаптер — иначе список уезжает вниз.
     private void devgramUpdateCellFor(MessageObject obj) {
@@ -26893,12 +26971,29 @@ public class ChatActivity extends BaseFragment implements
             Integer mid = markAsDeletedMessages.get(a);
             MessageObject obj = chatAdapter != null && chatAdapter.isFiltered ? filteredMessagesDict.get(mid) :  messagesDict[loadIndex].get(mid);
             // --- DevGram: чужие удаления не убираем из чата, а помечаем «удалено» (логика из AyuGram, GPL) ---
-            if (DevGramConfig.saveDeletedMessages && !DevGramMessagesController.getInstance().isDeletePermitted(getDialogId(), mid)) {
-                if (obj != null && obj.messageOwner != null && !obj.messageOwner.devgramDeleted) {
-                    obj.messageOwner.devgramDeleted = true;
-                    // точечно перерисовываем ТОЛЬКО эту ячейку — список не двигаем
-                    devgramUpdateCellFor(obj);
+            final boolean devgramSaveOn = DevGramConfig.saveDeletedMessages;
+            final boolean devgramPermitted = DevGramMessagesController.getInstance().isDeletePermitted(getDialogId(), mid);
+            devgramDiag("mid=" + mid + " save=" + devgramSaveOn + " permit=" + devgramPermitted
+                    + " -> " + (devgramSaveOn && !devgramPermitted ? "УДЕРЖАНО" : "УДАЛЕНО"));
+            if (devgramSaveOn && !devgramPermitted) {
+                // запасной поиск: сообщения может не быть в messagesDict, но оно есть в списке
+                MessageObject devgramObj = obj;
+                if (devgramObj == null && messages != null) {
+                    for (int di = 0; di < messages.size(); di++) {
+                        MessageObject dm = messages.get(di);
+                        if (dm != null && dm.getId() == mid) {
+                            devgramObj = dm;
+                            break;
+                        }
+                    }
                 }
+                if (devgramObj != null && devgramObj.messageOwner != null && !devgramObj.messageOwner.devgramDeleted) {
+                    devgramObj.messageOwner.devgramDeleted = true;
+                    // точечно перерисовываем ТОЛЬКО эту ячейку — список не двигаем
+                    devgramUpdateCellFor(devgramObj);
+                }
+                devgramDiag("удержано mid=" + mid + " obj=" + (obj != null) + " " + devgramPos());
+                devgramLastKeptDeletion = System.currentTimeMillis();
                 continue;
             }
             DevGramMessagesController.getInstance().consumeDeletePermit(getDialogId(), mid);
