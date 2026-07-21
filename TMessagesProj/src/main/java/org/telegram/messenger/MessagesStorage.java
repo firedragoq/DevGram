@@ -15845,9 +15845,11 @@ public class MessagesStorage extends BaseController {
                                     } else if (MessageObject.getDocument(oldMessage) != null && MessageObject.getDocument(message) != null) {
                                         sameMedia = MessageObject.getDocument(oldMessage).id == MessageObject.getDocument(message).id;
                                     }
-                                    // --- DevGram: сохраняем предыдущую версию сообщения при правке (логика из AyuGram, GPL) ---
-                                    if (DevGramConfig.saveMessagesHistory && message.from_id != null
-                                            && (!TextUtils.equals(oldMessage.message, message.message) || !sameMedia)) {
+                                    // --- DevGram: сохраняем предыдущую версию при правке ТЕКСТА (логика из AyuGram, GPL) ---
+                                    // Ловим по изменению текста — чёткий признак правки; не создаём ложные ревизии
+                                    // при перезагрузке веб-превью и захватываем в т.ч. собственные правки.
+                                    if (DevGramConfig.saveMessagesHistory && oldMessage != null
+                                            && !TextUtils.equals(oldMessage.message, message.message)) {
                                         DevGramMessagesController.getInstance().onMessageEdited(currentAccount, oldMessage, MessageObject.getDialogId(message), 0, message.id);
                                     }
                                     // --- DevGram end ---

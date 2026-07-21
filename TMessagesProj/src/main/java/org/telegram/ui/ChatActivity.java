@@ -1799,6 +1799,8 @@ public class ChatActivity extends BaseFragment implements
     private final static int video_call = 33;
     private final static int hideTitle = 34;
     private final static int goToFirstMessage = 35;
+    private final static int devgram_deleted_history = 9091; // DevGram: история удалёнок
+    private long devgramLastKeptDeletion; // DevGram: время последнего удержания удалёнки (для сохранения скролла)
     private final static int deleteAllYourMessages = 36;
     private final static int deleteAllUnpinnedMessages = 37;
     private final static int deleteAllYourMessagesInAllTopics = 38;
@@ -4269,6 +4271,8 @@ public class ChatActivity extends BaseFragment implements
                     // This is timestamp of launch date of the Telegram.
                     // August 2013.
                     jumpToDate(1375350800);
+                } else if (id == devgram_deleted_history) {
+                    presentFragment(new DevGramDeletedHistoryActivity(dialog_id, getTopicId()));
                 } else if (id == deleteAllYourMessages) {
                     org.telegram.messenger.forkgram.ForkDialogs.CreateDeleteAllYourMessagesAlert(
                         currentAccount,
@@ -4698,6 +4702,11 @@ public class ChatActivity extends BaseFragment implements
 
 
             headerItem.addSubItem(goToFirstMessage, R.drawable.to_first, LocaleController.getString("GoToFirstMessage", R.string.GoToFirstMessage), themeDelegate);
+
+            // DevGram: история удалёнок этого чата
+            if (DevGramConfig.saveDeletedMessages && chatMode == MODE_DEFAULT) {
+                headerItem.addSubItem(devgram_deleted_history, R.drawable.msg_delete, "История удалёнок", themeDelegate);
+            }
 
             if (currentUser != null && chatMode != MODE_SAVED) {
                 headerItem.lazilyAddSubItem(call, R.drawable.msg_callback, LocaleController.getString(R.string.Call));
@@ -21076,6 +21085,36 @@ public class ChatActivity extends BaseFragment implements
         }
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
 
+        // --- DevGram: если только что удержали удалёнку — сохраняем позицию скролла после перезагрузки ---
+        if (System.currentTimeMillis() - devgramLastKeptDeletion < 3000 && chatListView != null && !messages.isEmpty()) {
+            MessageObject devAnchor = null;
+            int devAnchorTop = 0;
+            for (int i = 0; i < chatListView.getChildCount(); i++) {
+                View v = chatListView.getChildAt(i);
+                if (v instanceof ChatMessageCell) {
+                    devAnchor = ((ChatMessageCell) v).getMessageObject();
+                    devAnchorTop = getScrollingOffsetForView(v);
+                    break;
+                } else if (v instanceof ChatActionCell) {
+                    devAnchor = ((ChatActionCell) v).getMessageObject();
+                    devAnchorTop = getScrollingOffsetForView(v);
+                    break;
+                }
+            }
+            if (devAnchor != null) {
+                final MessageObject fDevAnchor = devAnchor;
+                final int fDevTop = devAnchorTop;
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (chatLayoutManager != null && chatAdapter != null) {
+                        int idx = messages.indexOf(fDevAnchor);
+                        if (idx >= 0) {
+                            chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + idx, fDevTop);
+                        }
+                    }
+                });
+            }
+        }
+
         // --- DevGram: подмешиваем сохранённые удалёнки, чтобы они не пропадали при перезагрузке чата ---
         if (DevGramConfig.saveDeletedMessages && mode == MODE_DEFAULT && dialog_id != 0) {
             try {
@@ -26834,6 +26873,23 @@ public class ChatActivity extends BaseFragment implements
 
         boolean updated = false;
         boolean devgramMarkedDeleted = false; // DevGram: пометили удалёнку (обновить видимые ячейки без скролла)
+        // DevGram: запоминаем верхнее видимое сообщение, чтобы удержать позицию скролла при удалении
+        MessageObject devgramAnchor = null;
+        int devgramAnchorTop = 0;
+        if (chatListView != null) {
+            for (int devI = 0; devI < chatListView.getChildCount(); devI++) {
+                View devV = chatListView.getChildAt(devI);
+                if (devV instanceof ChatMessageCell) {
+                    devgramAnchor = ((ChatMessageCell) devV).getMessageObject();
+                    devgramAnchorTop = getScrollingOffsetForView(devV);
+                    break;
+                } else if (devV instanceof ChatActionCell) {
+                    devgramAnchor = ((ChatActionCell) devV).getMessageObject();
+                    devgramAnchorTop = getScrollingOffsetForView(devV);
+                    break;
+                }
+            }
+        }
         LongSparseArray<MessageObject.GroupedMessages> newGroups = null;
         LongSparseArray<Integer> newGroupsSizes = null;
         int size = markAsDeletedMessages.size();
@@ -26867,6 +26923,7 @@ public class ChatActivity extends BaseFragment implements
                     // помечаем через updateVisibleRows (без adapter-notify), чтобы список НЕ скроллился вниз
                     devgramMarkedDeleted = true;
                 }
+                devgramLastKeptDeletion = System.currentTimeMillis(); // держим позицию скролла при перезагрузке
                 continue;
             }
             DevGramMessagesController.getInstance().consumeDeletePermit(getDialogId(), mid);
@@ -27175,6 +27232,20 @@ public class ChatActivity extends BaseFragment implements
 
         if (chatMode == MODE_QUICK_REPLIES && messages != null && messages.isEmpty()) {
             threadMessageId = 0;
+        }
+
+        // DevGram: удержали удалёнку — возвращаем скролл на прежнее место (не улетаем вниз)
+        if (devgramMarkedDeleted && devgramAnchor != null) {
+            final MessageObject fDevAnchor = devgramAnchor;
+            final int fDevTop = devgramAnchorTop;
+            AndroidUtilities.runOnUIThread(() -> {
+                if (chatLayoutManager != null && chatAdapter != null) {
+                    int idx = messages.indexOf(fDevAnchor);
+                    if (idx >= 0) {
+                        chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + idx, fDevTop);
+                    }
+                }
+            });
         }
     }
 
@@ -46605,9 +46676,11 @@ public class ChatActivity extends BaseFragment implements
                     options.add(OPTION_COPY);
                     icons.add(R.drawable.msg_copy);
                 }
-                // --- DevGram: история изменений сообщения (если есть сохранённые ревизии) ---
-                if (selectedObject != null && selectedObject.messageOwner != null
-                        && DevGramMessagesController.getInstance().hasAnyRevisions(getUserConfig().getClientUserId(), getDialogId(), selectedObject.getId())) {
+                // --- DevGram: история изменений — показываем для любого изменённого сообщения ---
+                if (selectedObject != null && selectedObject.messageOwner != null && DevGramConfig.saveMessagesHistory
+                        && ((selectedObject.messageOwner.flags & TLRPC.MESSAGE_FLAG_EDITED) != 0
+                            || selectedObject.messageOwner.edit_date != 0
+                            || DevGramMessagesController.getInstance().hasAnyRevisions(getUserConfig().getClientUserId(), getDialogId(), selectedObject.getId()))) {
                     items.add("История изменений");
                     options.add(OPTION_DEVGRAM_HISTORY);
                     icons.add(R.drawable.msg_edit);
