@@ -11,6 +11,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -34,6 +35,7 @@ public class DevGramSettingsActivity extends BaseFragment {
     private static final int ID_CAT_GENERAL = 1;
     private static final int ID_CAT_GHOST = 2;
     private static final int ID_CAT_SPY = 3;
+    private static final int ID_BADGES = 4; // выдача значков — только для команды
 
     @Override
     public View createView(Context context) {
@@ -111,6 +113,13 @@ public class DevGramSettingsActivity extends BaseFragment {
         items.add(UItem.asButton(ID_CAT_GHOST, R.drawable.devgram_cat_ghost, "Режим призрака"));
         items.add(UItem.asButton(ID_CAT_SPY, R.drawable.devgram_cat_spy, "Слежка"));
         items.add(UItem.asShadow(null));
+
+        // Раздел для команды проекта: выдача значков. Видно только участникам команды.
+        if (DevGramBadges.isTeam(getUserConfig().getClientUserId())) {
+            items.add(UItem.asHeader("Разработчику"));
+            items.add(UItem.asButton(ID_BADGES, R.drawable.devgram_supporter, "Значки DevGram"));
+            items.add(UItem.asShadow("Выдача значков пользователям и чатам по ID."));
+        }
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
@@ -120,6 +129,8 @@ public class DevGramSettingsActivity extends BaseFragment {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GHOST));
         } else if (item.id == ID_CAT_SPY) {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
+        } else if (item.id == ID_BADGES) {
+            presentFragment(new DevGramBadgesActivity());
         }
     }
 }

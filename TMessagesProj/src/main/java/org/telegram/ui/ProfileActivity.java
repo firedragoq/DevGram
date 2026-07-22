@@ -134,6 +134,8 @@ import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ChatThemeController;
 import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.DevGramBadges;
+import org.telegram.messenger.DevGramRegDate;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.Emoji;
@@ -11099,6 +11101,62 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return lockIconDrawable;
     }
 
+    // DevGram: значок «поддержал форк». Держим по одному на каждый вариант имени (крупное/мелкое).
+    private final Drawable[] devgramSupporterDrawable = new Drawable[2];
+
+    private Drawable getDevGramSupporterDrawable(int a) {
+        if (devgramSupporterDrawable[a] == null) {
+            devgramSupporterDrawable[a] = ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter).mutate();
+        }
+        return devgramSupporterDrawable[a];
+    }
+
+    // DevGram: датацентр аккаунта по dc_id аватарки — «DC2, Amsterdam, NL».
+    // Определяется только когда есть аватарка (в ней лежит dc_id); иначе null → показываем «ID».
+    private String devgramDcInfo() {
+        int dc = 0;
+        if (userId != 0) {
+            TLRPC.User u = getMessagesController().getUser(userId);
+            if (u != null && u.photo != null) {
+                dc = u.photo.dc_id;
+            }
+        } else if (chatId != 0) {
+            TLRPC.Chat c = getMessagesController().getChat(chatId);
+            if (c != null && c.photo != null) {
+                dc = c.photo.dc_id;
+            }
+        }
+        if (dc <= 0) {
+            return null;
+        }
+        String loc;
+        switch (dc) {
+            case 1: case 3: loc = "Miami, US"; break;
+            case 2: case 4: loc = "Amsterdam, NL"; break;
+            case 5: loc = "Singapore, SG"; break;
+            default: loc = null; break;
+        }
+        return loc != null ? ("DC" + dc + ", " + loc) : ("DC" + dc);
+    }
+
+    // DevGram: показать примерную дату регистрации по ID пользователя.
+    private void showDevGramRegDate(long uid) {
+        String date = DevGramRegDate.estimate(uid);
+        if (date == null || getParentActivity() == null) {
+            return;
+        }
+        String text;
+        if (uid == getUserConfig().getClientUserId()) {
+            text = "Вы создали свой аккаунт примерно в " + date;
+        } else {
+            TLRPC.User u = getMessagesController().getUser(uid);
+            text = UserObject.getUserName(u) + " создал(а) свой аккаунт примерно в " + date;
+        }
+        BulletinFactory.of(ProfileActivity.this)
+                .createSimpleBulletin(ContextCompat.getDrawable(getParentActivity(), R.drawable.msg_calendar2), text)
+                .show();
+    }
+
     private Drawable getVerifiedCrossfadeDrawable(int a) {
         if (verifiedCrossfadeDrawable[a] == null) {
             verifiedDrawable[a] = Theme.profile_verifiedDrawable.getConstantState().newDrawable().mutate();
@@ -11537,6 +11595,20 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (a == 1 && (rightIconIsStatus || rightIconIsPremium)) {
                     nameTextView[a].setRightDrawableOutside(true);
                 }
+                // DevGram: значок в отдельном третьем слоте — виден всегда (рядом с verified/premium) и кликается
+                if (DevGramBadges.isBadged(user.id)) {
+                    nameTextView[a].setRightDrawable3(getDevGramSupporterDrawable(a));
+                    final CharSequence badgeName = UserObject.getUserName(user);
+                    nameTextView[a].setRightDrawable3OnClick(v ->
+                            BulletinFactory.of(ProfileActivity.this)
+                                    .createSimpleBulletin(
+                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
+                                            DevGramBadges.badgeText(user.id, badgeName))
+                                    .show());
+                } else {
+                    nameTextView[a].setRightDrawable3(null);
+                    nameTextView[a].setRightDrawable3OnClick(null);
+                }
                 if (user.self && getMessagesController().isPremiumUser(user)) {
                     nameTextView[a].setRightDrawableOnClick(v -> {
                         showStatusSelect();
@@ -11844,6 +11916,20 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     } else {
                         nameTextView[a].setRightDrawable(null);
                     }
+                }
+                // DevGram: значок «официальный чат» в отдельном третьем слоте
+                if (DevGramBadges.isBadged(-chatId)) {
+                    nameTextView[a].setRightDrawable3(getDevGramSupporterDrawable(a));
+                    final CharSequence badgeName = chat.title;
+                    nameTextView[a].setRightDrawable3OnClick(v ->
+                            BulletinFactory.of(ProfileActivity.this)
+                                    .createSimpleBulletin(
+                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
+                                            DevGramBadges.badgeText(-chatId, badgeName))
+                                    .show());
+                } else {
+                    nameTextView[a].setRightDrawable3(null);
+                    nameTextView[a].setRightDrawable3OnClick(null);
                 }
                 if (chat.bot_verification_icon != 0) {
                     nameTextView[a].setLeftDrawableOutside(true);
@@ -13581,7 +13667,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             ? userId
                             : chatId;
                         if (did != 0) {
-                            detailCell.setTextAndValue(did + "", "ID", false);
+                            // DevGram: под ID показываем датацентр по аватарке (как на скрине)
+                            String dc = devgramDcInfo();
+                            detailCell.setTextAndValue(did + "", dc != null ? dc : "ID", false);
                         }
                     } else if (position == usernameRow) {
                         String username = null;
@@ -13703,6 +13791,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         drawable.setColorFilter(new PorterDuffColorFilter(dontApplyPeerColor(getThemedColor(Theme.key_actionBarDefaultIcon), false), PorterDuff.Mode.MULTIPLY));
                         detailCell.setImage(drawable, LocaleController.getString(R.string.GetQRCode));
                         detailCell.setImageClickListener(ProfileActivity.this::onTextDetailCellImageClicked);
+                    } else if (position == idRow && userId != 0) {
+                        // DevGram: календарик справа от ID — примерная дата регистрации
+                        Drawable drawable = ContextCompat.getDrawable(detailCell.getContext(), R.drawable.msg_calendar2);
+                        drawable.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_switch2TrackChecked), PorterDuff.Mode.MULTIPLY));
+                        detailCell.setImage(drawable, "Дата регистрации");
+                        final long uid = userId;
+                        detailCell.setImageClickListener(v -> showDevGramRegDate(uid));
                     } else {
                         detailCell.setImage(null);
                         detailCell.setImageClickListener(null);

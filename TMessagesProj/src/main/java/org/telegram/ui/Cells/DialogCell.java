@@ -65,6 +65,7 @@ import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ChatThemeController;
 import org.telegram.messenger.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
@@ -638,6 +639,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private boolean drawVerified;
     private boolean drawBotVerified;
     private boolean drawPremium;
+    private boolean drawDevgramBadge; // DevGram: значок «поддержал форк» / «официальный чат»
+    private Drawable devgramBadgeDrawable;
     private final View emojiStatusView;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
@@ -1318,6 +1321,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         drawVerified = false;
         drawBotVerified = false;
         drawPremium = false;
+        drawDevgramBadge = false;
         drawForwardIcon = false;
         drawGiftIcon = false;
         drawScam = 0;
@@ -1549,6 +1553,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     }
                     if (dialogBotVerificationIcon != 0 && drawBotVerified) {
                         botVerification.set(dialogBotVerificationIcon, false);
+                    }
+                    // DevGram: свой значок рисуется всегда, даже рядом с verified/premium —
+                    // для него отводится отдельное место правее штатных иконок.
+                    if (drawScam == 0 && DevGramBadges.isBadged(currentDialogId)) {
+                        drawDevgramBadge = true;
                     }
                 }
             }
@@ -2409,6 +2418,16 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameLeft += w;
             }
         }
+        // DevGram: своё место под значок — отдельно от штатных слотов, чтобы он помещался
+        // рядом с verified/premium, а не вместо них.
+        if (drawDevgramBadge) {
+            final int w = dp(4 + 18);
+            nameWidth -= w;
+            nameAdditionalsForChannelSubscriber += w;
+            if (LocaleController.isRTL) {
+                nameLeft += w;
+            }
+        }
         if (drawBotVerified) {
             nameWidth -= dp(21);
         }
@@ -2925,7 +2944,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if (drawBotVerified) {
                     nameLeft += dp(21);
                 }
-                if ((dialogMuted || true) || drawUnmute || drawVerified || drawPremium || drawScam != 0) {
+                if ((dialogMuted || true) || drawUnmute || drawVerified || drawPremium || drawDevgramBadge || drawScam != 0) {
                     nameMuteLeft = (int) (nameLeft + left + dp(6));
                     if (drawPremium) {
                         nameMutedIconLeft = nameMuteLeft + dp(24 + 6);
@@ -4556,6 +4575,28 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
                 setDrawableBounds((drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable), nameMuteLeft, y);
                 (drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable).draw(canvas);
+            }
+
+            // DevGram: свой значок рисуем отдельно от штатной цепочки — сдвигая вправо на
+            // ширину уже занятой иконки, чтобы он не наезжал на verified/premium.
+            if (drawDevgramBadge) {
+                float y = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 13.5f : 16.5f);
+                if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
+                    y -= dp(9);
+                }
+                int offset = 0;
+                if (drawVerified) {
+                    offset = Theme.dialogs_verifiedDrawable.getIntrinsicWidth() + dp(3);
+                } else if (drawPremium) {
+                    offset = dp(24);
+                }
+                if (devgramBadgeDrawable == null) {
+                    devgramBadgeDrawable = getContext().getResources().getDrawable(R.drawable.devgram_supporter).mutate();
+                }
+                final int sz = dp(18);
+                final int left = nameMuteLeft - dp(1) + offset;
+                devgramBadgeDrawable.setBounds(left, (int) y, left + sz, (int) y + sz);
+                devgramBadgeDrawable.draw(canvas);
             }
 
             if (drawReorder || reorderIconProgress != 0) {

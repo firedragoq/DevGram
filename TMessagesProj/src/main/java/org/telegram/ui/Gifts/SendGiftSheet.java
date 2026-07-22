@@ -159,9 +159,9 @@ public class SendGiftSheet extends BottomSheetWithRecyclerListView implements No
 //        setSlidingActionBar();
         headerPaddingTop = dp(4);
         headerPaddingBottom = dp(-10);
-        if (self) {
-            anonymous = true;
-        }
+        // DevGram: «Скрыть моё имя» по умолчанию выключено, в том числе при подарке себе
+        // (в оригинале для self галочка включалась принудительно).
+        anonymous = false;
 
         this.currentAccount = currentAccount;
         this.dialogId = dialogId;

@@ -66,6 +66,10 @@ public class SimpleTextView extends View implements Drawable.Callback {
     private Drawable leftDrawable;
     private Drawable rightDrawable;
     private Drawable rightDrawable2;
+    private Drawable rightDrawable3; // DevGram: третий слот (значок форка), рисуется после rightDrawable2
+    public int rightDrawable3X;
+    public int rightDrawable3Y;
+    private OnClickListener rightDrawable3OnClickListener;
     private Drawable replacedDrawable;
     private String replacedText;
     private int replacingDrawableTextIndex;
@@ -513,7 +517,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
             currentScrollDelay = SCROLL_DELAY_MS;
             checkUi_layerType();
         }
-        createLayout(width - getPaddingLeft() - getPaddingRight() - minusWidth - (leftDrawableOutside && leftDrawable != null ? leftDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0));
+        createLayout(width - getPaddingLeft() - getPaddingRight() - minusWidth - (leftDrawableOutside && leftDrawable != null ? leftDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable3 != null ? rightDrawable3.getIntrinsicWidth() + drawablePadding : 0));
 
         int finalHeight;
         if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) {
@@ -523,7 +527,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
         }
         if (widthWrapContent) {
 //            textWidth = (int) Math.ceil(layout.getLineWidth(0));
-            width = Math.min(width, getPaddingLeft() + textWidth + getPaddingRight() + minusWidth + (leftDrawableOutside && leftDrawable != null ? leftDrawable.getIntrinsicWidth() + drawablePadding : 0) + (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) + (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0));
+            width = Math.min(width, getPaddingLeft() + textWidth + getPaddingRight() + minusWidth + (leftDrawableOutside && leftDrawable != null ? leftDrawable.getIntrinsicWidth() + drawablePadding : 0) + (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) + (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0) + (rightDrawableOutside && rightDrawable3 != null ? rightDrawable3.getIntrinsicWidth() + drawablePadding : 0));
         }
         setMeasuredDimension(width, finalHeight);
 
@@ -612,7 +616,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
 
     @Override
     protected boolean verifyDrawable(@NonNull Drawable who) {
-        return who == rightDrawable || who == rightDrawable2 || who == leftDrawable || super.verifyDrawable(who);
+        return who == rightDrawable || who == rightDrawable2 || who == rightDrawable3 || who == leftDrawable || super.verifyDrawable(who);
     }
 
     public void replaceTextWithDrawable(Drawable drawable, String replacedText) {
@@ -682,6 +686,32 @@ public class SimpleTextView extends View implements Drawable.Callback {
 
     public Drawable getRightDrawable2() {
         return rightDrawable2;
+    }
+
+    // DevGram: третий правый слот — рисуется правее rightDrawable2, со своим кликом.
+    public boolean setRightDrawable3(Drawable drawable) {
+        if (rightDrawable3 == drawable) {
+            return false;
+        }
+        if (rightDrawable3 != null) {
+            rightDrawable3.setCallback(null);
+        }
+        rightDrawable3 = drawable;
+        if (drawable != null) {
+            drawable.setCallback(this);
+        }
+        if (!recreateLayoutMaybe()) {
+            invalidate();
+        }
+        return true;
+    }
+
+    public Drawable getRightDrawable3() {
+        return rightDrawable3;
+    }
+
+    public void setRightDrawable3OnClick(OnClickListener onClickListener) {
+        rightDrawable3OnClickListener = onClickListener;
     }
 
     public void setRightDrawableScale(float scale) {
@@ -932,6 +962,33 @@ public class SimpleTextView extends View implements Drawable.Callback {
             rightDrawable2.draw(canvas);
             totalWidth += drawablePadding + dw;
         }
+        // DevGram: третий слот — правее rightDrawable2
+        if (rightDrawable3 != null && !rightDrawableHidden && rightDrawableScale > 0 && !rightDrawableOutside && !rightDrawableInside) {
+            int x = textOffsetX + textWidth + drawablePadding + (int) -scrollingOffset;
+            if (rightDrawable != null) {
+                x += (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale) + drawablePadding;
+            }
+            if (rightDrawable2 != null) {
+                x += (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale) + drawablePadding;
+            }
+            if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL ||
+                    (gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT) {
+                x += offsetX;
+            }
+            int dw = (int) (rightDrawable3.getIntrinsicWidth() * rightDrawableScale);
+            int dh = (int) (rightDrawable3.getIntrinsicHeight() * rightDrawableScale);
+            int y;
+            if ((gravity & Gravity.VERTICAL_GRAVITY_MASK) == Gravity.CENTER_VERTICAL) {
+                y = (getMeasuredHeight() - dh) / 2 + rightDrawableTopPadding;
+            } else {
+                y = getPaddingTop() + (textHeight - dh) / 2 + rightDrawableTopPadding;
+            }
+            rightDrawable3.setBounds(x, y, x + dw, y + dh);
+            rightDrawable3X = x + (dw >> 1);
+            rightDrawable3Y = y + (dh >> 1);
+            rightDrawable3.draw(canvas);
+            totalWidth += drawablePadding + dw;
+        }
         int nextScrollX = totalWidth + dp(DIST_BETWEEN_SCROLLING_TEXT);
 
         if (scrollingOffset != 0) {
@@ -1150,6 +1207,31 @@ public class SimpleTextView extends View implements Drawable.Callback {
             rightDrawable2.setBounds(x, y, x + dw, y + dh);
             rightDrawable2.draw(canvas);
         }
+        // DevGram: третий слот в режиме outside
+        if (rightDrawable3 != null && rightDrawableOutside) {
+            int x = Math.min(
+                    textOffsetX + textWidth + drawablePadding + (scrollingOffset == 0 ? -nextScrollX : (int) -scrollingOffset) + nextScrollX,
+                    getMaxTextWidth() - paddingRight + drawablePadding
+            );
+            if (rightDrawable != null) {
+                x += (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale) + drawablePadding;
+            }
+            if (rightDrawable2 != null) {
+                x += (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale) + drawablePadding;
+            }
+            int dw = (int) (rightDrawable3.getIntrinsicWidth() * rightDrawableScale);
+            int dh = (int) (rightDrawable3.getIntrinsicHeight() * rightDrawableScale);
+            int y;
+            if ((gravity & Gravity.VERTICAL_GRAVITY_MASK) == Gravity.CENTER_VERTICAL) {
+                y = (getMeasuredHeight() - dh) / 2 + rightDrawableTopPadding;
+            } else {
+                y = getPaddingTop() + (textHeight - dh) / 2 + rightDrawableTopPadding;
+            }
+            rightDrawable3.setBounds(x, y, x + dw, y + dh);
+            rightDrawable3X = x + (dw >> 1);
+            rightDrawable3Y = y + (dh >> 1);
+            rightDrawable3.draw(canvas);
+        }
     }
 
     public int getRightDrawableX() {
@@ -1161,7 +1243,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
     }
 
     public int getMaxTextWidth() {
-        return getMeasuredWidth() - (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0);
+        return getMeasuredWidth() - (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable3 != null ? rightDrawable3.getIntrinsicWidth() + drawablePadding : 0);
     }
 
     public float getExactWidth() {
@@ -1358,8 +1440,31 @@ public class SimpleTextView extends View implements Drawable.Callback {
                 getParent().requestDisallowInterceptTouchEvent(false);
             }
         }
-        return super.onTouchEvent(event) || maybeClick;
+        // DevGram: клик по значку в третьем слоте
+        if (rightDrawable3OnClickListener != null && rightDrawable3 != null) {
+            AndroidUtilities.rectTmp.set(rightDrawable3X - dp(16), rightDrawable3Y - dp(16), rightDrawable3X + dp(16), rightDrawable3Y + dp(16));
+            if (event.getAction() == MotionEvent.ACTION_DOWN && AndroidUtilities.rectTmp.contains((int) event.getX(), (int) event.getY())) {
+                maybeClick3 = true;
+                touchDownX = event.getX();
+                touchDownY = event.getY();
+                getParent().requestDisallowInterceptTouchEvent(true);
+            } else if (event.getAction() == MotionEvent.ACTION_MOVE && maybeClick3) {
+                if (Math.abs(event.getX() - touchDownX) >= AndroidUtilities.touchSlop || Math.abs(event.getY() - touchDownY) >= AndroidUtilities.touchSlop) {
+                    maybeClick3 = false;
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
+            } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                if (maybeClick3 && event.getAction() == MotionEvent.ACTION_UP) {
+                    rightDrawable3OnClickListener.onClick(this);
+                }
+                maybeClick3 = false;
+                getParent().requestDisallowInterceptTouchEvent(false);
+            }
+        }
+        return super.onTouchEvent(event) || maybeClick || maybeClick3;
     }
+
+    private boolean maybeClick3;
 
     public static interface PressableDrawable {
         public void setPressed(boolean value);

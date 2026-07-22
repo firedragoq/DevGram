@@ -77,6 +77,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SvgHelper;
+import org.telegram.messenger.DevGramHiddenGifts;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
@@ -85,6 +86,7 @@ import org.telegram.messenger.utils.DrawableUtils;
 import org.telegram.messenger.utils.tlutils.AmountUtils;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
+import org.telegram.tgnet.Vector;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.ui.AccountFrozenAlert;
@@ -263,6 +265,26 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
             lastFragment.presentFragment(ProfileActivity.of(dialogId));
         });
         topView.addView(balanceView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.TOP, 0, -3, -10, 0));
+
+        // DevGram: кнопка обновления списка скрытых подарков — слева, на уровне баланса
+        final ImageView refreshHiddenView = new ImageView(context);
+        refreshHiddenView.setScaleType(ImageView.ScaleType.CENTER);
+        refreshHiddenView.setImageResource(R.drawable.msg_retry);
+        refreshHiddenView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4, resourcesProvider), PorterDuff.Mode.SRC_IN));
+        refreshHiddenView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 1, dp(18)));
+        ScaleStateListAnimator.apply(refreshHiddenView);
+        refreshHiddenView.setOnClickListener(v -> {
+            DevGramHiddenGifts.invalidate();
+            DevGramHiddenGifts.load(currentAccount, () -> {
+                if (adapter != null) {
+                    adapter.update(true);
+                }
+                BulletinFactory.of(GiftSheet.this.container, GiftSheet.this.resourcesProvider)
+                        .createSimpleBulletin(R.raw.done, "Список подарков обновлён")
+                        .show();
+            });
+        });
+        topView.addView(refreshHiddenView, LayoutHelper.createFrame(36, 36, Gravity.LEFT | Gravity.TOP, 6, -1, 0, 0));
 
         final LinearLayout bottomView = new LinearLayout(context);
         bottomView.setOrientation(LinearLayout.VERTICAL);
@@ -464,6 +486,23 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
         itemAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
         itemAnimator.setDelayIncrement(40);
         recyclerListView.setItemAnimator(itemAnimator);
+        // DevGram: долгое нажатие по скрытому подарку копирует его полный id
+        recyclerListView.setOnItemLongClickListener((view, position) -> {
+            final UItem item = adapter.getItem(position - 1);
+            if (item == null || !(item.object instanceof TL_stars.StarGift)) {
+                return false;
+            }
+            final TL_stars.StarGift g = (TL_stars.StarGift) item.object;
+            if (!DevGramHiddenGifts.isHidden(g.id)) {
+                return false;
+            }
+            AndroidUtilities.addToClipboard(Long.toString(g.id));
+            BulletinFactory.of(GiftSheet.this.container, GiftSheet.this.resourcesProvider)
+                    .createCopyBulletin("ID подарка скопирован")
+                    .show();
+            return true;
+        });
+
         recyclerListView.setOnItemClickListener((view, position) -> {
             final UItem item = adapter.getItem(position - 1);
             if (item == null) return;
@@ -885,18 +924,41 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
             }
         }
         if (premiumTiers.isEmpty()) {
-            //BoostRepository.loadGiftOptions(currentAccount, null, paymentOptions -> {
-            //    if (getContext() == null || !isShown()) return;
-            //    options = BoostRepository.filterGiftOptions(paymentOptions, 1);
-            //    options = BoostRepository.filterGiftOptionsByBilling(options);
-            //    if (!options.isEmpty()) {
-            //        updatePremiumTiers();
-            //        if (adapter != null) {
-            //            adapter.update(true);
-            //        }
-            //    }
-            //});
+            // DevGram: в форке загрузка тарифов Premium была вырезана вместе с Google Billing,
+            // из-за чего блок «3/6/12 месяцев» всегда оставался пустым. Оплата у нас идёт
+            // через invoice (useInvoiceBilling), поэтому запрашиваем опции напрямую.
+            loadPremiumOptions();
         }
+    }
+
+    private boolean loadingPremiumOptions;
+
+    private void loadPremiumOptions() {
+        if (loadingPremiumOptions) {
+            return;
+        }
+        loadingPremiumOptions = true;
+        final TLRPC.TL_payments_getPremiumGiftCodeOptions req = new TLRPC.TL_payments_getPremiumGiftCodeOptions();
+        ConnectionsManager.getInstance(currentAccount).sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
+            loadingPremiumOptions = false;
+            if (!(res instanceof Vector) || getContext() == null) {
+                return;
+            }
+            final ArrayList<TLRPC.TL_premiumGiftCodeOption> loaded = new ArrayList<>();
+            for (Object o : ((Vector) res).objects) {
+                if (o instanceof TLRPC.TL_premiumGiftCodeOption) {
+                    loaded.add((TLRPC.TL_premiumGiftCodeOption) o);
+                }
+            }
+            if (loaded.isEmpty()) {
+                return;
+            }
+            options = BoostRepository.filterGiftOptions(loaded, 1);
+            updatePremiumTiers();
+            if (adapter != null) {
+                adapter.update(true);
+            }
+        }));
     }
 
     @Override
@@ -1012,6 +1074,19 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
                 finalGifts = gifts;
             }
             int giftsCount = 0;
+            // DevGram: скрытые подарки (событийные мишки и т.п.) — сверху, до обычных
+            if (selectedTab == TAB_ALL) {
+                DevGramHiddenGifts.load(currentAccount, () -> {
+                    if (adapter != null) {
+                        adapter.update(true);
+                    }
+                });
+                final ArrayList<TL_stars.StarGift> hidden = DevGramHiddenGifts.get();
+                for (int i = 0; i < hidden.size(); ++i) {
+                    items.add(GiftCell.Factory.asStarGift(selectedTab, hidden.get(i), false, false, false, false, false));
+                    giftsCount++;
+                }
+            }
             for (int i = 0; i < finalGifts.size(); ++i) {
                 final TL_stars.StarGift gift = finalGifts.get(i);
                 if (
@@ -1982,6 +2057,14 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
                     ribbon.setStrokeColor(0);
                     ribbon.setBackdrop(null);
                     ribbon.setText(getString(R.string.Gift2LimitedRibbon), true);
+                } else if (DevGramHiddenGifts.isHidden(gift.id)) {
+                    // DevGram: на скрытых подарках — хвост их id, полный копируется долгим нажатием
+                    final String idStr = Long.toString(gift.id);
+                    ribbon.setVisibility(View.VISIBLE);
+                    ribbon.setColor(Theme.getColor(Theme.key_color_purple, resourcesProvider));
+                    ribbon.setStrokeColor(0);
+                    ribbon.setBackdrop(null);
+                    ribbon.setText(10, idStr.length() > 5 ? idStr.substring(idStr.length() - 5) : idStr, true);
                 } else {
                     ribbon.setBackdrop(null);
                     ribbon.setStrokeColor(0);

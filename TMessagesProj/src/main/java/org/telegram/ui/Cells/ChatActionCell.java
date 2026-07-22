@@ -830,7 +830,9 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
                     parentObject = messageObject;
                     final TLRPC.TL_messageActionStarGift action = (TLRPC.TL_messageActionStarGift) messageObject.messageOwner.action;
                     if (action.gift != null) {
-                        document = action.gift.sticker;
+                        // DevGram: было action.gift.sticker — пустое, если стикер пришёл в атрибутах,
+                        // из-за чего превью подарка не рисовалось. getDocument() ищет в обоих местах.
+                        document = action.gift.getDocument();
                     }
                 } else if (messageObject.messageOwner.action instanceof TLRPC.TL_messageActionStarGiftUnique && ((TLRPC.TL_messageActionStarGiftUnique) messageObject.messageOwner.action).refunded) {
                     parentObject = messageObject;

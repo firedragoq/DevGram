@@ -117,6 +117,12 @@
     >
         <!-- usesCleartextTraffic for browser supporting opening http:// links -->
 
+        <!-- One UI (Samsung) по умолчанию подкладывает под иконку свою белую плашку, считая,
+             что у приложения нет собственного фона. Этим флагом говорим, что фон у нас свой. -->
+        <meta-data
+            android:name="com.samsung.android.icon_container.has_icon_container"
+            android:value="true" />
+
         <activity-alias
             android:enabled="true"
             android:name="org.telegram.messenger.DefaultIcon"

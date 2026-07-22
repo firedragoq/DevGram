@@ -40,6 +40,7 @@ import androidx.core.content.ContextCompat;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ChatObject;
+import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLog;
@@ -981,7 +982,23 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             rightDrawableContentDescription = getString(R.string.AccDescrPremium);
         } else {
             titleTextView.setRightDrawable(null);
+            titleTextView.setRightDrawableOnClick(null);
             rightDrawableContentDescription = null;
+        }
+        // DevGram: значок в отдельном третьем слоте — виден рядом с verified/premium, кликается
+        if (parentFragment != null && DevGramBadges.isBadged(parentFragment.getDialogId())) {
+            final long badgeDialogId = parentFragment.getDialogId();
+            final CharSequence badgeName = titleTextView.getText();
+            titleTextView.setRightDrawable3(ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter));
+            titleTextView.setRightDrawable3OnClick(v ->
+                    BulletinFactory.of(parentFragment)
+                            .createSimpleBulletin(
+                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
+                                    DevGramBadges.badgeText(badgeDialogId, badgeName))
+                            .show());
+        } else {
+            titleTextView.setRightDrawable3(null);
+            titleTextView.setRightDrawable3OnClick(null);
         }
         checkActionBar(animated);
     }
