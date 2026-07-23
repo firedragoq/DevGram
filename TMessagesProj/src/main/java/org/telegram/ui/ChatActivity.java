@@ -14978,35 +14978,31 @@ public class ChatActivity extends BaseFragment implements
         showFieldPanel(true, messageObjectToReply, null, null, null, true, 0, null, false, 0, true);
     }
 
-    // DevGram: отложенный ответ на удалённое сообщение из экрана «История удалёнок».
-    // Экран удалёнок — отдельный, а навигация при возврате может всплыть к уже открытому
-    // чату, поэтому передаём ответ статически, а нужный (живой) инстанс применяет его в
-    // onResume — гарантированно после createView.
+    // DevGram: ответ на удалённое сообщение из экрана «История удалёнок».
+    // Серверный reply/quote к удалённому сообщению отклоняется сервером (восклицательный
+    // знак), поэтому — как в AyuGram — просто копируем текст удалёнки в поле ввода блок-цитатой
+    // (обычный текст сообщения, всегда отправляется). Экран удалёнок отдельный, навигация
+    // при возврате может всплыть к уже открытому чату, поэтому передаём текст статически,
+    // а нужный (живой) инстанс вставляет его в поле в onTransitionAnimationEnd/onResume.
     private static long devgramPendingReplyDialogId;
-    private static MessageObject devgramPendingReplyMessage;
-    private static boolean devgramPendingReplyAsQuote;
+    private static CharSequence devgramPendingReplyText;
 
-    public static void setDevGramPendingReply(long dialogId, MessageObject message, boolean asQuote) {
+    public static void setDevGramPendingReply(long dialogId, CharSequence quoteText) {
         devgramPendingReplyDialogId = dialogId;
-        devgramPendingReplyMessage = message;
-        devgramPendingReplyAsQuote = asQuote;
+        devgramPendingReplyText = quoteText;
     }
 
     private void applyDevGramPendingReply() {
-        if (devgramPendingReplyMessage == null || dialog_id != devgramPendingReplyDialogId || chatActivityEnterView == null) {
+        if (TextUtils.isEmpty(devgramPendingReplyText) || dialog_id != devgramPendingReplyDialogId || chatActivityEnterView == null) {
             return;
         }
-        final MessageObject m = devgramPendingReplyMessage;
-        final boolean quote = devgramPendingReplyAsQuote;
-        devgramPendingReplyMessage = null; // применяем один раз
-        if (quote) {
-            ReplyQuote q = ReplyQuote.from(m);
-            if (q != null) {
-                showFieldPanelForReplyQuote(m, q);
-                return;
-            }
-        }
-        showFieldPanelForReply(m);
+        final CharSequence quoteText = devgramPendingReplyText;
+        devgramPendingReplyText = null; // применяем один раз
+        SpannableStringBuilder sb = new SpannableStringBuilder(quoteText);
+        // оборачиваем весь текст в блок-цитату; putQuoteToEditable сам добавит перевод строки
+        org.telegram.ui.Components.QuoteSpan.putQuoteToEditable(sb, 0, sb.length(), false);
+        chatActivityEnterView.setFieldText(sb);
+        chatActivityEnterView.openKeyboard();
     }
 
     private Runnable onHideFieldPanelRunnable;

@@ -252,13 +252,14 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
     // (в превью показывается тип: «Фотография», «Видео», «Голосовое…»). Ответ передаём
     // статически — нужный (живой) инстанс чата применит его в onResume. Свайп влево — то же.
     private void replyInChat(MessageObject message) {
-        // у старых удалёнок dialog_id мог не сохраниться — проставим, иначе getDialogId()
-        // не совпадёт с чатом и цитата не построится
-        if (message.messageOwner != null && message.messageOwner.dialog_id == 0) {
-            message.messageOwner.dialog_id = dialogId;
+        // текст цитаты: текст удалёнки, либо метка типа медиа
+        CharSequence quoteText;
+        if (message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message)) {
+            quoteText = message.messageOwner.message;
+        } else {
+            quoteText = deletedMediaLabel(message);
         }
-        boolean asQuote = message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message);
-        ChatActivity.setDevGramPendingReply(dialogId, message, asQuote);
+        ChatActivity.setDevGramPendingReply(dialogId, quoteText);
         Bundle args = new Bundle();
         if (dialogId > 0) {
             args.putLong("user_id", dialogId);
@@ -266,6 +267,18 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             args.putLong("chat_id", -dialogId);
         }
         presentFragment(new ChatActivity(args));
+    }
+
+    private String deletedMediaLabel(MessageObject m) {
+        if (m.isVoice()) return "Голосовое сообщение";
+        if (m.isRoundVideo()) return "Видеосообщение";
+        if (m.isGif()) return "GIF";
+        if (m.isVideo()) return "Видео";
+        if (m.isPhoto()) return "Фотография";
+        if (m.isMusic()) return "Аудио";
+        if (m.isSticker() || m.isAnimatedSticker()) return "Стикер";
+        if (m.getDocument() != null) return "Файл";
+        return "Медиа";
     }
 
     // Переслать: стандартный пикер пересылки.
@@ -362,9 +375,11 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
 
                 @Override
                 public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                    // смахивание влево (как обычный ответ) → ответить на удалённое сообщение
-                    if (onSwipeReply != null && velocityX < -AndroidUtilities.dp(600)
-                            && Math.abs(velocityX) > Math.abs(velocityY) * 1.5f) {
+                    // смахивание влево (как обычный ответ) → ответить на удалённое сообщение.
+                    // Порог по скорости невысокий + горизонтальное движение должно преобладать.
+                    if (onSwipeReply != null && e1 != null && e2 != null
+                            && (e2.getX() - e1.getX()) < -AndroidUtilities.dp(48)
+                            && Math.abs(velocityX) > Math.abs(velocityY)) {
                         onSwipeReply.run();
                         return true;
                     }
