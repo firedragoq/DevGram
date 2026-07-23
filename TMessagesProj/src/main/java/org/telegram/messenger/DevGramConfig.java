@@ -27,6 +27,13 @@ public class DevGramConfig {
     // Скрывать рекламу: спонсорские сообщения в каналах и ботах + реклама в видеоплеере.
     public static boolean disableAds = false;
 
+    // Локальный премиум: клиент ведёт себя так, будто у аккаунта есть Telegram Premium —
+    // открываются КЛИЕНТСКИЕ фичи (безлимит папок, премиум-эмодзи/стикеры/реакции, статусы
+    // и т.п.). Серверные вещи (гигабайтные загрузки, премиум-реакции у собеседников) подделать
+    // нельзя. Хук стоит в UserConfig.isPremium() и MessagesController.isPremiumUser() — только
+    // для нашего аккаунта, чужим премиум не приписываем.
+    public static boolean localPremium = false;
+
     // --- сохранение истории ---
     // По умолчанию ВЫКЛЮЧЕНЫ, как и режим призрака: мод не должен ничего менять,
     // пока пользователь сам не включит нужную функцию.
@@ -57,6 +64,7 @@ public class DevGramConfig {
             sendOnlinePackets = preferences.getBoolean("sendOnlinePackets", true);
             sendUploadTyping = preferences.getBoolean("sendUploadTyping", true);
             disableAds = preferences.getBoolean("disableAds", false);
+            localPremium = preferences.getBoolean("localPremium", false);
             saveDeletedMessages = preferences.getBoolean("saveDeletedMessages", false);
             saveMessagesHistory = preferences.getBoolean("saveMessagesHistory", false);
             saveMedia = preferences.getBoolean("saveMedia", false);
@@ -103,6 +111,18 @@ public class DevGramConfig {
     public static void setDisableAds(boolean v) {
         disableAds = v;
         preferences.edit().putBoolean("disableAds", v).apply();
+    }
+
+    public static void setLocalPremium(boolean v) {
+        localPremium = v;
+        preferences.edit().putBoolean("localPremium", v).apply();
+        // применяем сразу ко всем активным аккаунтам: разблокируем папки/лимиты и обновляем UI,
+        // чтобы не требовался перезапуск приложения
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                UserConfig.getInstance(a).notifyPremiumChanged();
+            }
+        }
     }
 
     public static void setSaveDeletedMessages(boolean v) {

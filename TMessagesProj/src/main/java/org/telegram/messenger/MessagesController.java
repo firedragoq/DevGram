@@ -922,7 +922,10 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean isPremiumUser(TLRPC.User currentUser) {
-        return currentUser != null && currentUser.premium && !isSupportUser(currentUser);
+        // DevGram: локальный премиум приписываем ТОЛЬКО своему аккаунту, чужим — нет
+        return currentUser != null && !isSupportUser(currentUser)
+                && (currentUser.premium
+                    || (currentUser.id == getUserConfig().getClientUserId() && DevGramConfig.localPremium));
     }
 
     public boolean didPressTranscribeButtonEnough() {

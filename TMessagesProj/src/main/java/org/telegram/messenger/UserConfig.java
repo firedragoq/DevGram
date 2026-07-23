@@ -618,10 +618,24 @@ public class UserConfig extends BaseController {
 
     public boolean isPremium() {
         TLRPC.User user = currentUser;
+        // DevGram: локальный премиум — считаем аккаунт премиумным, даже если сервер так не думает
         if (user == null) {
-            return false;
+            return DevGramConfig.localPremium;
         }
-        return user.premium;
+        return DevGramConfig.localPremium || user.premium;
+    }
+
+    // DevGram: применить смену локального премиума на лету — обновить лимиты/папки/реакции и UI,
+    // чтобы не требовался перезапуск. Повторяет логику checkPremiumSelf().
+    public void notifyPremiumChanged() {
+        AndroidUtilities.runOnUIThread(() -> {
+            getMessagesController().updatePremium(isPremium());
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.currentUserPremiumStatusChanged);
+            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.premiumStatusChangedGlobal);
+            getMediaDataController().loadPremiumPromo(false);
+            getMediaDataController().loadReactions(false, null);
+            getMessagesController().getStoriesController().invalidateStoryLimit();
+        });
     }
 
     public Long getEmojiStatus() {

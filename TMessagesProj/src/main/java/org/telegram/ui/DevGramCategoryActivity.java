@@ -42,6 +42,7 @@ public class DevGramCategoryActivity extends BaseFragment {
     // Основные
     private static final int ID_SHOW_CONTACTS = 7;
     private static final int ID_DISABLE_ADS = 14;
+    private static final int ID_LOCAL_PREMIUM = 15;
 
     private final int category;
     private UniversalRecyclerView listView;
@@ -125,6 +126,12 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.disableAds));
             items.add(UItem.asShadow("Убирает спонсорские сообщения в каналах и у ботов, а также рекламу "
                     + "в видеоплеере. Клиент не просто прячет их, а вообще не запрашивает у сервера."));
+
+            items.add(UItem.asCheck(ID_LOCAL_PREMIUM, "Локальный премиум")
+                    .setChecked(DevGramConfig.localPremium));
+            items.add(UItem.asShadow("Разблокирует клиентские премиум-функции: безлимит папок, "
+                    + "премиум-эмодзи и реакции, статусы, увеличенные лимиты. Работает только локально — "
+                    + "серверные возможности (гигабайтные загрузки, премиум-реакции у собеседников) недоступны."));
         }
     }
 
@@ -147,6 +154,8 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setSaveInBotChats(!DevGramConfig.saveInBotChats);
         } else if (item.id == ID_DISABLE_ADS) {
             DevGramConfig.setDisableAds(!DevGramConfig.disableAds);
+        } else if (item.id == ID_LOCAL_PREMIUM) {
+            DevGramConfig.setLocalPremium(!DevGramConfig.localPremium);
         } else if (item.id == ID_SHOW_CONTACTS) {
             getUserConfig().setShowContactsTab(!getUserConfig().showContactsTab);
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
