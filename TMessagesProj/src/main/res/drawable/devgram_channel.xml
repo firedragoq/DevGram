@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DevGram: канал — бумажный самолётик (в тему логотипа) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M21.43,2.59c0.4,-0.18 0.85,0.22 0.69,0.63l-6.6,17.2c-0.16,0.42 -0.74,0.46 -0.96,0.06l-3.5,-6.36 -6.36,-3.5c-0.4,-0.22 -0.36,-0.8 0.06,-0.96l16.67,-6.4zM18.3,6.28l-8.1,5.9 1.02,0.56c0.14,0.08 0.26,0.2 0.34,0.34l0.56,1.02 5.9,-8.1c0.16,-0.2 -0.08,-0.44 -0.28,-0.28l-0.06,0.06z" />
+</vector>

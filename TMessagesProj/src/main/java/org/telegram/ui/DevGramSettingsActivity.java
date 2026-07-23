@@ -14,6 +14,7 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.R;
+import org.telegram.messenger.browser.Browser;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
@@ -36,6 +37,11 @@ public class DevGramSettingsActivity extends BaseFragment {
     private static final int ID_CAT_GHOST = 2;
     private static final int ID_CAT_SPY = 3;
     private static final int ID_BADGES = 4; // выдача значков — только для команды
+    private static final int ID_LINK_CHANNEL = 10;
+    private static final int ID_LINK_CHAT = 11;
+
+    private static final String LINK_CHANNEL = "https://t.me/devgramnews";
+    private static final String LINK_CHAT = "https://t.me/devgram_chat";
 
     @Override
     public View createView(Context context) {
@@ -114,6 +120,12 @@ public class DevGramSettingsActivity extends BaseFragment {
         items.add(UItem.asButton(ID_CAT_SPY, R.drawable.devgram_cat_spy, "Слежка"));
         items.add(UItem.asShadow(null));
 
+        // Ссылки на официальный канал и чат
+        items.add(UItem.asHeader("Ссылки"));
+        items.add(UItem.asButton(ID_LINK_CHANNEL, R.drawable.devgram_channel, "Канал", "@devgramnews"));
+        items.add(UItem.asButton(ID_LINK_CHAT, R.drawable.devgram_chat, "Чат", "@devgram_chat"));
+        items.add(UItem.asShadow(null));
+
         // Раздел для команды проекта: выдача значков. Видно только участникам команды.
         if (DevGramBadges.isTeam(getUserConfig().getClientUserId())) {
             items.add(UItem.asHeader("Разработчику"));
@@ -131,6 +143,10 @@ public class DevGramSettingsActivity extends BaseFragment {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
         } else if (item.id == ID_BADGES) {
             presentFragment(new DevGramBadgesActivity());
+        } else if (item.id == ID_LINK_CHANNEL) {
+            Browser.openUrl(getContext(), LINK_CHANNEL);
+        } else if (item.id == ID_LINK_CHAT) {
+            Browser.openUrl(getContext(), LINK_CHAT);
         }
     }
 }
