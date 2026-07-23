@@ -40020,7 +40020,8 @@ public class ChatActivity extends BaseFragment implements
             }
             long selfId = getUserConfig().getClientUserId();
             if (!DevGramMessagesController.getInstance().hasAnyRevisions(selfId, getDialogId(), msg.getId())) {
-                android.widget.Toast.makeText(getParentActivity(), "История изменений пуста", android.widget.Toast.LENGTH_SHORT).show();
+                // Нет сохранённых ревизий — тап игнорируем молча (без всплывашки «пуста»).
+                // Сам тап сюда почти не доходит: ChatMessageCell уже не перехватывает жест без ревизий.
                 return;
             }
             final int msgId = msg.getId();
@@ -46812,12 +46813,12 @@ public class ChatActivity extends BaseFragment implements
         }
 
         // --- DevGram: «История изменений» — в самом конце метода, чтобы пункт попадал в меню
-        // при ЛЮБОЙ ветке (обычные чаты, секретные, каналы), для любого изменённого сообщения ---
+        // при ЛЮБОЙ ветке (обычные чаты, секретные, каналы). Показываем ТОЛЬКО когда реально
+        // есть сохранённые ревизии: серверный флаг «изменено» бывает и без наших ревизий
+        // (правка медиа/подписи, правка с другого устройства, до установки) — тогда история пуста. ---
         if (message != null && message.messageOwner != null && DevGramConfig.saveMessagesHistory
                 && !options.contains(OPTION_DEVGRAM_HISTORY)
-                && ((message.messageOwner.flags & TLRPC.MESSAGE_FLAG_EDITED) != 0
-                    || message.messageOwner.edit_date != 0
-                    || DevGramMessagesController.getInstance().hasAnyRevisions(getUserConfig().getClientUserId(), getDialogId(), message.getId()))) {
+                && DevGramMessagesController.getInstance().hasAnyRevisions(getUserConfig().getClientUserId(), getDialogId(), message.getId())) {
             items.add("История изменений");
             options.add(OPTION_DEVGRAM_HISTORY);
             icons.add(R.drawable.msg_edit);

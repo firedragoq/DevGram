@@ -113,6 +113,7 @@ import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.DevGramConfig;
+import org.telegram.messenger.DevGramMessagesController;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
@@ -4195,7 +4196,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 && y <= textY + currentMessageObject.textHeight(transitionParams);
         boolean result = false;
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            if (inText) {
+            // Реагируем на тап только если реально есть сохранённые ревизии — иначе не перехватываем
+            // жест (обычное выделение текста) и не показываем пустую историю.
+            if (inText && devgramHasRevisions()) {
                 devgramEditPressed = true;
                 result = true;
             }
@@ -4212,6 +4215,21 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             devgramEditPressed = false;
         }
         return result;
+    }
+
+    // DevGram: есть ли в хранилище сохранённые ревизии этого сообщения. Дешёвый индексный
+    // SELECT по тапу — чтобы предлагать «Историю изменений» только когда есть что показать.
+    private boolean devgramHasRevisions() {
+        try {
+            MessageObject mo = currentMessageObject;
+            if (mo == null) {
+                return false;
+            }
+            long selfId = UserConfig.getInstance(currentAccount).getClientUserId();
+            return DevGramMessagesController.getInstance().hasAnyRevisions(selfId, mo.getDialogId(), mo.getId());
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     private boolean checkRoundSeekbar(MotionEvent event) {
