@@ -8,9 +8,12 @@
 package org.telegram.ui;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -20,6 +23,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DevGramMessagesController;
+import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
@@ -268,11 +272,34 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         return "сообщений";
     }
 
-    // Ячейка удалёнки: если у сообщения есть локально сохранённый файл вложения (attachPath),
-    // насильно грузим его в photoImage — иначе после очистки кеша осталось бы битое превью.
+    // Ячейка удалёнки:
+    //  • аватарку входящих рисуем сами — в обычном чате её рисует ChatActivity внешним
+    //    проходом (getAvatarImage()), в standalone-списке этого нет, поэтому onDraw;
+    //  • медиа грузим из локально сохранённого файла (attachPath) — иначе битое превью;
+    //  • тап ловим GestureDetector'ом: обычный onClick ChatMessageCell съедает.
     private static class DeletedMessageCell extends ChatMessageCell {
+        Runnable onTap;
+        private final GestureDetector gestureDetector;
+
         DeletedMessageCell(Context context, int account) {
             super(context, account);
+            gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onSingleTapUp(MotionEvent e) {
+                    if (onTap != null) {
+                        onTap.run();
+                    }
+                    return true;
+                }
+            });
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            // read-only просмотр: любые внутренние нажатия ячейки нам не нужны, ловим только тап.
+            // Скролл продолжает работать: RecyclerView перехватывает MOVE через onInterceptTouchEvent.
+            gestureDetector.onTouchEvent(event);
+            return true;
         }
 
         @Override
@@ -283,6 +310,21 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
                 File f = new File(mo.messageOwner.attachPath);
                 if (f.exists() && f.length() > 0) {
                     getPhotoImage().setImage(mo.messageOwner.attachPath, null, null, null, 0);
+                }
+            }
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (isAvatarVisible) {
+                ImageReceiver a = getAvatarImage();
+                if (a != null) {
+                    int sz = AndroidUtilities.dp(42);
+                    int y = getMeasuredHeight() - sz - AndroidUtilities.dp(2); // низ бабла, как в чате
+                    a.setImageCoords(AndroidUtilities.dp(6), y, sz, sz);
+                    a.setVisible(true, false);
+                    a.draw(canvas);
                 }
             }
         }
@@ -312,7 +354,7 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             cell.isChat = true;
             cell.setFullyDraw(true);
             cell.setMessageObject(message, null, false, false, position == 0);
-            cell.setOnClickListener(v -> showMessageMenu(message, catchTime));
+            cell.onTap = () -> showMessageMenu(message, catchTime);
         }
 
         @Override
