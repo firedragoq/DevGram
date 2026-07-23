@@ -18,6 +18,7 @@ import android.util.LongSparseArray;
 import org.telegram.tgnet.SerializedData;
 import org.telegram.tgnet.TLRPC;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -97,6 +98,19 @@ public class DevGramMessagesController {
                     return;
                 }
             }
+            // сохраняем сам файл вложения на диск, пока он ещё в кеше — иначе после
+            // очистки кеша останется битый превью. Путь пишем в attachPath, чтобы медиа
+            // грузилось из локальной копии (как в AyuGram).
+            try {
+                if (msg.dialog_id == 0) {
+                    msg.dialog_id = dialogId;
+                }
+                String mediaPath = saveMediaFile(accountId, msg);
+                if (mediaPath != null) {
+                    msg.attachPath = mediaPath;
+                }
+            } catch (Throwable ignore) {
+            }
             byte[] data = serialize(msg);
             if (data == null) {
                 return;
@@ -111,6 +125,74 @@ public class DevGramMessagesController {
             cv.put("catchTime", catchTime);
             cv.put("data", data);
             db.insert("deleted_messages", null, cv);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    // Копирует файл вложения из кеша в постоянную папку DevGram. Возвращает путь копии
+    // или null, если сохранять нечего/файла нет на диске.
+    private static String saveMediaFile(int accountId, TLRPC.Message msg) {
+        try {
+            if (!DevGramConfig.saveMedia || msg == null || msg.media == null) {
+                return null;
+            }
+            File src = FileLoader.getInstance(accountId).getPathToMessage(msg);
+            if (src == null || !src.exists() || src.length() == 0) {
+                return null;
+            }
+            File dir = new File(ApplicationLoader.getFilesDirFixed(), "devgram_saved");
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            File dst = new File(dir, Math.abs(msg.dialog_id) + "_" + msg.id + "_" + src.getName());
+            if (!dst.exists() || dst.length() != src.length()) {
+                if (!AndroidUtilities.copyFileSafe(src, dst)) {
+                    return null;
+                }
+            }
+            return dst.getAbsolutePath();
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
+        }
+    }
+
+    // Запись удалёнки вместе с датой удаления (catchTime) — для экрана удалёнок и «Деталей».
+    public static class DeletedEntry {
+        public TLRPC.Message message;
+        public int catchTime; // когда поймали удаление
+    }
+
+    public List<DeletedEntry> getDeletedEntries(long userId, long dialogId, long topicId) {
+        ArrayList<DeletedEntry> res = new ArrayList<>();
+        try {
+            SQLiteDatabase db = helper.getReadableDatabase();
+            try (Cursor c = db.rawQuery(
+                    "SELECT data, catchTime FROM deleted_messages WHERE userId=? AND dialogId=? AND topicId=? ORDER BY messageId ASC",
+                    new String[]{Long.toString(userId), Long.toString(dialogId), Long.toString(topicId)})) {
+                while (c.moveToNext()) {
+                    TLRPC.Message m = deserialize(c.getBlob(0));
+                    if (m != null) {
+                        DeletedEntry e = new DeletedEntry();
+                        e.message = m;
+                        e.catchTime = c.getInt(1);
+                        res.add(e);
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return res;
+    }
+
+    // Убрать одну удалёнку из хранилища (пункт «Удалить» в меню).
+    public void deleteDeletedMessage(long userId, long dialogId, int messageId) {
+        try {
+            SQLiteDatabase db = helper.getWritableDatabase();
+            db.delete("deleted_messages", "userId=? AND dialogId=? AND messageId=?",
+                    new String[]{Long.toString(userId), Long.toString(dialogId), Integer.toString(messageId)});
         } catch (Throwable e) {
             FileLog.e(e);
         }

@@ -1,11 +1,15 @@
 /*
  * DevGram: экран «История удалёнок» — все сохранённые удалённые сообщения чата,
  * отрисованные настоящими бабблами (ChatMessageCell) на фоне-обоях, как мини-чат.
+ * По тапу на сообщение — меню (Копировать / Показать в чате / Детали / Удалить),
+ * как в AyuGram. Медиа грузится из локально сохранённой копии (attachPath).
  */
 
 package org.telegram.ui;
 
 import android.content.Context;
+import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,17 +20,22 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DevGramMessagesController;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatMessageCell;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +45,7 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
     private final long dialogId;
     private final long topicId;
     private final ArrayList<MessageObject> messages = new ArrayList<>();
+    private final ArrayList<Integer> catchTimes = new ArrayList<>(); // дата удаления, синхронно с messages
     private RecyclerListView listView;
 
     public DevGramDeletedHistoryActivity(long dialogId, long topicId) {
@@ -50,21 +60,32 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
     }
 
     private void loadMessages() {
+        messages.clear();
+        catchTimes.clear();
         long selfId = getUserConfig().getClientUserId();
-        List<TLRPC.Message> saved = DevGramMessagesController.getInstance().getDeletedMessages(selfId, dialogId, topicId);
-        Collections.sort(saved, (a, b) -> Integer.compare(a.id, b.id)); // от старых к новым
-        for (TLRPC.Message m : saved) {
+        List<DevGramMessagesController.DeletedEntry> saved =
+                DevGramMessagesController.getInstance().getDeletedEntries(selfId, dialogId, topicId);
+        // от старых к новым
+        Collections.sort(saved, (a, b) -> Integer.compare(a.message.id, b.message.id));
+        for (DevGramMessagesController.DeletedEntry entry : saved) {
+            TLRPC.Message m = entry.message;
             if (m == null) {
                 continue;
             }
             try {
+                // в личке у входящего from_id может отсутствовать — подставляем собеседника,
+                // чтобы зарезолвились аватарка и имя отправителя
+                if (dialogId > 0 && !m.out && MessageObject.getPeerId(m.from_id) == 0) {
+                    TLRPC.TL_peerUser p = new TLRPC.TL_peerUser();
+                    p.user_id = dialogId;
+                    m.from_id = p;
+                }
                 MessageObject mo = new MessageObject(currentAccount, m, true, true);
-                // входящие рисуем с аватаркой отправителя (в т.ч. в личке), чтобы всегда было
-                // видно, кто прислал удалённое сообщение; свои — без аватарки, как в обычном чате
                 if (!mo.isOutOwner()) {
-                    mo.forceAvatar = true;
+                    mo.forceAvatar = true; // всегда показываем, кто прислал
                 }
                 messages.add(mo);
+                catchTimes.add(entry.catchTime);
             } catch (Throwable ignore) {
             }
         }
@@ -100,9 +121,8 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             }
         });
 
-        // isActionBarVisible()/useRootView() переопределены в false: наш actionBar лежит НАД
-        // contentView (обычный fragment-layout), поэтому обои НЕ надо повторно сдвигать и клипать
-        // на высоту экшн-бара — иначе сверху чёрная полоса высотой в экшн-бар.
+        // isActionBarVisible()/useRootView() → false: actionBar лежит НАД contentView, поэтому
+        // обои НЕ надо повторно сдвигать/клипать на высоту экшн-бара (иначе чёрная полоса сверху).
         SizeNotifierFrameLayout contentView = new SizeNotifierFrameLayout(context) {
             @Override
             protected boolean isActionBarVisible() {
@@ -119,7 +139,7 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
 
         listView = new RecyclerListView(context);
         // как в настоящем чате: сообщения прижаты книзу, при открытии видно самые свежие,
-        // вверх листаем к более старым (обои теперь заполняют весь фон, пустоты сверху нет)
+        // вверх листаем к более старым
         LinearLayoutManager layoutManager = new LinearLayoutManager(context);
         layoutManager.setStackFromEnd(true);
         listView.setLayoutManager(layoutManager);
@@ -135,12 +155,109 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             empty.setGravity(Gravity.CENTER);
             empty.setTextColor(Theme.getColor(Theme.key_chat_serviceText, resourceProvider));
             empty.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 15);
-            empty.setPadding(org.telegram.messenger.AndroidUtilities.dp(32), 0, org.telegram.messenger.AndroidUtilities.dp(32), 0);
+            empty.setPadding(AndroidUtilities.dp(32), 0, AndroidUtilities.dp(32), 0);
             contentView.addView(empty, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
         }
 
         fragmentView = contentView;
         return fragmentView;
+    }
+
+    // ================= меню по тапу =================
+
+    private void showMessageMenu(MessageObject message, int catchTime) {
+        if (getParentActivity() == null || message == null) {
+            return;
+        }
+        final CharSequence text = message.messageOwner != null ? message.messageOwner.message : null;
+        final boolean hasText = !TextUtils.isEmpty(text);
+
+        ArrayList<CharSequence> titles = new ArrayList<>();
+        ArrayList<Integer> icons = new ArrayList<>();
+        ArrayList<Integer> actions = new ArrayList<>();
+        if (hasText) {
+            titles.add("Копировать");
+            icons.add(R.drawable.msg_copy);
+            actions.add(0);
+        }
+        titles.add("Показать в чате");
+        icons.add(R.drawable.msg_openin);
+        actions.add(1);
+        titles.add("Детали");
+        icons.add(R.drawable.msg_info);
+        actions.add(2);
+        titles.add("Удалить");
+        icons.add(R.drawable.msg_delete);
+        actions.add(3);
+
+        int[] iconsArr = new int[icons.size()];
+        for (int i = 0; i < icons.size(); i++) {
+            iconsArr[i] = icons.get(i);
+        }
+
+        BottomSheet.Builder builder = new BottomSheet.Builder(getParentActivity());
+        builder.setItems(titles.toArray(new CharSequence[0]), iconsArr, (dialog, which) -> {
+            int action = actions.get(which);
+            switch (action) {
+                case 0:
+                    AndroidUtilities.addToClipboard(text);
+                    BulletinFactory.of(this).createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
+                    break;
+                case 1:
+                    openInChat(message.getId());
+                    break;
+                case 2:
+                    showDetails(message, catchTime);
+                    break;
+                case 3:
+                    removeEntry(message);
+                    break;
+            }
+        });
+        builder.show();
+    }
+
+    private void openInChat(int messageId) {
+        Bundle args = new Bundle();
+        if (dialogId > 0) {
+            args.putLong("user_id", dialogId);
+        } else {
+            args.putLong("chat_id", -dialogId);
+        }
+        args.putInt("message_id", messageId);
+        presentFragment(new ChatActivity(args));
+    }
+
+    private void showDetails(MessageObject message, int catchTime) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("ID: ").append(message.getId()).append('\n');
+        sb.append("Дата: ").append(LocaleController.formatDateTime(message.messageOwner.date, true)).append('\n');
+        sb.append("Дата удаления: ").append(catchTime != 0 ? LocaleController.formatDateTime(catchTime, true) : "—");
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle("Детали");
+        builder.setMessage(sb.toString());
+        builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
+        showDialog(builder.create());
+    }
+
+    private void removeEntry(MessageObject message) {
+        long selfId = getUserConfig().getClientUserId();
+        DevGramMessagesController.getInstance().deleteDeletedMessage(selfId, dialogId, message.getId());
+        int idx = messages.indexOf(message);
+        if (idx >= 0) {
+            messages.remove(idx);
+            if (idx < catchTimes.size()) {
+                catchTimes.remove(idx);
+            }
+        }
+        if (listView != null && listView.getAdapter() != null) {
+            listView.getAdapter().notifyDataSetChanged();
+        }
+        actionBar.setSubtitle(messages.size() + " " + pluralMessages(messages.size()));
     }
 
     private String pluralMessages(int n) {
@@ -151,6 +268,26 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         return "сообщений";
     }
 
+    // Ячейка удалёнки: если у сообщения есть локально сохранённый файл вложения (attachPath),
+    // насильно грузим его в photoImage — иначе после очистки кеша осталось бы битое превью.
+    private static class DeletedMessageCell extends ChatMessageCell {
+        DeletedMessageCell(Context context, int account) {
+            super(context, account);
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            super.onLayout(changed, l, t, r, b);
+            MessageObject mo = getMessageObject();
+            if (mo != null && mo.messageOwner != null && !TextUtils.isEmpty(mo.messageOwner.attachPath)) {
+                File f = new File(mo.messageOwner.attachPath);
+                if (f.exists() && f.length() > 0) {
+                    getPhotoImage().setImage(mo.messageOwner.attachPath, null, null, null, 0);
+                }
+            }
+        }
+    }
+
     private class Adapter extends RecyclerListView.SelectionAdapter {
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
@@ -159,7 +296,7 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
 
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            ChatMessageCell cell = new ChatMessageCell(parent.getContext(), currentAccount);
+            DeletedMessageCell cell = new DeletedMessageCell(parent.getContext(), currentAccount);
             cell.setDelegate(new ChatMessageCell.ChatMessageCellDelegate() {
             });
             cell.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
@@ -168,15 +305,14 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
 
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            ChatMessageCell cell = (ChatMessageCell) holder.itemView;
-            MessageObject message = messages.get(position);
-            // ВАЖНО: без isChat=true ячейка не рисует ни аватарку, ни имя отправителя
-            // (needDrawAvatar() требует именно этот флаг)
+            DeletedMessageCell cell = (DeletedMessageCell) holder.itemView;
+            final MessageObject message = messages.get(position);
+            final int catchTime = position < catchTimes.size() ? catchTimes.get(position) : 0;
+            // ВАЖНО: isChat=true — иначе не рисуется ни аватарка, ни имя отправителя
             cell.isChat = true;
             cell.setFullyDraw(true);
-            // без группировки: у КАЖДОГО сообщения своя аватарка и имя отправителя,
-            // чтобы всегда было понятно, кто прислал удалённое сообщение
             cell.setMessageObject(message, null, false, false, position == 0);
+            cell.setOnClickListener(v -> showMessageMenu(message, catchTime));
         }
 
         @Override

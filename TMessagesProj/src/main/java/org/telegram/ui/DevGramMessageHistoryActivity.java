@@ -64,11 +64,7 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
             }
             base = rev;
             try {
-                MessageObject mo = new MessageObject(currentAccount, rev, true, true);
-                if (!mo.isOutOwner()) {
-                    mo.forceAvatar = true;
-                }
-                messages.add(mo);
+                messages.add(new MessageObject(currentAccount, rev, true, true));
             } catch (Throwable ignore) {
             }
         }
@@ -86,11 +82,7 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
                 cur.flags = base.flags;
                 cur.dialog_id = base.dialog_id;
             }
-            MessageObject mo = new MessageObject(currentAccount, cur, true, true);
-            if (!mo.isOutOwner()) {
-                mo.forceAvatar = true;
-            }
-            messages.add(mo);
+            messages.add(new MessageObject(currentAccount, cur, true, true));
         } catch (Throwable ignore) {
         }
     }
@@ -168,7 +160,8 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             ChatMessageCell cell = (ChatMessageCell) holder.itemView;
             MessageObject message = messages.get(position);
-            cell.isChat = true;
+            // как в AyuGram: без аватарок — все ревизии от одного отправителя
+            cell.isChat = false;
             cell.setFullyDraw(true);
             cell.setMessageObject(message, null, false, false, position == 0);
         }
