@@ -29,9 +29,10 @@ import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
+import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
-import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Components.BulletinFactory;
@@ -167,58 +168,72 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         return fragmentView;
     }
 
-    // ================= меню по тапу =================
+    // ================= меню по тапу (как обычное контекстное меню сообщения) =================
 
-    private void showMessageMenu(MessageObject message, int catchTime) {
-        if (getParentActivity() == null || message == null) {
+    private void showMessageMenu(View anchor, MessageObject message, int catchTime, float tapX, float tapY) {
+        if (getParentActivity() == null || message == null || fragmentView == null) {
             return;
         }
         final CharSequence text = message.messageOwner != null ? message.messageOwner.message : null;
         final boolean hasText = !TextUtils.isEmpty(text);
 
-        ArrayList<CharSequence> titles = new ArrayList<>();
-        ArrayList<Integer> icons = new ArrayList<>();
-        ArrayList<Integer> actions = new ArrayList<>();
+        ActionBarPopupWindow.ActionBarPopupWindowLayout layout =
+                new ActionBarPopupWindow.ActionBarPopupWindowLayout(getParentActivity(), R.drawable.popup_fixed_alert2, resourceProvider);
+        layout.setFitItems(true);
+
+        final ActionBarPopupWindow[] popup = new ActionBarPopupWindow[1];
+
+        addMenuItem(layout, "Ответить", R.drawable.menu_reply, popup, () -> replyInChat(message));
+        addMenuItem(layout, "Переслать", R.drawable.msg_forward, popup, () -> forwardMessage(message));
         if (hasText) {
-            titles.add("Копировать");
-            icons.add(R.drawable.msg_copy);
-            actions.add(0);
+            addMenuItem(layout, "Копировать", R.drawable.msg_copy, popup, () -> {
+                AndroidUtilities.addToClipboard(text);
+                BulletinFactory.of(this).createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
+            });
         }
-        titles.add("Показать в чате");
-        icons.add(R.drawable.msg_openin);
-        actions.add(1);
-        titles.add("Детали");
-        icons.add(R.drawable.msg_info);
-        actions.add(2);
-        titles.add("Удалить");
-        icons.add(R.drawable.msg_delete);
-        actions.add(3);
+        addMenuItem(layout, "Показать в чате", R.drawable.msg_openin, popup, () -> openInChat(message.getId()));
+        addMenuItem(layout, "Детали", R.drawable.msg_info, popup, () -> showDetails(message, catchTime));
+        addMenuItem(layout, "Удалить", R.drawable.msg_delete, popup, () -> removeEntry(message));
 
-        int[] iconsArr = new int[icons.size()];
-        for (int i = 0; i < icons.size(); i++) {
-            iconsArr[i] = icons.get(i);
+        popup[0] = new ActionBarPopupWindow(layout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
+        popup[0].setPauseNotifications(true);
+        popup[0].setDismissAnimationDuration(220);
+        popup[0].setOutsideTouchable(true);
+        popup[0].setClippingEnabled(true);
+        popup[0].setAnimationStyle(R.style.PopupContextAnimation);
+        popup[0].setFocusable(true);
+        layout.measure(
+                View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST));
+        popup[0].setInputMethodMode(ActionBarPopupWindow.INPUT_METHOD_NOT_NEEDED);
+        popup[0].setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED);
+
+        // позиция — в точку тапа, с зажимом по краям экрана
+        int[] loc = new int[2];
+        anchor.getLocationInWindow(loc);
+        int menuW = layout.getMeasuredWidth();
+        int menuH = layout.getMeasuredHeight();
+        int x = loc[0] + (int) tapX;
+        int y = loc[1] + (int) tapY;
+        x = Math.max(AndroidUtilities.dp(8), Math.min(x, AndroidUtilities.displaySize.x - menuW - AndroidUtilities.dp(8)));
+        int maxY = AndroidUtilities.displaySize.y - menuH - AndroidUtilities.dp(8);
+        if (y > maxY) {
+            y = Math.max(AndroidUtilities.dp(8), maxY);
         }
+        popup[0].showAtLocation(fragmentView, Gravity.LEFT | Gravity.TOP, x, y);
+    }
 
-        BottomSheet.Builder builder = new BottomSheet.Builder(getParentActivity());
-        builder.setItems(titles.toArray(new CharSequence[0]), iconsArr, (dialog, which) -> {
-            int action = actions.get(which);
-            switch (action) {
-                case 0:
-                    AndroidUtilities.addToClipboard(text);
-                    BulletinFactory.of(this).createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
-                    break;
-                case 1:
-                    openInChat(message.getId());
-                    break;
-                case 2:
-                    showDetails(message, catchTime);
-                    break;
-                case 3:
-                    removeEntry(message);
-                    break;
+    private void addMenuItem(ActionBarPopupWindow.ActionBarPopupWindowLayout layout, String text, int icon,
+                             ActionBarPopupWindow[] popup, Runnable action) {
+        ActionBarMenuSubItem item = new ActionBarMenuSubItem(getParentActivity(), false, false, resourceProvider);
+        item.setTextAndIcon(text, icon);
+        item.setOnClickListener(v -> {
+            if (popup[0] != null) {
+                popup[0].dismiss();
             }
+            action.run();
         });
-        builder.show();
+        layout.addView(item, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
     }
 
     private void openInChat(int messageId) {
@@ -230,6 +245,48 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         }
         args.putInt("message_id", messageId);
         presentFragment(new ChatActivity(args));
+    }
+
+    // Ответить: открываем реальный чат и ставим ответ на это сообщение. Удалённый текст
+    // показывается цитатой в панели ответа (как в AyuGram). То же действие — по свайпу влево.
+    private void replyInChat(MessageObject message) {
+        Bundle args = new Bundle();
+        if (dialogId > 0) {
+            args.putLong("user_id", dialogId);
+        } else {
+            args.putLong("chat_id", -dialogId);
+        }
+        ChatActivity chat = new ChatActivity(args);
+        presentFragment(chat);
+        // поле ввода создаётся в createView — ставим ответ чуть позже
+        AndroidUtilities.runOnUIThread(() -> chat.showFieldPanelForReply(message), 200);
+    }
+
+    // Переслать: стандартный пикер пересылки.
+    private void forwardMessage(MessageObject message) {
+        Bundle args = new Bundle();
+        args.putBoolean("onlySelect", true);
+        args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
+        DialogsActivity fragment = new DialogsActivity(args);
+        fragment.setDelegate((fragment1, dids, m, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
+            if (dids.isEmpty()) {
+                return false;
+            }
+            long did = dids.get(0).dialogId;
+            ArrayList<MessageObject> fmsg = new ArrayList<>();
+            fmsg.add(message);
+            org.telegram.messenger.SendMessagesHelper.getInstance(currentAccount)
+                    .sendMessage(fmsg, did, false, false, true, 0, 0);
+            Bundle a = new Bundle();
+            if (did > 0) {
+                a.putLong("user_id", did);
+            } else {
+                a.putLong("chat_id", -did);
+            }
+            presentFragment(new ChatActivity(a), true);
+            return true;
+        });
+        presentFragment(fragment);
     }
 
     private void showDetails(MessageObject message, int catchTime) {
@@ -277,8 +334,13 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
     //    проходом (getAvatarImage()), в standalone-списке этого нет, поэтому onDraw;
     //  • медиа грузим из локально сохранённого файла (attachPath) — иначе битое превью;
     //  • тап ловим GestureDetector'ом: обычный onClick ChatMessageCell съедает.
+    interface OnCellTap {
+        void onTap(DeletedMessageCell cell, float x, float y);
+    }
+
     private static class DeletedMessageCell extends ChatMessageCell {
-        Runnable onTap;
+        OnCellTap onTap;
+        Runnable onSwipeReply;
         private final GestureDetector gestureDetector;
 
         DeletedMessageCell(Context context, int account) {
@@ -287,9 +349,20 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
                 @Override
                 public boolean onSingleTapUp(MotionEvent e) {
                     if (onTap != null) {
-                        onTap.run();
+                        onTap.onTap(DeletedMessageCell.this, e.getX(), e.getY());
                     }
                     return true;
+                }
+
+                @Override
+                public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                    // смахивание влево (как обычный ответ) → ответить на удалённое сообщение
+                    if (onSwipeReply != null && velocityX < -AndroidUtilities.dp(600)
+                            && Math.abs(velocityX) > Math.abs(velocityY) * 1.5f) {
+                        onSwipeReply.run();
+                        return true;
+                    }
+                    return false;
                 }
             });
         }
@@ -354,7 +427,8 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             cell.isChat = true;
             cell.setFullyDraw(true);
             cell.setMessageObject(message, null, false, false, position == 0);
-            cell.onTap = () -> showMessageMenu(message, catchTime);
+            cell.onTap = (c, x, y) -> showMessageMenu(c, message, catchTime, x, y);
+            cell.onSwipeReply = () -> replyInChat(message);
         }
 
         @Override
