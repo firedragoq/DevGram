@@ -10,8 +10,9 @@ package org.telegram.ui;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.os.Bundle;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
-import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -39,6 +40,7 @@ import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
+import org.telegram.ui.Components.URLSpanUserMention;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -252,13 +254,26 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
     // (в превью показывается тип: «Фотография», «Видео», «Голосовое…»). Ответ передаём
     // статически — нужный (живой) инстанс чата применит его в onResume. Свайп влево — то же.
     private void replyInChat(MessageObject message) {
-        // текст цитаты: текст удалёнки, либо метка типа медиа
-        CharSequence quoteText;
+        // тело цитаты: текст удалёнки, либо метка типа медиа
+        CharSequence body;
         if (message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message)) {
-            quoteText = message.messageOwner.message;
+            body = message.messageOwner.message;
         } else {
-            quoteText = deletedMediaLabel(message);
+            body = deletedMediaLabel(message);
         }
+        // в группах/каналах добавляем ник отправителя первой строкой — кликабельным
+        // упоминанием (ведёт в профиль), чтобы было видно, кто прислал удалённое
+        SpannableStringBuilder quoteText = new SpannableStringBuilder();
+        if (dialogId < 0) {
+            long fromId = message.getFromChatId();
+            String name = senderName(fromId);
+            if (name != null && fromId > 0) {
+                quoteText.append(name);
+                quoteText.setSpan(new URLSpanUserMention("" + fromId, 3), 0, quoteText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                quoteText.append("\n");
+            }
+        }
+        quoteText.append(body);
         ChatActivity.setDevGramPendingReply(dialogId, quoteText);
         Bundle args = new Bundle();
         if (dialogId > 0) {
@@ -267,6 +282,21 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             args.putLong("chat_id", -dialogId);
         }
         presentFragment(new ChatActivity(args));
+    }
+
+    private String senderName(long fromId) {
+        if (fromId > 0) {
+            TLRPC.User u = getMessagesController().getUser(fromId);
+            if (u != null) {
+                return ContactsController.formatName(u.first_name, u.last_name);
+            }
+        } else if (fromId < 0) {
+            TLRPC.Chat c = getMessagesController().getChat(-fromId);
+            if (c != null) {
+                return c.title;
+            }
+        }
+        return null;
     }
 
     private String deletedMediaLabel(MessageObject m) {
@@ -359,40 +389,36 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
 
     private static class DeletedMessageCell extends ChatMessageCell {
         OnCellTap onTap;
-        Runnable onSwipeReply;
-        private final GestureDetector gestureDetector;
+        private float downX, downY;
+        private long downTime;
 
         DeletedMessageCell(Context context, int account) {
             super(context, account);
-            gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
-                @Override
-                public boolean onSingleTapUp(MotionEvent e) {
-                    if (onTap != null) {
-                        onTap.onTap(DeletedMessageCell.this, e.getX(), e.getY());
-                    }
-                    return true;
-                }
-
-                @Override
-                public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                    // смахивание влево (как обычный ответ) → ответить на удалённое сообщение.
-                    // Порог по скорости невысокий + горизонтальное движение должно преобладать.
-                    if (onSwipeReply != null && e1 != null && e2 != null
-                            && (e2.getX() - e1.getX()) < -AndroidUtilities.dp(48)
-                            && Math.abs(velocityX) > Math.abs(velocityY)) {
-                        onSwipeReply.run();
-                        return true;
-                    }
-                    return false;
-                }
-            });
         }
 
         @Override
         public boolean onTouchEvent(MotionEvent event) {
-            // read-only просмотр: любые внутренние нажатия ячейки нам не нужны, ловим только тап.
-            // Скролл продолжает работать: RecyclerView перехватывает MOVE через onInterceptTouchEvent.
-            gestureDetector.onTouchEvent(event);
+            // read-only просмотр: ловим только тап (открывает меню). Свайп-ответ здесь НЕ нужен —
+            // он работает в самом чате на удалёнке. Вертикальный скролл продолжает работать:
+            // RecyclerView перехватывает MOVE через onInterceptTouchEvent и шлёт ACTION_CANCEL.
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = event.getX();
+                    downY = event.getY();
+                    downTime = System.currentTimeMillis();
+                    return true;
+                case MotionEvent.ACTION_UP: {
+                    float dx = event.getX() - downX;
+                    float dy = event.getY() - downY;
+                    long dt = System.currentTimeMillis() - downTime;
+                    if (Math.abs(dx) < AndroidUtilities.dp(12) && Math.abs(dy) < AndroidUtilities.dp(12) && dt < 350) {
+                        if (onTap != null) {
+                            onTap.onTap(this, event.getX(), event.getY());
+                        }
+                    }
+                    return true;
+                }
+            }
             return true;
         }
 
@@ -449,7 +475,6 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             cell.setFullyDraw(true);
             cell.setMessageObject(message, null, false, false, position == 0);
             cell.onTap = (c, x, y) -> showMessageMenu(c, message, catchTime, x, y);
-            cell.onSwipeReply = () -> replyInChat(message);
         }
 
         @Override

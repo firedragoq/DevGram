@@ -14975,7 +14975,60 @@ public class ChatActivity extends BaseFragment implements
     }
 
     public void showFieldPanelForReply(MessageObject messageObjectToReply) {
+        // DevGram: ответ на удалёнку прямо в чате (свайп/меню) — серверный reply к удалённому
+        // сообщению сервер отклоняет (восклицательный знак). Как в AyuGram, вместо этого
+        // копируем текст удалёнки в поле ввода блок-цитатой (обычный текст, всегда отправляется).
+        if (messageObjectToReply != null && messageObjectToReply.messageOwner != null
+                && messageObjectToReply.messageOwner.devgramDeleted) {
+            devgramInsertDeletedQuote(messageObjectToReply);
+            return;
+        }
         showFieldPanel(true, messageObjectToReply, null, null, null, true, 0, null, false, 0, true);
+    }
+
+    // Собирает и вставляет блок-цитату по удалённому сообщению: в группах первой строкой —
+    // ник отправителя кликабельным упоминанием (ведёт в профиль), затем текст либо метка медиа.
+    private void devgramInsertDeletedQuote(MessageObject message) {
+        if (chatActivityEnterView == null) {
+            return;
+        }
+        CharSequence body;
+        if (!TextUtils.isEmpty(message.messageOwner.message)) {
+            body = message.messageOwner.message;
+        } else {
+            body = devgramMediaLabel(message);
+        }
+        SpannableStringBuilder sb = new SpannableStringBuilder();
+        if (dialog_id < 0) {
+            long fromId = message.getFromChatId();
+            if (fromId > 0) {
+                TLRPC.User u = getMessagesController().getUser(fromId);
+                if (u != null) {
+                    String name = ContactsController.formatName(u.first_name, u.last_name);
+                    if (!TextUtils.isEmpty(name)) {
+                        sb.append(name);
+                        sb.setSpan(new org.telegram.ui.Components.URLSpanUserMention("" + fromId, 3), 0, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        sb.append("\n");
+                    }
+                }
+            }
+        }
+        sb.append(body);
+        org.telegram.ui.Components.QuoteSpan.putQuoteToEditable(sb, 0, sb.length(), false);
+        chatActivityEnterView.setFieldText(sb);
+        chatActivityEnterView.openKeyboard();
+    }
+
+    private String devgramMediaLabel(MessageObject m) {
+        if (m.isVoice()) return "Голосовое сообщение";
+        if (m.isRoundVideo()) return "Видеосообщение";
+        if (m.isGif()) return "GIF";
+        if (m.isVideo()) return "Видео";
+        if (m.isPhoto()) return "Фотография";
+        if (m.isMusic()) return "Аудио";
+        if (m.isSticker() || m.isAnimatedSticker()) return "Стикер";
+        if (m.getDocument() != null) return "Файл";
+        return "Медиа";
     }
 
     // DevGram: ответ на удалённое сообщение из экрана «История удалёнок».
