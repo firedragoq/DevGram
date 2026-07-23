@@ -247,32 +247,20 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         presentFragment(new ChatActivity(args));
     }
 
-    // Ответить: открываем реальный чат и ставим ответ на это сообщение. Удалённый текст
-    // делаем ЦИТАТОЙ (showFieldPanelForReplyQuote) — иначе панель ответа показывает
-    // серверную версию сообщения (уже удалённую/пустую). То же действие — по свайпу влево.
+    // Ответить: открываем реальный чат и ставим ответ на это сообщение. Текстовую удалёнку
+    // делаем ЦИТАТОЙ (удалённый текст виден в панели ответа), медиа/пустую — обычным ответом
+    // (в превью показывается тип: «Фотография», «Видео», «Голосовое…»). Ответ передаём
+    // статически — нужный (живой) инстанс чата применит его в onResume. Свайп влево — то же.
     private void replyInChat(MessageObject message) {
+        boolean asQuote = message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message);
+        ChatActivity.setDevGramPendingReply(dialogId, message, asQuote);
         Bundle args = new Bundle();
         if (dialogId > 0) {
             args.putLong("user_id", dialogId);
         } else {
             args.putLong("chat_id", -dialogId);
         }
-        ChatActivity chat = new ChatActivity(args);
-        presentFragment(chat);
-        // текстовую удалёнку цитируем целиком; медиа/пустую — обычным ответом
-        ChatActivity.ReplyQuote quote = null;
-        if (message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message)) {
-            quote = ChatActivity.ReplyQuote.from(message);
-        }
-        final ChatActivity.ReplyQuote fquote = quote;
-        // поле ввода создаётся в createView — ставим ответ чуть позже, чтобы оно успело появиться
-        AndroidUtilities.runOnUIThread(() -> {
-            if (fquote != null) {
-                chat.showFieldPanelForReplyQuote(message, fquote);
-            } else {
-                chat.showFieldPanelForReply(message);
-            }
-        }, 350);
+        presentFragment(new ChatActivity(args));
     }
 
     // Переслать: стандартный пикер пересылки.

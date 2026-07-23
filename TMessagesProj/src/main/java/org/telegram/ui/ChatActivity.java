@@ -14978,6 +14978,43 @@ public class ChatActivity extends BaseFragment implements
         showFieldPanel(true, messageObjectToReply, null, null, null, true, 0, null, false, 0, true);
     }
 
+    // DevGram: отложенный ответ на удалённое сообщение из экрана «История удалёнок».
+    // Экран удалёнок — отдельный, а навигация при возврате может всплыть к уже открытому
+    // чату, поэтому передаём ответ статически, а нужный (живой) инстанс применяет его в
+    // onResume — гарантированно после createView.
+    private static long devgramPendingReplyDialogId;
+    private static MessageObject devgramPendingReplyMessage;
+    private static boolean devgramPendingReplyAsQuote;
+
+    public static void setDevGramPendingReply(long dialogId, MessageObject message, boolean asQuote) {
+        devgramPendingReplyDialogId = dialogId;
+        devgramPendingReplyMessage = message;
+        devgramPendingReplyAsQuote = asQuote;
+    }
+
+    private void applyDevGramPendingReply() {
+        if (devgramPendingReplyMessage == null || dialog_id != devgramPendingReplyDialogId) {
+            return;
+        }
+        final MessageObject m = devgramPendingReplyMessage;
+        final boolean quote = devgramPendingReplyAsQuote;
+        devgramPendingReplyMessage = null; // применяем один раз
+        // небольшая задержка — чтобы восстановление черновика уже отработало
+        AndroidUtilities.runOnUIThread(() -> {
+            if (chatActivityEnterView == null) {
+                return;
+            }
+            if (quote) {
+                ReplyQuote q = ReplyQuote.from(m);
+                if (q != null) {
+                    showFieldPanelForReplyQuote(m, q);
+                    return;
+                }
+            }
+            showFieldPanelForReply(m);
+        }, 150);
+    }
+
     private Runnable onHideFieldPanelRunnable;
     public void showFieldPanelForReplyQuote(MessageObject messageObjectToReply, ReplyQuote quote) {
         showFieldPanel(true, messageObjectToReply, null, null, null, true, 0, quote, false, 0, true);
@@ -30488,6 +30525,9 @@ public class ChatActivity extends BaseFragment implements
         if (starReactionsOverlay != null) {
             starReactionsOverlay.bringToFront();
         }
+
+        // DevGram: применяем отложенный ответ на удалёнку, если он для этого чата
+        applyDevGramPendingReply();
     }
 
     public float getPullingDownOffset() {
