@@ -59,6 +59,11 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             }
             try {
                 MessageObject mo = new MessageObject(currentAccount, m, true, true);
+                // входящие рисуем с аватаркой отправителя (в т.ч. в личке), чтобы всегда было
+                // видно, кто прислал удалённое сообщение; свои — без аватарки, как в обычном чате
+                if (!mo.isOutOwner()) {
+                    mo.forceAvatar = true;
+                }
                 messages.add(mo);
             } catch (Throwable ignore) {
             }
@@ -95,13 +100,28 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
             }
         });
 
-        SizeNotifierFrameLayout contentView = new SizeNotifierFrameLayout(context);
+        // isActionBarVisible()/useRootView() переопределены в false: наш actionBar лежит НАД
+        // contentView (обычный fragment-layout), поэтому обои НЕ надо повторно сдвигать и клипать
+        // на высоту экшн-бара — иначе сверху чёрная полоса высотой в экшн-бар.
+        SizeNotifierFrameLayout contentView = new SizeNotifierFrameLayout(context) {
+            @Override
+            protected boolean isActionBarVisible() {
+                return false;
+            }
+
+            @Override
+            protected boolean useRootView() {
+                return false;
+            }
+        };
         contentView.setOccupyStatusBar(false);
         contentView.setBackgroundImage(Theme.getCachedWallpaper(), Theme.isWallpaperMotion());
 
         listView = new RecyclerListView(context);
-        // сообщения идут СВЕРХУ вниз (без прижатия книзу — иначе сверху пустая тёмная область)
+        // как в настоящем чате: сообщения прижаты книзу, при открытии видно самые свежие,
+        // вверх листаем к более старым (обои теперь заполняют весь фон, пустоты сверху нет)
         LinearLayoutManager layoutManager = new LinearLayoutManager(context);
+        layoutManager.setStackFromEnd(true);
         listView.setLayoutManager(layoutManager);
         listView.setAdapter(new Adapter());
         listView.setVerticalScrollBarEnabled(false);

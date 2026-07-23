@@ -1,31 +1,34 @@
 /*
- * DevGram: экран истории изменений сообщения.
- * Показывает сохранённые предыдущие версии (ревизии) + текущую.
- * Данные берутся из DevGramMessagesController (BLOB сериализованного TLRPC.Message).
+ * DevGram: экран истории изменений сообщения — в виде мини-чата (как в AyuGram).
+ * Каждая сохранённая ревизия и текущая версия рисуются настоящими бабблами
+ * (ChatMessageCell) на фоне-обоях, снизу вверх, как реальная переписка.
+ * Данные — из DevGramMessagesController (BLOB сериализованного TLRPC.Message).
  */
 
 package org.telegram.ui;
 
 import android.content.Context;
-import android.graphics.Typeface;
-import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
+import android.view.ViewGroup;
+
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DevGramMessagesController;
-import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.RecyclerListView;
+import org.telegram.ui.Components.SizeNotifierFrameLayout;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class DevGramMessageHistoryActivity extends BaseFragment {
@@ -33,6 +36,8 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
     private final long dialogId;
     private final int messageId;
     private final CharSequence currentText;
+    private final ArrayList<MessageObject> messages = new ArrayList<>();
+    private RecyclerListView listView;
 
     public DevGramMessageHistoryActivity(long dialogId, int messageId, CharSequence currentText) {
         this.dialogId = dialogId;
@@ -41,10 +46,61 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
     }
 
     @Override
+    public boolean onFragmentCreate() {
+        loadMessages();
+        return super.onFragmentCreate();
+    }
+
+    private void loadMessages() {
+        long selfId = getUserConfig().getClientUserId();
+        List<TLRPC.Message> revisions = DevGramMessagesController.getInstance().getRevisions(selfId, dialogId, messageId);
+
+        // берём образец (peer_id/from_id/out) из последней ревизии — чтобы текущая версия
+        // встала в бабблах на ту же сторону и с той же аватаркой
+        TLRPC.Message base = null;
+        for (TLRPC.Message rev : revisions) {
+            if (rev == null) {
+                continue;
+            }
+            base = rev;
+            try {
+                MessageObject mo = new MessageObject(currentAccount, rev, true, true);
+                if (!mo.isOutOwner()) {
+                    mo.forceAvatar = true;
+                }
+                messages.add(mo);
+            } catch (Throwable ignore) {
+            }
+        }
+
+        // текущая (действующая) версия — как последнее сообщение
+        try {
+            TLRPC.TL_message cur = new TLRPC.TL_message();
+            cur.id = messageId;
+            cur.message = currentText != null ? currentText.toString() : "";
+            cur.date = (int) (System.currentTimeMillis() / 1000);
+            if (base != null) {
+                cur.peer_id = base.peer_id;
+                cur.from_id = base.from_id;
+                cur.out = base.out;
+                cur.flags = base.flags;
+                cur.dialog_id = base.dialog_id;
+            }
+            MessageObject mo = new MessageObject(currentAccount, cur, true, true);
+            if (!mo.isOutOwner()) {
+                mo.forceAvatar = true;
+            }
+            messages.add(mo);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    @Override
     public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle("История изменений");
+        actionBar.setSubtitle(messages.size() + " " + pluralVersions(messages.size()));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
@@ -54,64 +110,72 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
             }
         });
 
-        ScrollView scrollView = new ScrollView(context);
-        scrollView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
-
-        LinearLayout container = new LinearLayout(context);
-        container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
-        scrollView.addView(container, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
-
-        long selfId = getUserConfig().getClientUserId();
-        List<TLRPC.Message> revisions = DevGramMessagesController.getInstance().getRevisions(selfId, dialogId, messageId);
-
-        int version = 1;
-        for (TLRPC.Message rev : revisions) {
-            int date = rev.edit_date != 0 ? rev.edit_date : rev.date;
-            CharSequence text = rev.message;
-            if (TextUtils.isEmpty(text)) {
-                text = rev.media != null ? "[медиа]" : "[пустое сообщение]";
+        // isActionBarVisible()/useRootView() → false: actionBar лежит НАД contentView, поэтому
+        // обои не надо повторно сдвигать/клипать на высоту экшн-бара (иначе чёрная полоса сверху).
+        SizeNotifierFrameLayout contentView = new SizeNotifierFrameLayout(context) {
+            @Override
+            protected boolean isActionBarVisible() {
+                return false;
             }
-            addCard(context, container, "Версия " + version, date, text);
-            version++;
-        }
 
-        // текущая (действующая) версия
-        CharSequence cur = currentText;
-        if (TextUtils.isEmpty(cur)) {
-            cur = "[медиа или пустое сообщение]";
-        }
-        addCard(context, container, "Текущая версия", 0, cur);
+            @Override
+            protected boolean useRootView() {
+                return false;
+            }
+        };
+        contentView.setOccupyStatusBar(false);
+        contentView.setBackgroundImage(Theme.getCachedWallpaper(), Theme.isWallpaperMotion());
 
-        fragmentView = scrollView;
+        listView = new RecyclerListView(context);
+        // как в чате: версии прижаты книзу, свежая (текущая) — снизу, вверх листаем к старым
+        LinearLayoutManager layoutManager = new LinearLayoutManager(context);
+        layoutManager.setStackFromEnd(true);
+        listView.setLayoutManager(layoutManager);
+        listView.setAdapter(new Adapter());
+        listView.setVerticalScrollBarEnabled(false);
+        listView.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
+        listView.setClipToPadding(false);
+        contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+
+        fragmentView = contentView;
         return fragmentView;
     }
 
-    private void addCard(Context context, LinearLayout container, String label, int dateSeconds, CharSequence text) {
-        LinearLayout card = new LinearLayout(context);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider));
-        card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(12));
+    private String pluralVersions(int n) {
+        int mod10 = n % 10;
+        int mod100 = n % 100;
+        if (mod10 == 1 && mod100 != 11) return "версия";
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "версии";
+        return "версий";
+    }
 
-        TextView header = new TextView(context);
-        header.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText2, resourceProvider));
-        header.setTextSize(13);
-        header.setTypeface(AndroidUtilities.bold());
-        String headerText = label;
-        if (dateSeconds != 0) {
-            headerText += " · " + LocaleController.formatDateTime(dateSeconds, true);
+    private class Adapter extends RecyclerListView.SelectionAdapter {
+        @Override
+        public boolean isEnabled(RecyclerView.ViewHolder holder) {
+            return false;
         }
-        header.setText(headerText);
-        card.addView(header, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
-        TextView body = new TextView(context);
-        body.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
-        body.setTextSize(16);
-        body.setText(text);
-        card.addView(body, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 6, 0, 0));
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            ChatMessageCell cell = new ChatMessageCell(parent.getContext(), currentAccount);
+            cell.setDelegate(new ChatMessageCell.ChatMessageCellDelegate() {
+            });
+            cell.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
+            return new RecyclerListView.Holder(cell);
+        }
 
-        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT);
-        lp.topMargin = AndroidUtilities.dp(8);
-        container.addView(card, lp);
+        @Override
+        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            ChatMessageCell cell = (ChatMessageCell) holder.itemView;
+            MessageObject message = messages.get(position);
+            cell.isChat = true;
+            cell.setFullyDraw(true);
+            cell.setMessageObject(message, null, false, false, position == 0);
+        }
+
+        @Override
+        public int getItemCount() {
+            return messages.size();
+        }
     }
 }
