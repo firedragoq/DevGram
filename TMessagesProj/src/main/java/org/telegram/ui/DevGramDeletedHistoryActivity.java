@@ -248,7 +248,8 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
     }
 
     // Ответить: открываем реальный чат и ставим ответ на это сообщение. Удалённый текст
-    // показывается цитатой в панели ответа (как в AyuGram). То же действие — по свайпу влево.
+    // делаем ЦИТАТОЙ (showFieldPanelForReplyQuote) — иначе панель ответа показывает
+    // серверную версию сообщения (уже удалённую/пустую). То же действие — по свайпу влево.
     private void replyInChat(MessageObject message) {
         Bundle args = new Bundle();
         if (dialogId > 0) {
@@ -258,8 +259,20 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
         }
         ChatActivity chat = new ChatActivity(args);
         presentFragment(chat);
-        // поле ввода создаётся в createView — ставим ответ чуть позже
-        AndroidUtilities.runOnUIThread(() -> chat.showFieldPanelForReply(message), 200);
+        // текстовую удалёнку цитируем целиком; медиа/пустую — обычным ответом
+        ChatActivity.ReplyQuote quote = null;
+        if (message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message)) {
+            quote = ChatActivity.ReplyQuote.from(message);
+        }
+        final ChatActivity.ReplyQuote fquote = quote;
+        // поле ввода создаётся в createView — ставим ответ чуть позже, чтобы оно успело появиться
+        AndroidUtilities.runOnUIThread(() -> {
+            if (fquote != null) {
+                chat.showFieldPanelForReplyQuote(message, fquote);
+            } else {
+                chat.showFieldPanelForReply(message);
+            }
+        }, 350);
     }
 
     // Переслать: стандартный пикер пересылки.
