@@ -252,6 +252,11 @@ public class DevGramDeletedHistoryActivity extends BaseFragment {
     // (в превью показывается тип: «Фотография», «Видео», «Голосовое…»). Ответ передаём
     // статически — нужный (живой) инстанс чата применит его в onResume. Свайп влево — то же.
     private void replyInChat(MessageObject message) {
+        // у старых удалёнок dialog_id мог не сохраниться — проставим, иначе getDialogId()
+        // не совпадёт с чатом и цитата не построится
+        if (message.messageOwner != null && message.messageOwner.dialog_id == 0) {
+            message.messageOwner.dialog_id = dialogId;
+        }
         boolean asQuote = message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message);
         ChatActivity.setDevGramPendingReply(dialogId, message, asQuote);
         Bundle args = new Bundle();

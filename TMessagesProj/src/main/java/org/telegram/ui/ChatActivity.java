@@ -14993,26 +14993,20 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private void applyDevGramPendingReply() {
-        if (devgramPendingReplyMessage == null || dialog_id != devgramPendingReplyDialogId) {
+        if (devgramPendingReplyMessage == null || dialog_id != devgramPendingReplyDialogId || chatActivityEnterView == null) {
             return;
         }
         final MessageObject m = devgramPendingReplyMessage;
         final boolean quote = devgramPendingReplyAsQuote;
         devgramPendingReplyMessage = null; // применяем один раз
-        // небольшая задержка — чтобы восстановление черновика уже отработало
-        AndroidUtilities.runOnUIThread(() -> {
-            if (chatActivityEnterView == null) {
+        if (quote) {
+            ReplyQuote q = ReplyQuote.from(m);
+            if (q != null) {
+                showFieldPanelForReplyQuote(m, q);
                 return;
             }
-            if (quote) {
-                ReplyQuote q = ReplyQuote.from(m);
-                if (q != null) {
-                    showFieldPanelForReplyQuote(m, q);
-                    return;
-                }
-            }
-            showFieldPanelForReply(m);
-        }, 150);
+        }
+        showFieldPanelForReply(m);
     }
 
     private Runnable onHideFieldPanelRunnable;
@@ -27917,6 +27911,8 @@ public class ChatActivity extends BaseFragment implements
         if (isOpen) {
             checkShowBlur(false);
             openAnimationEnded = true;
+            // DevGram: чат полностью показан — самое надёжное место применить отложенный ответ на удалёнку
+            applyDevGramPendingReply();
             getNotificationCenter().onAnimationFinish(transitionAnimationIndex);
             NotificationCenter.getGlobalInstance().onAnimationFinish(transitionAnimationGlobalIndex);
 //            if (Build.VERSION.SDK_INT >= 21) {
@@ -30526,8 +30522,11 @@ public class ChatActivity extends BaseFragment implements
             starReactionsOverlay.bringToFront();
         }
 
-        // DevGram: применяем отложенный ответ на удалёнку, если он для этого чата
-        applyDevGramPendingReply();
+        // DevGram: если чат уже был открыт (возврат/pop) — применяем отложенный ответ здесь;
+        // для свежего открытия это делает onTransitionAnimationEnd (когда чат полностью показан)
+        if (openAnimationEnded) {
+            applyDevGramPendingReply();
+        }
     }
 
     public float getPullingDownOffset() {
