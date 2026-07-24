@@ -122,8 +122,8 @@ public class DevGramSettingsActivity extends BaseFragment {
 
         // Ссылки на официальный канал и чат
         items.add(UItem.asHeader("Ссылки"));
-        items.add(UItem.asButton(ID_LINK_CHANNEL, R.drawable.devgram_channel, "Канал", "@devgramnews"));
-        items.add(UItem.asButton(ID_LINK_CHAT, R.drawable.devgram_chat, "Чат", "@devgram_chat"));
+        items.add(UItem.asButton(ID_LINK_CHANNEL, R.drawable.devgram_channel, "Канал", "@DevGramNews"));
+        items.add(UItem.asButton(ID_LINK_CHAT, R.drawable.devgram_chat, "Чат", "@DevGram_chat"));
         items.add(UItem.asShadow(null));
 
         // Раздел для команды проекта: выдача значков. Видно только участникам команды.

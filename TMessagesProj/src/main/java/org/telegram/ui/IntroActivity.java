@@ -45,6 +45,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -153,13 +154,8 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     @Override
     public View createView(Context context) {
-        // DevGram: на приветствии — наш логотип (белый самолёт на тёмной монетке) + название,
-        // вместо чёрного вордмарка «Telegram».
-        logoDrawable = context.getResources().getDrawable(R.drawable.devgram_logo).mutate();
-        logoDrawable.setBounds(0, 0, dp(32), dp(32));
-        SpannableStringBuilder ssb = new SpannableStringBuilder("  DevGram");
-        ssb.setSpan(new ImageSpan(logoDrawable, ImageSpan.ALIGN_BOTTOM), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        titles[0] = ssb;
+        // DevGram: заголовок первой страницы — просто название (большой логотип рисуется по центру).
+        titles[0] = "DevGram";
 
 
         actionBar.setAddToContainer(false);
@@ -251,6 +247,13 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
         TextureView textureView = new TextureView(context);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
+        // DevGram: прячем GL-анимацию Telegram (там рисовался чёрный самолёт ТГ) и кладём
+        // поверх наш настоящий логотип — иконку приложения (самолёт с </>).
+        textureView.setVisibility(View.INVISIBLE);
+        ImageView introLogoView = new ImageView(context);
+        introLogoView.setImageResource(R.mipmap.icon_01_foreground);
+        introLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        frameLayout2.addView(introLogoView, LayoutHelper.createFrame(ICON_HEIGHT_DP, ICON_HEIGHT_DP, Gravity.CENTER));
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
