@@ -45,6 +45,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -153,11 +154,8 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     @Override
     public View createView(Context context) {
-        logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo).mutate();
-        logoDrawable.setBounds(0, dp(8.666f), dp(115), dp(35));
-        SpannableStringBuilder ssb = new SpannableStringBuilder(LocaleController.getString(R.string.Page1Title));
-        ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        titles[0] = ssb;
+        // DevGram: заголовок первой страницы — название мода вместо вордмарка «Telegram».
+        titles[0] = "DevGram";
 
 
         actionBar.setAddToContainer(false);
@@ -249,6 +247,16 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
         TextureView textureView = new TextureView(context);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
+        // DevGram: центральная «аватарка» экрана авторизации — наша иконка приложения вместо
+        // самолёта Telegram. GL-текстуру НЕ прячем через visibility (иначе surface не создаётся,
+        // нативный GL Intro.* не инициализируется и приложение падает нативным крэшем) — делаем
+        // её прозрачной (alpha=0): GL живёт и инициализируется штатно, но не виден, а сверху —
+        // наш логотип (адаптивная иконка ic_launcher, непрозрачная, полностью перекрывает низ).
+        textureView.setAlpha(0f);
+        ImageView introLogoView = new ImageView(context);
+        introLogoView.setImageResource(R.mipmap.ic_launcher);
+        introLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        frameLayout2.addView(introLogoView, LayoutHelper.createFrame(ICON_HEIGHT_DP, ICON_HEIGHT_DP, Gravity.CENTER));
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
