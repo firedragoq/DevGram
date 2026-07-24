@@ -361,6 +361,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private Long emojiStatusGiftId;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[] emojiStatusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[2];
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[] botVerificationDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[2];
+    // DevGram: значок бренда рядом с именем — кастом-эмодзи (самолёт/галочка) по document_id
+    private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[] devgramBadgeDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[2];
     private final Drawable[] verifiedCheckDrawable = new Drawable[2];
     private final CrossfadeDrawable[] verifiedCrossfadeDrawable = new CrossfadeDrawable[2];
     private final CrossfadeDrawable[] premiumCrossfadeDrawable = new CrossfadeDrawable[2];
@@ -3464,6 +3466,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         botVerificationDrawable[i].attach();
                     }
                 }
+                for (int i = 0; i < devgramBadgeDrawable.length; ++i) {
+                    if (devgramBadgeDrawable[i] != null) {
+                        devgramBadgeDrawable[i].attach();
+                    }
+                }
             }
 
             @Override
@@ -3478,6 +3485,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 for (int i = 0; i < botVerificationDrawable.length; ++i) {
                     if (botVerificationDrawable[i] != null) {
                         botVerificationDrawable[i].detach();
+                    }
+                }
+                for (int i = 0; i < devgramBadgeDrawable.length; ++i) {
+                    if (devgramBadgeDrawable[i] != null) {
+                        devgramBadgeDrawable[i].detach();
                     }
                 }
             }
@@ -11101,14 +11113,17 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return lockIconDrawable;
     }
 
-    // DevGram: значок «поддержал форк». Держим по одному на каждый вариант имени (крупное/мелкое).
-    private final Drawable[] devgramSupporterDrawable = new Drawable[2];
-
-    private Drawable getDevGramSupporterDrawable(int a) {
-        if (devgramSupporterDrawable[a] == null) {
-            devgramSupporterDrawable[a] = ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter).mutate();
+    // DevGram: значок бренда рядом с именем — анимированный кастом-эмодзи по document_id роли.
+    // Держим по одному на каждый вариант имени (крупное/мелкое).
+    private Drawable getDevGramBadgeDrawable(int a, long dialogId) {
+        if (devgramBadgeDrawable[a] == null) {
+            devgramBadgeDrawable[a] = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(nameTextView[a], AndroidUtilities.dp(22), a == 0 ? AnimatedEmojiDrawable.CACHE_TYPE_EMOJI_STATUS : AnimatedEmojiDrawable.CACHE_TYPE_KEYBOARD);
+            if (fragmentViewAttached) {
+                devgramBadgeDrawable[a].attach();
+            }
         }
-        return devgramSupporterDrawable[a];
+        devgramBadgeDrawable[a].set(DevGramBadges.emojiIdOf(dialogId), false);
+        return devgramBadgeDrawable[a];
     }
 
     // DevGram: датацентр аккаунта по dc_id аватарки — «DC2, Amsterdam, NL».
@@ -11591,19 +11606,36 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } else {
                     nameTextView[a].setLeftDrawableOutside(false);
                 }
+                // DevGram: значок бренда — слева от имени (в свободном левом слоте), кликается
+                final boolean devgramBadged = DevGramBadges.isBadged(user.id);
+                final boolean devgramInLeft = devgramBadged && leftIcon == null;
+                if (devgramInLeft) {
+                    nameTextView[a].setLeftDrawableOutside(false);
+                    leftIcon = getDevGramBadgeDrawable(a, user.id);
+                }
                 nameTextView[a].setLeftDrawable(leftIcon);
                 if (a == 1 && (rightIconIsStatus || rightIconIsPremium)) {
                     nameTextView[a].setRightDrawableOutside(true);
                 }
-                // DevGram: значок в отдельном третьем слоте — виден всегда (рядом с verified/premium) и кликается
-                if (DevGramBadges.isBadged(user.id)) {
-                    nameTextView[a].setRightDrawable3(getDevGramSupporterDrawable(a));
-                    final CharSequence badgeName = UserObject.getUserName(user);
+                final CharSequence devgramBadgeName = UserObject.getUserName(user);
+                if (devgramInLeft) {
+                    nameTextView[a].setLeftDrawableOnClick(v ->
+                            BulletinFactory.of(ProfileActivity.this)
+                                    .createSimpleBulletin(
+                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
+                                            DevGramBadges.badgeText(user.id, devgramBadgeName))
+                                    .show());
+                } else {
+                    nameTextView[a].setLeftDrawableOnClick(null);
+                }
+                // запасной вариант: если левый слот занят (бот-верификация) — значок справа
+                if (devgramBadged && !devgramInLeft) {
+                    nameTextView[a].setRightDrawable3(getDevGramBadgeDrawable(a, user.id));
                     nameTextView[a].setRightDrawable3OnClick(v ->
                             BulletinFactory.of(ProfileActivity.this)
                                     .createSimpleBulletin(
                                             ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
-                                            DevGramBadges.badgeText(user.id, badgeName))
+                                            DevGramBadges.badgeText(user.id, devgramBadgeName))
                                     .show());
                 } else {
                     nameTextView[a].setRightDrawable3(null);
@@ -11917,25 +11949,41 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         nameTextView[a].setRightDrawable(null);
                     }
                 }
-                // DevGram: значок «официальный чат» в отдельном третьем слоте
-                if (DevGramBadges.isBadged(-chatId)) {
-                    nameTextView[a].setRightDrawable3(getDevGramSupporterDrawable(a));
-                    final CharSequence badgeName = chat.title;
+                // DevGram: значок канала — слева от имени (в свободном левом слоте), кликается
+                final boolean chatBadged = DevGramBadges.isBadged(-chatId);
+                final CharSequence chatBadgeName = chat.title;
+                boolean chatBadgeInLeft = false;
+                if (chat.bot_verification_icon != 0) {
+                    nameTextView[a].setLeftDrawableOutside(true);
+                    nameTextView[a].setLeftDrawable(getBotVerificationDrawable(chat.bot_verification_icon, false, a));
+                } else if (chatBadged) {
+                    nameTextView[a].setLeftDrawableOutside(false);
+                    nameTextView[a].setLeftDrawable(getDevGramBadgeDrawable(a, -chatId));
+                    chatBadgeInLeft = true;
+                } else {
+                    nameTextView[a].setLeftDrawable(null);
+                }
+                if (chatBadgeInLeft) {
+                    nameTextView[a].setLeftDrawableOnClick(v ->
+                            BulletinFactory.of(ProfileActivity.this)
+                                    .createSimpleBulletin(
+                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
+                                            DevGramBadges.badgeText(-chatId, chatBadgeName))
+                                    .show());
+                } else {
+                    nameTextView[a].setLeftDrawableOnClick(null);
+                }
+                if (chatBadged && !chatBadgeInLeft) {
+                    nameTextView[a].setRightDrawable3(getDevGramBadgeDrawable(a, -chatId));
                     nameTextView[a].setRightDrawable3OnClick(v ->
                             BulletinFactory.of(ProfileActivity.this)
                                     .createSimpleBulletin(
                                             ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
-                                            DevGramBadges.badgeText(-chatId, badgeName))
+                                            DevGramBadges.badgeText(-chatId, chatBadgeName))
                                     .show());
                 } else {
                     nameTextView[a].setRightDrawable3(null);
                     nameTextView[a].setRightDrawable3OnClick(null);
-                }
-                if (chat.bot_verification_icon != 0) {
-                    nameTextView[a].setLeftDrawableOutside(true);
-                    nameTextView[a].setLeftDrawable(getBotVerificationDrawable(chat.bot_verification_icon, false, a));
-                } else {
-                    nameTextView[a].setLeftDrawable(null);
                 }
                 if (a == 0 && onlineTextOverride != null) {
                     onlineTextView[a].setText(onlineTextOverride);

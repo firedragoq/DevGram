@@ -126,6 +126,8 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
 
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatusDrawable;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerificationDrawable;
+    // DevGram: значок бренда рядом с именем в шапке — кастом-эмодзи по document_id роли.
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable devgramBadgeDrawable;
 
     protected boolean useAnimatedSubtitle() {
         return false;
@@ -373,6 +375,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
 
         emojiStatusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(titleTextView, dp(24));
         botVerificationDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(titleTextView, dp(17));
+        devgramBadgeDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(titleTextView, dp(20));
     }
 
     public ButtonBounce bounce = new ButtonBounce(this);
@@ -906,7 +909,38 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     private String rightDrawable2ContentDescription = null;
 
     public void setTitleIcons(Drawable leftIcon, Drawable mutedIcon) {
+        // DevGram: значок бренда — слева от имени, если левый слот свободен (нет замка/бот-верификации).
+        final boolean devgramBadged = parentFragment != null && DevGramBadges.isBadged(parentFragment.getDialogId());
+        final long devgramBadgeDialogId = parentFragment != null ? parentFragment.getDialogId() : 0;
+        boolean devgramInLeft = false;
+        if (leftIcon == null && devgramBadged) {
+            leftIcon = getDevGramBadgeDrawable(devgramBadgeDialogId);
+            devgramInLeft = true;
+        }
         titleTextView.setLeftDrawable(leftIcon);
+        final CharSequence devgramBadgeName = titleTextView.getText();
+        if (devgramInLeft) {
+            titleTextView.setLeftDrawableOnClick(v ->
+                    BulletinFactory.of(parentFragment)
+                            .createSimpleBulletin(
+                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
+                                    DevGramBadges.badgeText(devgramBadgeDialogId, devgramBadgeName))
+                            .show());
+        } else {
+            titleTextView.setLeftDrawableOnClick(null);
+        }
+        if (devgramBadged && !devgramInLeft) {
+            titleTextView.setRightDrawable3(getDevGramBadgeDrawable(devgramBadgeDialogId));
+            titleTextView.setRightDrawable3OnClick(v ->
+                    BulletinFactory.of(parentFragment)
+                            .createSimpleBulletin(
+                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
+                                    DevGramBadges.badgeText(devgramBadgeDialogId, devgramBadgeName))
+                            .show());
+        } else {
+            titleTextView.setRightDrawable3(null);
+            titleTextView.setRightDrawable3OnClick(null);
+        }
         if (!rightDrawableIsScamOrVerified && !rightDrawableIsScam) {
             if (mutedIcon != null) {
                 rightDrawable2ContentDescription = getString(R.string.NotificationsMuted);
@@ -916,6 +950,12 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             titleTextView.setRightDrawable2(mutedIcon);
         }
         checkActionBar(true);
+    }
+
+    // DevGram: значок бренда для шапки — ставим кастом-эмодзи по роли диалога.
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable getDevGramBadgeDrawable(long dialogId) {
+        devgramBadgeDrawable.set(DevGramBadges.emojiIdOf(dialogId), false);
+        return devgramBadgeDrawable;
     }
 
     public AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable getBotVerificationDrawable(long icon, boolean animated) {
@@ -985,21 +1025,10 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             titleTextView.setRightDrawableOnClick(null);
             rightDrawableContentDescription = null;
         }
-        // DevGram: значок в отдельном третьем слоте — виден рядом с verified/premium, кликается
-        if (parentFragment != null && DevGramBadges.isBadged(parentFragment.getDialogId())) {
-            final long badgeDialogId = parentFragment.getDialogId();
-            final CharSequence badgeName = titleTextView.getText();
-            titleTextView.setRightDrawable3(ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter));
-            titleTextView.setRightDrawable3OnClick(v ->
-                    BulletinFactory.of(parentFragment)
-                            .createSimpleBulletin(
-                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
-                                    DevGramBadges.badgeText(badgeDialogId, badgeName))
-                            .show());
-        } else {
-            titleTextView.setRightDrawable3(null);
-            titleTextView.setRightDrawable3OnClick(null);
-        }
+        // DevGram: значок бренда рисуется слева от имени — им управляет setTitleIcons.
+        // Здесь только сбрасываем правый запасной слот, чтобы не осталось значка от прошлого чата.
+        titleTextView.setRightDrawable3(null);
+        titleTextView.setRightDrawable3OnClick(null);
         checkActionBar(animated);
     }
 
@@ -1556,6 +1585,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (botVerificationDrawable != null) {
             botVerificationDrawable.attach();
         }
+        if (devgramBadgeDrawable != null) {
+            devgramBadgeDrawable.attach();
+        }
     }
 
     @Override
@@ -1573,6 +1605,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         }
         if (botVerificationDrawable != null) {
             botVerificationDrawable.detach();
+        }
+        if (devgramBadgeDrawable != null) {
+            devgramBadgeDrawable.detach();
         }
     }
 

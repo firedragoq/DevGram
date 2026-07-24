@@ -99,9 +99,10 @@ public class DevGramBadgesActivity extends BaseFragment {
         String[] names = {
                 DevGramBadges.roleName(DevGramBadges.ROLE_TEAM),
                 DevGramBadges.roleName(DevGramBadges.ROLE_SUPPORTER),
+                DevGramBadges.roleName(DevGramBadges.ROLE_CHANNEL),
                 DevGramBadges.roleName(DevGramBadges.ROLE_OFFICIAL),
         };
-        int[] values = {DevGramBadges.ROLE_TEAM, DevGramBadges.ROLE_SUPPORTER, DevGramBadges.ROLE_OFFICIAL};
+        int[] values = {DevGramBadges.ROLE_TEAM, DevGramBadges.ROLE_SUPPORTER, DevGramBadges.ROLE_CHANNEL, DevGramBadges.ROLE_OFFICIAL};
         roles.setItems(names, (dialog, which) -> askId(values[which]));
         roles.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
         showDialog(roles.create());
@@ -113,7 +114,8 @@ public class DevGramBadgesActivity extends BaseFragment {
         editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 18);
         editText.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
         editText.setInputType(InputType.TYPE_CLASS_NUMBER);
-        editText.setHint(role == DevGramBadges.ROLE_OFFICIAL ? "ID чата" : "ID пользователя");
+        boolean channelRole = role == DevGramBadges.ROLE_OFFICIAL || role == DevGramBadges.ROLE_CHANNEL;
+        editText.setHint(channelRole ? "ID канала" : "ID пользователя");
         editText.setHintColor(Theme.getColor(Theme.key_dialogTextHint, resourceProvider));
         editText.setCursorColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
         editText.setCursorSize(AndroidUtilities.dp(20));

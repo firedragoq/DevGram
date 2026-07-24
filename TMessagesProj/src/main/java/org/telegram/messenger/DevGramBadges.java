@@ -23,7 +23,13 @@ public class DevGramBadges {
 
     public static final int ROLE_TEAM = 0;       // команда проекта (пользователь)
     public static final int ROLE_SUPPORTER = 1;  // поддержавший форк (пользователь)
-    public static final int ROLE_OFFICIAL = 2;   // официальный чат/канал
+    public static final int ROLE_OFFICIAL = 2;   // официальный канал/ресурс DevGram
+    public static final int ROLE_CHANNEL = 3;    // обычный канал (верификация DevGram)
+
+    // Кастом-эмодзи Telegram, которые рисуются как значок рядом с именем (по document_id).
+    public static final long EMOJI_TEAM_SUPPORTER = 5411424042932543123L; // ✈️ команда и поддержавшие
+    public static final long EMOJI_CHANNEL        = 5413368748289598440L; // ✅ обычные каналы
+    public static final long EMOJI_OFFICIAL       = 5413671801182004970L; // ✈️ официальные каналы DevGram
 
     // Базовая команда — зашита в код, снять из интерфейса нельзя.
     private static final HashSet<Long> TEAM_HARDCODED = new HashSet<>(Arrays.asList(
@@ -71,6 +77,21 @@ public class DevGramBadges {
         return chatId > 0 && roleOf(-chatId) == ROLE_OFFICIAL;
     }
 
+    // document_id кастом-эмодзи для значка этого диалога (0 — значка нет).
+    public static long emojiIdOf(long dialogId) {
+        switch (roleOf(dialogId)) {
+            case ROLE_TEAM:
+            case ROLE_SUPPORTER:
+                return EMOJI_TEAM_SUPPORTER;
+            case ROLE_CHANNEL:
+                return EMOJI_CHANNEL;
+            case ROLE_OFFICIAL:
+                return EMOJI_OFFICIAL;
+            default:
+                return 0;
+        }
+    }
+
     // --- управление (экран «Значки DevGram») ---
 
     // Выдать значок. rawId — то, что ввёл разработчик (без знака); роль определяет тип.
@@ -79,8 +100,9 @@ public class DevGramBadges {
         if (p == null || rawId == 0) {
             return;
         }
-        // официальный чат хранится как dialogId (<0), пользователь — как id (>0)
-        long dialogId = role == ROLE_OFFICIAL ? -Math.abs(rawId) : Math.abs(rawId);
+        // каналы хранятся как dialogId (<0), пользователи — как id (>0)
+        boolean isChannelRole = role == ROLE_OFFICIAL || role == ROLE_CHANNEL;
+        long dialogId = isChannelRole ? -Math.abs(rawId) : Math.abs(rawId);
         p.edit().putInt(key(dialogId), role).apply();
     }
 
@@ -111,7 +133,8 @@ public class DevGramBadges {
     public static String roleName(int role) {
         switch (role) {
             case ROLE_TEAM: return "Команда проекта";
-            case ROLE_OFFICIAL: return "Официальный чат";
+            case ROLE_OFFICIAL: return "Официальный канал DevGram";
+            case ROLE_CHANNEL: return "Канал";
             default: return "Поддержавший";
         }
     }
@@ -121,13 +144,16 @@ public class DevGramBadges {
         if (name == null) {
             name = "";
         }
-        int role = roleOf(dialogId);
-        if (role == ROLE_OFFICIAL || dialogId < 0) {
-            return name + " получил(а) верификацию от DevGram";
+        switch (roleOf(dialogId)) {
+            case ROLE_OFFICIAL:
+                return name + " является официальным ресурсом DevGram";
+            case ROLE_CHANNEL:
+                return name + " — канал, верифицированный DevGram";
+            case ROLE_TEAM:
+                return name + " — команда проекта DevGram";
+            case ROLE_SUPPORTER:
+            default:
+                return name + " поддержал(а) разработку DevGram и получил(а) уникальный значок";
         }
-        if (role == ROLE_TEAM) {
-            return name + " — команда проекта DevGram";
-        }
-        return name + " поддержал(а) разработку DevGram и получил(а) уникальный значок";
     }
 }

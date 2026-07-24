@@ -70,6 +70,11 @@ public class SimpleTextView extends View implements Drawable.Callback {
     public int rightDrawable3X;
     public int rightDrawable3Y;
     private OnClickListener rightDrawable3OnClickListener;
+    // DevGram: клик по левому drawable (значок теперь слева от ника)
+    public int leftDrawableX;
+    public int leftDrawableY;
+    private OnClickListener leftDrawableOnClickListener;
+    private boolean maybeClickLeft;
     private Drawable replacedDrawable;
     private String replacedText;
     private int replacingDrawableTextIndex;
@@ -714,6 +719,11 @@ public class SimpleTextView extends View implements Drawable.Callback {
         rightDrawable3OnClickListener = onClickListener;
     }
 
+    // DevGram: клик по значку в левом слоте (значок бренда теперь слева от имени).
+    public void setLeftDrawableOnClick(OnClickListener onClickListener) {
+        leftDrawableOnClickListener = onClickListener;
+    }
+
     public void setRightDrawableScale(float scale) {
         rightDrawableScale = scale;
     }
@@ -893,6 +903,8 @@ public class SimpleTextView extends View implements Drawable.Callback {
             }
             leftDrawable.setBounds(x, y, x + leftDrawable.getIntrinsicWidth(), y + leftDrawable.getIntrinsicHeight());
             leftDrawable.draw(canvas);
+            leftDrawableX = x + (leftDrawable.getIntrinsicWidth() >> 1);
+            leftDrawableY = y + (leftDrawable.getIntrinsicHeight() >> 1);
             if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.LEFT || (gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL) {
                 textOffsetX += drawablePadding + leftDrawable.getIntrinsicWidth();
             }
@@ -1172,6 +1184,8 @@ public class SimpleTextView extends View implements Drawable.Callback {
             }
             leftDrawable.setBounds(x, y, x + dw, y + dh);
             leftDrawable.draw(canvas);
+            leftDrawableX = x + (dw >> 1);
+            leftDrawableY = y + (dh >> 1);
         }
         if (rightDrawable != null && rightDrawableOutside) {
             int x = Math.min(textOffsetX + textWidth + drawablePadding + (scrollingOffset == 0 ? -nextScrollX : (int) -scrollingOffset) + nextScrollX, getMaxTextWidth() - paddingRight + drawablePadding);
@@ -1461,7 +1475,28 @@ public class SimpleTextView extends View implements Drawable.Callback {
                 getParent().requestDisallowInterceptTouchEvent(false);
             }
         }
-        return super.onTouchEvent(event) || maybeClick || maybeClick3;
+        // DevGram: клик по значку в левом слоте
+        if (leftDrawableOnClickListener != null && leftDrawable != null) {
+            AndroidUtilities.rectTmp.set(leftDrawableX - dp(16), leftDrawableY - dp(16), leftDrawableX + dp(16), leftDrawableY + dp(16));
+            if (event.getAction() == MotionEvent.ACTION_DOWN && AndroidUtilities.rectTmp.contains((int) event.getX(), (int) event.getY())) {
+                maybeClickLeft = true;
+                touchDownX = event.getX();
+                touchDownY = event.getY();
+                getParent().requestDisallowInterceptTouchEvent(true);
+            } else if (event.getAction() == MotionEvent.ACTION_MOVE && maybeClickLeft) {
+                if (Math.abs(event.getX() - touchDownX) >= AndroidUtilities.touchSlop || Math.abs(event.getY() - touchDownY) >= AndroidUtilities.touchSlop) {
+                    maybeClickLeft = false;
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
+            } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                if (maybeClickLeft && event.getAction() == MotionEvent.ACTION_UP) {
+                    leftDrawableOnClickListener.onClick(this);
+                }
+                maybeClickLeft = false;
+                getParent().requestDisallowInterceptTouchEvent(false);
+            }
+        }
+        return super.onTouchEvent(event) || maybeClick || maybeClick3 || maybeClickLeft;
     }
 
     private boolean maybeClick3;

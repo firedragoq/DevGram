@@ -153,10 +153,12 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     @Override
     public View createView(Context context) {
-        logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo).mutate();
-        logoDrawable.setBounds(0, dp(8.666f), dp(115), dp(35));
-        SpannableStringBuilder ssb = new SpannableStringBuilder(LocaleController.getString(R.string.Page1Title));
-        ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        // DevGram: на приветствии — наш логотип (белый самолёт на тёмной монетке) + название,
+        // вместо чёрного вордмарка «Telegram».
+        logoDrawable = context.getResources().getDrawable(R.drawable.devgram_logo).mutate();
+        logoDrawable.setBounds(0, 0, dp(32), dp(32));
+        SpannableStringBuilder ssb = new SpannableStringBuilder("  DevGram");
+        ssb.setSpan(new ImageSpan(logoDrawable, ImageSpan.ALIGN_BOTTOM), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         titles[0] = ssb;
 
 

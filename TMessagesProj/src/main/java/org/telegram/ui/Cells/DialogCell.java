@@ -639,8 +639,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private boolean drawVerified;
     private boolean drawBotVerified;
     private boolean drawPremium;
-    private boolean drawDevgramBadge; // DevGram: значок «поддержал форк» / «официальный чат»
-    private Drawable devgramBadgeDrawable;
+    private boolean drawDevgramBadge; // DevGram: значок бренда (кастом-эмодзи) слева от имени
+    private int devgramBadgeLeft;     // X начала значка (слева от ника)
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable devgramBadgeEmoji;
     private final View emojiStatusView;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
@@ -721,6 +722,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         addView(emojiStatusView);
         emojiStatus = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(emojiStatusView, dp(22));
         botVerification = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(17));
+        devgramBadgeEmoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(18));
         avatarImage.setAllowLoadingOnAttachedOnly(true);
     }
 
@@ -962,6 +964,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (botVerification != null) {
             botVerification.detach();
         }
+        if (devgramBadgeEmoji != null) {
+            devgramBadgeEmoji.detach();
+        }
         AnimatedEmojiSpan.release(this, animatedEmojiStack);
         AnimatedEmojiSpan.release(this, animatedEmojiStack2);
         AnimatedEmojiSpan.release(this, animatedEmojiStack3);
@@ -987,6 +992,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         }
         if (botVerification != null) {
             botVerification.attach();
+        }
+        if (devgramBadgeEmoji != null) {
+            devgramBadgeEmoji.attach();
         }
     }
 
@@ -2418,14 +2426,16 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameLeft += w;
             }
         }
-        // DevGram: своё место под значок — отдельно от штатных слотов, чтобы он помещался
-        // рядом с verified/premium, а не вместо них.
+        // DevGram: значок бренда — слева от имени. Резервируем ширину и сдвигаем имя вправо,
+        // значок рисуем в освободившемся начале строки (devgramBadgeLeft).
         if (drawDevgramBadge) {
-            final int w = dp(4 + 18);
+            final int w = dp(2 + 18);
             nameWidth -= w;
             nameAdditionalsForChannelSubscriber += w;
-            if (LocaleController.isRTL) {
-                nameLeft += w;
+            devgramBadgeLeft = nameLeft;
+            nameLeft += w;
+            if (devgramBadgeEmoji != null) {
+                devgramBadgeEmoji.set(DevGramBadges.emojiIdOf(currentDialogId), false);
             }
         }
         if (drawBotVerified) {
@@ -4577,26 +4587,17 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 (drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable).draw(canvas);
             }
 
-            // DevGram: свой значок рисуем отдельно от штатной цепочки — сдвигая вправо на
-            // ширину уже занятой иконки, чтобы он не наезжал на verified/premium.
-            if (drawDevgramBadge) {
+            // DevGram: значок бренда (кастом-эмодзи) — слева от имени, на месте, зарезервированном
+            // в buildLayout (devgramBadgeLeft). Вертикаль — как у имени.
+            if (drawDevgramBadge && devgramBadgeEmoji != null) {
                 float y = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 13.5f : 16.5f);
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
                     y -= dp(9);
                 }
-                int offset = 0;
-                if (drawVerified) {
-                    offset = Theme.dialogs_verifiedDrawable.getIntrinsicWidth() + dp(3);
-                } else if (drawPremium) {
-                    offset = dp(24);
-                }
-                if (devgramBadgeDrawable == null) {
-                    devgramBadgeDrawable = getContext().getResources().getDrawable(R.drawable.devgram_supporter).mutate();
-                }
                 final int sz = dp(18);
-                final int left = nameMuteLeft - dp(1) + offset;
-                devgramBadgeDrawable.setBounds(left, (int) y, left + sz, (int) y + sz);
-                devgramBadgeDrawable.draw(canvas);
+                final int left = devgramBadgeLeft;
+                devgramBadgeEmoji.setBounds(left, (int) y, left + sz, (int) y + sz);
+                devgramBadgeEmoji.draw(canvas);
             }
 
             if (drawReorder || reorderIconProgress != 0) {
