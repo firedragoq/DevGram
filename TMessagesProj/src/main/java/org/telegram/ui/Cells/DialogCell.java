@@ -1563,8 +1563,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         botVerification.set(dialogBotVerificationIcon, false);
                     }
                     // DevGram: свой значок рисуется всегда, даже рядом с verified/premium —
-                    // для него отводится отдельное место правее штатных иконок.
-                    if (drawScam == 0 && DevGramBadges.isBadged(currentDialogId)) {
+                    // для него отводится отдельное место правее штатных иконок. Но НЕ на чате
+                    // с самим собой («Избранное») — там значок не нужен.
+                    if (drawScam == 0 && DevGramBadges.isBadged(currentDialogId)
+                            && currentDialogId != UserConfig.getInstance(currentAccount).getClientUserId()) {
                         drawDevgramBadge = true;
                     }
                 }

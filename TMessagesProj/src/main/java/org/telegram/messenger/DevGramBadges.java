@@ -111,12 +111,120 @@ public class DevGramBadges {
         });
     }
 
+    private static Thread streamThread;
+
     public static void startSync() {
         if (syncStarted) {
             return;
         }
         syncStarted = true;
-        syncFromCloud();
+        syncFromCloud(); // быстрый первый снимок
+        startStream();   // + живой поток: значки обновляются у ВСЕХ сразу, без перезапуска
+    }
+
+    // Живой поток изменений через Firebase REST Server-Sent Events: держим долгую connection к
+    // badges.json (Accept: text/event-stream) и применяем события put/patch к кэшу. Как только
+    // кому-то выдали/сняли значок — он появляется/исчезает у всех сразу. Чтение открыто, токен
+    // не нужен. При обрыве — переподключаемся.
+    private static synchronized void startStream() {
+        if (streamThread != null) {
+            return;
+        }
+        streamThread = new Thread(DevGramBadges::streamLoop, "DevGramBadgesStream");
+        streamThread.setDaemon(true);
+        streamThread.start();
+    }
+
+    private static void streamLoop() {
+        while (true) {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL(RTDB_BASE + "/badges.json");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestProperty("Accept", "text/event-stream");
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(90000); // > keep-alive Firebase (~30с): тишина 90с → реконнект
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line, event = null;
+                    while ((line = br.readLine()) != null) {
+                        if (line.startsWith("event:")) {
+                            event = line.substring(6).trim();
+                        } else if (line.startsWith("data:")) {
+                            handleStreamData(event, line.substring(5).trim());
+                        }
+                    }
+                }
+            } catch (Throwable ignore) {
+                // обрыв/таймаут — переподключимся
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+            try {
+                Thread.sleep(5000); // пауза перед реконнектом
+            } catch (InterruptedException e) {
+                return;
+            }
+        }
+    }
+
+    private static void handleStreamData(String event, String data) {
+        if (!"put".equals(event) && !"patch".equals(event)) {
+            return; // keep-alive и прочее игнорируем
+        }
+        try {
+            JSONObject d = new JSONObject(data);
+            String path = d.optString("path", "/");
+            Object payload = d.opt("data");
+            SharedPreferences p = prefs();
+            if (p == null) {
+                return;
+            }
+            SharedPreferences.Editor ed = p.edit();
+            if ("/".equals(path)) {
+                // полный снимок (при подключении или полной замене)
+                ed.clear();
+                if (payload instanceof JSONObject) {
+                    JSONObject obj = (JSONObject) payload;
+                    for (Iterator<String> it = obj.keys(); it.hasNext(); ) {
+                        String k = it.next();
+                        putBadge(ed, k, obj.opt(k));
+                    }
+                }
+            } else {
+                // изменение одного значка: path = "/<dialogId>"
+                String k = path.startsWith("/") ? path.substring(1) : path;
+                int slash = k.indexOf('/');
+                if (slash >= 0) {
+                    k = k.substring(0, slash);
+                }
+                putBadge(ed, k, payload);
+            }
+            ed.apply();
+            AndroidUtilities.runOnUIThread(() ->
+                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.reloadInterface));
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    private static void putBadge(SharedPreferences.Editor ed, String key, Object value) {
+        try {
+            Long.parseLong(key); // только валидные dialogId
+        } catch (Throwable e) {
+            return;
+        }
+        if (value == null || value == JSONObject.NULL) {
+            ed.remove(key); // значок снят
+        } else if (value instanceof Number) {
+            ed.putInt(key, ((Number) value).intValue());
+        } else {
+            try {
+                ed.putInt(key, Integer.parseInt(String.valueOf(value)));
+            } catch (Throwable ignore) {
+            }
+        }
     }
 
     public static boolean isSignedIn() {
