@@ -45,7 +45,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -118,7 +117,6 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     private String[] messages;
     private int currentViewPagerPage;
     private EGLThread eglThread;
-    private ImageView introLogoView; // DevGram: наша иконка поверх GL на первой странице
     private long currentDate;
     private boolean justEndDragging;
     private boolean dragging;
@@ -248,15 +246,6 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
         TextureView textureView = new TextureView(context);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
-        // DevGram: наша иконка поверх GL-анимации на первой странице (странице логотипа).
-        // ВАЖНО: GL-текстуру НЕ трогаем ни visibility, ни alpha — любое скрытие ломает создание
-        // surface, нативный GL (Intro.*) не инициализируется и приложение падает. Просто кладём
-        // сверху непрозрачную иконку приложения (её чёрная «монетка» перекрывает кружок ТГ),
-        // а при листании на другие страницы прячем её по alpha — там у GL свои иллюстрации.
-        introLogoView = new ImageView(context);
-        introLogoView.setImageResource(R.mipmap.ic_launcher);
-        introLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        frameLayout2.addView(introLogoView, LayoutHelper.createFrame(ICON_HEIGHT_DP, ICON_HEIGHT_DP, Gravity.CENTER));
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
@@ -309,11 +298,6 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
                 bottomPages.setPageOffset(position, positionOffset);
-
-                // DevGram: наша иконка видна только на первой странице (логотипа), при листании прячем
-                if (introLogoView != null) {
-                    introLogoView.setAlpha(position == 0 ? Math.max(0f, 1f - positionOffset) : 0f);
-                }
 
                 float width = viewPager.getMeasuredWidth();
                 if (width == 0) {
@@ -814,7 +798,22 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             loadTexture(R.drawable.intro_powerful_star, 18);
             loadTexture(R.drawable.intro_private_door, 19);
             loadTexture(R.drawable.intro_private_screw, 20);
-            loadTexture(R.drawable.intro_tg_plane, 21);
+            // DevGram: самолёт логотипа — НАШ (белый, с прорезью </>), вместо самолёта Telegram.
+            // Рендерим силуэт icon_plane так, чтобы его bbox заполнил битмап 82×74dp (как у
+            // оригинального intro_tg_plane) — тогда нативный GL рисует наш самолёт на том же месте.
+            loadTexture(v -> {
+                int w = dp(82), h = dp(74);
+                Bitmap bm = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                Canvas cv = new Canvas(bm);
+                Drawable plane = getParentActivity().getResources().getDrawable(R.drawable.icon_plane).mutate();
+                plane.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
+                // bbox плана в icon_plane (viewport 108): x[21.6..85.7] w=64.1, y[26.6..80.5] h=53.9
+                float sx = w / 64.1f, sy = h / 53.9f;
+                int l = Math.round(-21.6f * sx), t = Math.round(-26.6f * sy);
+                plane.setBounds(l, t, Math.round(l + 108 * sx), Math.round(t + 108 * sy));
+                plane.draw(cv);
+                return bm;
+            }, 21);
             loadTexture(v -> {
                 Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
                 paint.setColor(0xFF000000); // DevGram: чёрный круг логотипа (как иконка)
