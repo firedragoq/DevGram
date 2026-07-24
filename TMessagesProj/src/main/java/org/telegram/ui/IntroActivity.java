@@ -249,7 +249,10 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
         // DevGram: прячем GL-анимацию Telegram (там рисовался чёрный самолёт ТГ) и кладём
         // поверх наш настоящий логотип — иконку приложения (самолёт с </>).
-        textureView.setVisibility(View.INVISIBLE);
+        // ВАЖНО: не INVISIBLE, а alpha=0 — иначе surface не создаётся, нативный GL-интро
+        // (Intro.*) не инициализируется и приложение падает нативным крэшем. С alpha=0
+        // текстура живёт и инициализируется штатно, но не видна, а сверху — наш логотип.
+        textureView.setAlpha(0f);
         ImageView introLogoView = new ImageView(context);
         introLogoView.setImageResource(R.mipmap.icon_01_foreground);
         introLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
