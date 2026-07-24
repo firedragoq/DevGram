@@ -45,7 +45,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -154,8 +153,11 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     @Override
     public View createView(Context context) {
-        // DevGram: заголовок первой страницы — просто название (большой логотип рисуется по центру).
-        titles[0] = "DevGram";
+        logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo).mutate();
+        logoDrawable.setBounds(0, dp(8.666f), dp(115), dp(35));
+        SpannableStringBuilder ssb = new SpannableStringBuilder(LocaleController.getString(R.string.Page1Title));
+        ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        titles[0] = ssb;
 
 
         actionBar.setAddToContainer(false);
@@ -247,16 +249,6 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
         TextureView textureView = new TextureView(context);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
-        // DevGram: прячем GL-анимацию Telegram (там рисовался чёрный самолёт ТГ) и кладём
-        // поверх наш настоящий логотип — иконку приложения (самолёт с </>).
-        // ВАЖНО: не INVISIBLE, а alpha=0 — иначе surface не создаётся, нативный GL-интро
-        // (Intro.*) не инициализируется и приложение падает нативным крэшем. С alpha=0
-        // текстура живёт и инициализируется штатно, но не видна, а сверху — наш логотип.
-        textureView.setAlpha(0f);
-        ImageView introLogoView = new ImageView(context);
-        introLogoView.setImageResource(R.mipmap.icon_01_foreground);
-        introLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        frameLayout2.addView(introLogoView, LayoutHelper.createFrame(ICON_HEIGHT_DP, ICON_HEIGHT_DP, Gravity.CENTER));
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
