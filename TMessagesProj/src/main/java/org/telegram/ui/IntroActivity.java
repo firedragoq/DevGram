@@ -23,6 +23,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
@@ -798,20 +799,23 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             loadTexture(R.drawable.intro_powerful_star, 18);
             loadTexture(R.drawable.intro_private_door, 19);
             loadTexture(R.drawable.intro_private_screw, 20);
-            // DevGram: самолёт логотипа — НАШ (белый, с прорезью </>), вместо самолёта Telegram.
-            // Рендерим силуэт icon_plane так, чтобы его bbox заполнил битмап 82×74dp (как у
-            // оригинального intro_tg_plane) — тогда нативный GL рисует наш самолёт на том же месте.
+            // DevGram: самолёт логотипа — НАСТОЯЩАЯ иконка приложения (icon_01_foreground,
+            // 3D-самолёт с </>), а не перерисовка. Берём реальный PNG, вырезаем непрозрачный
+            // bbox самолёта и растягиваем на битмап 82×74dp (размер оригинального intro_tg_plane),
+            // чтобы нативный GL поставил наш логотип ровно на место самолёта Telegram.
             loadTexture(v -> {
                 int w = dp(82), h = dp(74);
                 Bitmap bm = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
                 Canvas cv = new Canvas(bm);
-                Drawable plane = getParentActivity().getResources().getDrawable(R.drawable.icon_plane).mutate();
-                plane.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
-                // bbox плана в icon_plane (viewport 108): x[21.6..85.7] w=64.1, y[26.6..80.5] h=53.9
-                float sx = w / 64.1f, sy = h / 53.9f;
-                int l = Math.round(-21.6f * sx), t = Math.round(-26.6f * sy);
-                plane.setBounds(l, t, Math.round(l + 108 * sx), Math.round(t + 108 * sy));
-                plane.draw(cv);
+                Drawable d = getParentActivity().getResources().getDrawable(R.mipmap.icon_01_foreground);
+                if (d instanceof BitmapDrawable) {
+                    Bitmap src = ((BitmapDrawable) d).getBitmap();
+                    int sw = src.getWidth(), sh = src.getHeight();
+                    // непрозрачный bbox самолёта в icon_01_foreground: x[0.176..0.827] y[0.210..0.790]
+                    Rect srcR = new Rect(Math.round(sw * 0.176f), Math.round(sh * 0.210f),
+                            Math.round(sw * 0.827f), Math.round(sh * 0.790f));
+                    cv.drawBitmap(src, srcR, new Rect(0, 0, w, h), new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+                }
                 return bm;
             }, 21);
             loadTexture(v -> {
