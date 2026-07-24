@@ -30425,6 +30425,10 @@ public class ChatActivity extends BaseFragment implements
     public void onResume() {
         super.onResume();
         checkShowBlur(false);
+        // DevGram: значок в шапке мог измениться в облаке, пока чат был на паузе — обновим
+        if (avatarContainer != null) {
+            updateTitleIcons();
+        }
         activityResumeTime = System.currentTimeMillis();
         if (openImport && getSendMessagesHelper().getImportingHistory(dialog_id) != null) {
             ImportingAlert alert = new ImportingAlert(getParentActivity(), null, this, themeDelegate);
