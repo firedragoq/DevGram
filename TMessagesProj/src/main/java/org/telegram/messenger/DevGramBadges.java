@@ -66,9 +66,8 @@ public class DevGramBadges {
     // поэтому айпи нашего сервера нигде не участвует и максимально скрыт. Чтение открыто всем
     // (правило ".read": true), запись — по токену админа (вход email/пароль через Auth REST).
 
-    // URL Realtime Database — подставить ТОЧНЫЙ после включения RTDB в консоли (там покажет
-    // адрес; для региона US это ...default-rtdb.firebaseio.com, для других — ...firebasedatabase.app).
-    private static final String RTDB_BASE = "https://devgram-d03e4-default-rtdb.firebaseio.com";
+    // URL Realtime Database (регион europe-west1). Без завершающего слэша — ниже добавляем пути.
+    private static final String RTDB_BASE = "https://devgram-d03e4-default-rtdb.europe-west1.firebasedatabase.app";
     private static final String API_KEY = "AIzaSyAj-Fq-7707X54Yr8t51mFAkJmCLEKtYoU";
 
     private static volatile String adminIdToken; // токен админа после входа (нужен для записи)
