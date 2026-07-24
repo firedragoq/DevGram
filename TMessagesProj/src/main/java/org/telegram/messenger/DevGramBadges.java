@@ -77,6 +77,19 @@ public class DevGramBadges {
         void onResult(boolean ok, String error);
     }
 
+    // Сообщить всему UI, что значки изменились: reloadInterface (профиль/шапка) + updateInterfaces
+    // (список чатов пересобирает ячейки через DialogCell.update). Всегда на UI-потоке.
+    private static void notifyBadgesChanged() {
+        AndroidUtilities.runOnUIThread(() -> {
+            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.reloadInterface);
+            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                if (UserConfig.getInstance(a).isClientActivated()) {
+                    NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
+                }
+            }
+        });
+    }
+
     // Забрать значки из облака в локальный кэш (в фоне). Вызываем на старте и при открытии
     // экрана значков / после выдачи.
     public static void syncFromCloud() {
@@ -103,8 +116,7 @@ public class DevGramBadges {
                     }
                 }
                 ed.apply();
-                AndroidUtilities.runOnUIThread(() ->
-                        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.reloadInterface));
+                notifyBadgesChanged();
             } catch (Throwable e) {
                 FileLog.e(e);
             }

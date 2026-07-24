@@ -3778,6 +3778,13 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (isForumCell() != oldIsForumCell) {
             requestLayout = true;
         }
+        // DevGram: значок мог измениться в облаке — если состояние отличается от нарисованного,
+        // пересобираем ячейку (иначе в списке чатов он не появляется/не исчезает без перезапуска).
+        boolean newDevgramBadge = drawScam == 0 && DevGramBadges.isBadged(currentDialogId)
+                && currentDialogId != UserConfig.getInstance(currentAccount).getClientUserId();
+        if (newDevgramBadge != drawDevgramBadge) {
+            rebuildLayout = true;
+        }
         if (rebuildLayout) {
             if (attachedToWindow) {
                 buildLayout();
