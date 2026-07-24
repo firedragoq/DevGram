@@ -118,6 +118,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     private String[] messages;
     private int currentViewPagerPage;
     private EGLThread eglThread;
+    private ImageView introLogoView; // DevGram: наша иконка поверх GL на первой странице
     private long currentDate;
     private boolean justEndDragging;
     private boolean dragging;
@@ -247,13 +248,12 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
         TextureView textureView = new TextureView(context);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
-        // DevGram: центральная «аватарка» экрана авторизации — наша иконка приложения вместо
-        // самолёта Telegram. GL-текстуру НЕ прячем через visibility (иначе surface не создаётся,
-        // нативный GL Intro.* не инициализируется и приложение падает нативным крэшем) — делаем
-        // её прозрачной (alpha=0): GL живёт и инициализируется штатно, но не виден, а сверху —
-        // наш логотип (адаптивная иконка ic_launcher, непрозрачная, полностью перекрывает низ).
-        textureView.setAlpha(0f);
-        ImageView introLogoView = new ImageView(context);
+        // DevGram: наша иконка поверх GL-анимации на первой странице (странице логотипа).
+        // ВАЖНО: GL-текстуру НЕ трогаем ни visibility, ни alpha — любое скрытие ломает создание
+        // surface, нативный GL (Intro.*) не инициализируется и приложение падает. Просто кладём
+        // сверху непрозрачную иконку приложения (её чёрная «монетка» перекрывает кружок ТГ),
+        // а при листании на другие страницы прячем её по alpha — там у GL свои иллюстрации.
+        introLogoView = new ImageView(context);
         introLogoView.setImageResource(R.mipmap.ic_launcher);
         introLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         frameLayout2.addView(introLogoView, LayoutHelper.createFrame(ICON_HEIGHT_DP, ICON_HEIGHT_DP, Gravity.CENTER));
@@ -309,6 +309,11 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
                 bottomPages.setPageOffset(position, positionOffset);
+
+                // DevGram: наша иконка видна только на первой странице (логотипа), при листании прячем
+                if (introLogoView != null) {
+                    introLogoView.setAlpha(position == 0 ? Math.max(0f, 1f - positionOffset) : 0f);
+                }
 
                 float width = viewPager.getMeasuredWidth();
                 if (width == 0) {
