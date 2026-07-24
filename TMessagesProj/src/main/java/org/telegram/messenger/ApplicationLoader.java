@@ -360,6 +360,7 @@ public class ApplicationLoader extends Application {
         }
 
         DevGramConfig.loadConfig(); // DevGram: гарантируем загрузку конфига с готовым контекстом
+        DevGramBadges.startSync();   // DevGram: подтягиваем значки из облака (Firebase) для всех
 
         NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
 

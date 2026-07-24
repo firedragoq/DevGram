@@ -1,22 +1,34 @@
 /*
- * DevGram: значок «команда / поддержал форк / официальный» рядом с именем.
+ * DevGram: значок «команда / поддержавший / канал / официальный» рядом с именем.
  *
- * Идея как в exteraGram: у части пользователей и чатов рядом с названием рисуется наш
- * значок (в списке чатов, в шапке, в профиле), по тапу — всплывающая подпись.
+ * Хранилище — ОБЩЕЕ, в облаке Firebase Realtime Database (проект devgram-d03e4), узел
+ * "badges": { "<dialogId>": <role> }. Так значки видят ВСЕ пользователи, а не только тот,
+ * кто выдал. Айпи нашего сервера при этом не участвует вообще — приложение общается только
+ * с Google (Firebase), поэтому айпи максимально скрыт.
  *
- * Выдача — из самого приложения (экран «Значки DevGram», доступен команде): id и роль
- * хранятся в SharedPreferences, ничего пересобирать не нужно. Базовая команда зашита
- * в код (TEAM_HARDCODED) — её нельзя снять из интерфейса, чтобы не потерять доступ.
- * Значок пока временный — галочка; когда доведём эмодзи-самолёт, поменяем только иконку.
+ * Читают все (правило ".read": true), пишет только команда (вход по Firebase Auth, правило
+ * ".write" по admin-uid). Локальный SharedPreferences используется как КЭШ: слушатель RTDB
+ * зеркалит облако в кэш, а roleOf() читает из кэша (быстро и работает офлайн). Базовая команда
+ * зашита в код (TEAM_HARDCODED) — на случай пустого/недоступного облака.
  */
 
 package org.telegram.messenger;
 
 import android.content.SharedPreferences;
 
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 
 public class DevGramBadges {
@@ -47,6 +59,138 @@ public class DevGramBadges {
 
     private static String key(long dialogId) {
         return Long.toString(dialogId);
+    }
+
+    // ================= облако (Firebase через REST, без SDK) =================
+    // Всё общение — ТОЛЬКО с серверами Google (firebaseio.com / identitytoolkit.googleapis.com),
+    // поэтому айпи нашего сервера нигде не участвует и максимально скрыт. Чтение открыто всем
+    // (правило ".read": true), запись — по токену админа (вход email/пароль через Auth REST).
+
+    // URL Realtime Database — подставить ТОЧНЫЙ после включения RTDB в консоли (там покажет
+    // адрес; для региона US это ...default-rtdb.firebaseio.com, для других — ...firebasedatabase.app).
+    private static final String RTDB_BASE = "https://devgram-d03e4-default-rtdb.firebaseio.com";
+    private static final String API_KEY = "AIzaSyAj-Fq-7707X54Yr8t51mFAkJmCLEKtYoU";
+
+    private static volatile String adminIdToken; // токен админа после входа (нужен для записи)
+    private static boolean syncStarted;
+
+    public interface Callback {
+        void onResult(boolean ok, String error);
+    }
+
+    // Забрать значки из облака в локальный кэш (в фоне). Вызываем на старте и при открытии
+    // экрана значков / после выдачи.
+    public static void syncFromCloud() {
+        Utilities.globalQueue.postRunnable(() -> {
+            String json = httpSend("GET", RTDB_BASE + "/badges.json", null);
+            if (json == null) {
+                return;
+            }
+            try {
+                SharedPreferences p = prefs();
+                if (p == null) {
+                    return;
+                }
+                SharedPreferences.Editor ed = p.edit().clear();
+                if (!"null".equals(json.trim())) {
+                    JSONObject obj = new JSONObject(json);
+                    for (Iterator<String> it = obj.keys(); it.hasNext(); ) {
+                        String k = it.next();
+                        try {
+                            Long.parseLong(k); // валидируем ключ-dialogId
+                            ed.putInt(k, obj.getInt(k));
+                        } catch (Throwable ignore) {
+                        }
+                    }
+                }
+                ed.apply();
+                AndroidUtilities.runOnUIThread(() ->
+                        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.reloadInterface));
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    public static void startSync() {
+        if (syncStarted) {
+            return;
+        }
+        syncStarted = true;
+        syncFromCloud();
+    }
+
+    public static boolean isSignedIn() {
+        return adminIdToken != null;
+    }
+
+    // Вход команды: Firebase Auth REST (email/пароль → idToken). Токен держим в памяти сессии.
+    public static void signIn(String email, String password, Callback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("email", email);
+                body.put("password", password);
+                body.put("returnSecureToken", true);
+                String resp = httpSend("POST",
+                        "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + API_KEY,
+                        body.toString());
+                if (resp != null) {
+                    JSONObject r = new JSONObject(resp);
+                    if (r.has("idToken")) {
+                        adminIdToken = r.getString("idToken");
+                        AndroidUtilities.runOnUIThread(() -> cb.onResult(true, null));
+                        return;
+                    }
+                }
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(false, "неверный email или пароль"));
+            } catch (Throwable e) {
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(false, e.getMessage()));
+            }
+        });
+    }
+
+    // Простой HTTP: GET/PUT/DELETE/POST. Возвращает тело ответа (2xx) или null.
+    private static String httpSend(String method, String urlStr, String body) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod(method);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            if (body != null) {
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(body.getBytes(StandardCharsets.UTF_8));
+                }
+            }
+            int code = conn.getResponseCode();
+            boolean ok = code >= 200 && code < 300;
+            InputStream is = ok ? conn.getInputStream() : conn.getErrorStream();
+            StringBuilder sb = new StringBuilder();
+            if (is != null) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        sb.append(line);
+                    }
+                }
+            }
+            if (ok) {
+                return sb.toString();
+            }
+            FileLog.e("DevGramBadges http " + method + " " + code + ": " + sb);
+            return null;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
     }
 
     // Роль по dialogId (>0 — пользователь, <0 — чат). -1 если значка нет.
@@ -95,21 +239,38 @@ public class DevGramBadges {
     // --- управление (экран «Значки DevGram») ---
 
     // Выдать значок. rawId — то, что ввёл разработчик (без знака); роль определяет тип.
+    // Пишем в облако (PUT с токеном админа) — после записи перечитываем облако у себя, а у
+    // остальных подтянется при следующей синхронизации. Без токена — локальный фолбэк.
     public static void grant(long rawId, int role) {
-        SharedPreferences p = prefs();
-        if (p == null || rawId == 0) {
+        if (rawId == 0) {
             return;
         }
         // каналы хранятся как dialogId (<0), пользователи — как id (>0)
         boolean isChannelRole = role == ROLE_OFFICIAL || role == ROLE_CHANNEL;
-        long dialogId = isChannelRole ? -Math.abs(rawId) : Math.abs(rawId);
-        p.edit().putInt(key(dialogId), role).apply();
+        final long dialogId = isChannelRole ? -Math.abs(rawId) : Math.abs(rawId);
+        // оптимистично пишем локально (мгновенная обратная связь) — облако подтянется следом
+        SharedPreferences p = prefs();
+        if (p != null) {
+            p.edit().putInt(key(dialogId), role).apply();
+        }
+        if (adminIdToken != null) {
+            Utilities.globalQueue.postRunnable(() -> {
+                httpSend("PUT", RTDB_BASE + "/badges/" + dialogId + ".json?auth=" + adminIdToken, Integer.toString(role));
+                syncFromCloud();
+            });
+        }
     }
 
     public static void revoke(long dialogId) {
         SharedPreferences p = prefs();
         if (p != null) {
             p.edit().remove(key(dialogId)).apply();
+        }
+        if (adminIdToken != null) {
+            Utilities.globalQueue.postRunnable(() -> {
+                httpSend("DELETE", RTDB_BASE + "/badges/" + dialogId + ".json?auth=" + adminIdToken, null);
+                syncFromCloud();
+            });
         }
     }
 

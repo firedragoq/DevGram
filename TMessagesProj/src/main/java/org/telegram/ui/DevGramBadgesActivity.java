@@ -12,6 +12,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DevGramBadges;
@@ -40,6 +42,7 @@ public class DevGramBadgesActivity extends BaseFragment {
 
     @Override
     public View createView(Context context) {
+        DevGramBadges.syncFromCloud(); // подтянуть свежий список из облака при открытии экрана
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle("Значки DevGram");
@@ -134,8 +137,10 @@ public class DevGramBadgesActivity extends BaseFragment {
         builder.setPositiveButton("Выдать", (d, w) -> {
             long id = Utilities.parseLong(editText.getText().toString());
             if (id != 0) {
-                DevGramBadges.grant(id, role);
-                update();
+                ensureAdminSignedIn(() -> {
+                    DevGramBadges.grant(id, role);
+                    update();
+                });
             }
         });
         builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
@@ -150,12 +155,67 @@ public class DevGramBadgesActivity extends BaseFragment {
         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
         builder.setTitle("Снять значок");
         builder.setMessage("Убрать значок «" + DevGramBadges.roleName((int) g[1]) + "» у ID " + shown + "?");
-        builder.setPositiveButton("Снять", (d, w) -> {
+        builder.setPositiveButton("Снять", (d, w) -> ensureAdminSignedIn(() -> {
             DevGramBadges.revoke(dialogId);
             update();
-        });
+        }));
         builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
         showDialog(builder.create());
+    }
+
+    // Писать значки в облако можно только после входа команды (Firebase Auth REST). Если токен
+    // уже есть — сразу выполняем действие; иначе спрашиваем email/пароль и логинимся.
+    private void ensureAdminSignedIn(Runnable onReady) {
+        if (DevGramBadges.isSignedIn()) {
+            onReady.run();
+            return;
+        }
+        Context context = getParentActivity();
+        EditTextBoldCursor emailEt = makeInput(context, "Email команды", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS | InputType.TYPE_CLASS_TEXT);
+        EditTextBoldCursor passEt = makeInput(context, "Пароль", InputType.TYPE_TEXT_VARIATION_PASSWORD | InputType.TYPE_CLASS_TEXT);
+        passEt.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
+
+        LinearLayout box = new LinearLayout(context);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(4), AndroidUtilities.dp(24), 0);
+        box.addView(emailEt, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
+        box.addView(passEt, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 0f, 12f, 0f, 0f));
+
+        AlertDialog.Builder b = new AlertDialog.Builder(context);
+        b.setTitle("Вход команды DevGram");
+        b.setView(box);
+        b.setPositiveButton("Войти", (d, w) -> {
+            String email = emailEt.getText().toString().trim();
+            String pass = passEt.getText().toString();
+            if (email.isEmpty() || pass.isEmpty()) {
+                return;
+            }
+            DevGramBadges.signIn(email, pass, (ok, err) -> {
+                if (ok) {
+                    onReady.run();
+                } else {
+                    Toast.makeText(getParentActivity(), "Не удалось войти: " + err, Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+        b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(b.create());
+        emailEt.requestFocus();
+        AndroidUtilities.showKeyboard(emailEt);
+    }
+
+    private EditTextBoldCursor makeInput(Context context, String hint, int inputType) {
+        EditTextBoldCursor et = new EditTextBoldCursor(context);
+        et.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 18);
+        et.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
+        et.setInputType(inputType);
+        et.setHint(hint);
+        et.setHintColor(Theme.getColor(Theme.key_dialogTextHint, resourceProvider));
+        et.setCursorColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
+        et.setCursorSize(AndroidUtilities.dp(20));
+        et.setCursorWidth(1.5f);
+        et.setBackgroundDrawable(Theme.createEditTextDrawable(context, true));
+        return et;
     }
 
     private void update() {
