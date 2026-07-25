@@ -29,6 +29,7 @@ import java.util.TimeZone;
 public class DevGramStreaks {
 
     private static final String RTDB_BASE = "https://devgram-d03e4-default-rtdb.europe-west1.firebasedatabase.app";
+    private static final int MIN_SHOWN = 3; // огонёк показываем только начиная с 3 дней подряд
 
     private static SharedPreferences prefs;
     private static boolean syncStarted;
@@ -167,7 +168,10 @@ public class DevGramStreaks {
             String[] a = s.split(",");
             int streak = Integer.parseInt(a[3]);
             int streakDay = Integer.parseInt(a[4]);
-            return streakDay >= today() - 1 ? streak : 0;
+            if (streakDay < today() - 1) {
+                return 0; // стрик умер (пропустили день)
+            }
+            return streak >= MIN_SHOWN ? streak : 0; // огонёк показываем только от 3
         } catch (Throwable e) {
             return 0;
         }
