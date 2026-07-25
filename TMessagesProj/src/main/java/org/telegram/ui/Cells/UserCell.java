@@ -40,8 +40,11 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
+import androidx.core.content.ContextCompat;
+
 import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.UserObject;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.messenger.utils.DrawableUtils;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
@@ -676,8 +679,16 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
                 devgramBadge.set(DevGramBadges.emojiIdOf(currentUser.id), false);
                 nameTextView.setLeftDrawable(devgramBadge);
                 final long uid = currentUser.id;
-                nameTextView.setLeftDrawableOnClick(v ->
-                        Toast.makeText(getContext(), DevGramBadges.badgeText(uid, nameTextView.getText()), Toast.LENGTH_SHORT).show());
+                nameTextView.setLeftDrawableOnClick(v -> {
+                    org.telegram.ui.ActionBar.BaseFragment f = org.telegram.ui.LaunchActivity.getSafeLastFragment();
+                    if (f != null) {
+                        BulletinFactory.of(f)
+                                .createSimpleBulletin(
+                                        ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
+                                        DevGramBadges.badgeText(uid, nameTextView.getText()))
+                                .show();
+                    }
+                });
             } else {
                 nameTextView.setLeftDrawable(null);
                 nameTextView.setLeftDrawableOnClick(null);

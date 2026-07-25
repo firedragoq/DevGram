@@ -115,6 +115,9 @@ import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.DevGramConfig;
 import org.telegram.messenger.DevGramMessagesController;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Components.BulletinFactory;
+import org.telegram.ui.LaunchActivity;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
@@ -2285,7 +2288,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 devgramNameBadgePressed = false;
                 playSoundEffect(SoundEffectConstants.CLICK);
                 CharSequence nm = currentNameString != null ? currentNameString : "";
-                Toast.makeText(getContext(), DevGramBadges.badgeText(devgramNameBadgeDialogId, nm), Toast.LENGTH_SHORT).show();
+                BaseFragment f = LaunchActivity.getSafeLastFragment();
+                if (f != null) {
+                    BulletinFactory.of(f)
+                            .createSimpleBulletin(
+                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
+                                    DevGramBadges.badgeText(devgramNameBadgeDialogId, nm))
+                            .show();
+                }
                 return true;
             }
         } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
