@@ -2449,7 +2449,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         devgramStreak = currentDialogId > 0 ? DevGramStreaks.getStreak(currentDialogId) : 0;
         drawDevgramStreak = devgramStreak > 0;
         if (drawDevgramStreak) {
-            final int w = dp(2 + 20);
+            final int w = dp(2 + 18);
             nameWidth -= w;
             nameAdditionalsForChannelSubscriber += w;
             if (LocaleController.isRTL) {
@@ -4643,7 +4643,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 } else if (drawScam != 0) {
                     offset = Theme.dialogs_scamDrawable.getIntrinsicWidth() + dp(4);
                 }
-                final int sz = dp(20);
+                final int sz = dp(18);
                 final int left = nameMuteLeft - dp(1) + offset;
                 devgramStreakDrawable.setBounds(left, (int) y, left + sz, (int) y + sz);
                 devgramStreakDrawable.draw(canvas);

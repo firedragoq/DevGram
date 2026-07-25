@@ -1,7 +1,7 @@
 /*
  * DevGram: значок стрика — огонёк 🔥 с числом ВНУТРИ (сколько дней подряд общаетесь).
- * Пламя рисуем системным эмодзи (всегда аккуратно), число — белым по центру тела пламени.
- * Используется как right-drawable рядом с именем (справа от прем-эмодзи, где был значок).
+ * Пламя — системный эмодзи (по центру), число — белым по центру тела пламени. Пламя живо
+ * «колышется» (лёгкое мерцание по вертикали), число при этом стоит на месте.
  */
 
 package org.telegram.ui.Components;
@@ -12,6 +12,7 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.SystemClock;
 import android.text.TextPaint;
 
 import androidx.annotation.NonNull;
@@ -25,13 +26,16 @@ public class DevGramStreakDrawable extends Drawable {
     private final int size;
     private String numStr = "";
 
+    private final Runnable invalidateRunnable = this::invalidateSelf;
+
     public DevGramStreakDrawable() {
-        size = AndroidUtilities.dp(22);
-        flamePaint.setTextSize(AndroidUtilities.dp(22));
+        size = AndroidUtilities.dp(18);
+        flamePaint.setTextSize(AndroidUtilities.dp(18));
+        flamePaint.setTextAlign(Paint.Align.CENTER); // пламя строго по центру
         numPaint.setColor(0xFFFFFFFF);
         numPaint.setTypeface(AndroidUtilities.bold());
         numPaint.setTextAlign(Paint.Align.CENTER);
-        numPaint.setShadowLayer(AndroidUtilities.dp(1), 0, 0, 0x66000000);
+        numPaint.setShadowLayer(AndroidUtilities.dp(1.2f), 0, 0, 0x99000000);
     }
 
     public void setCount(int count) {
@@ -40,8 +44,8 @@ public class DevGramStreakDrawable extends Drawable {
             return;
         }
         numStr = s;
-        // подгоняем размер числа под количество цифр, чтобы влезало в пламя
-        numPaint.setTextSize(AndroidUtilities.dp(numStr.length() >= 3 ? 7f : (numStr.length() == 2 ? 8f : 9.5f)));
+        // размер числа под количество цифр, чтобы влезало в тело пламени
+        numPaint.setTextSize(AndroidUtilities.dp(numStr.length() >= 3 ? 6.5f : (numStr.length() == 2 ? 7.5f : 8.5f)));
         invalidateSelf();
     }
 
@@ -52,12 +56,24 @@ public class DevGramStreakDrawable extends Drawable {
             return;
         }
         float cx = b.exactCenterX();
+        // мерцание: пламя слегка тянется вверх/сжимается от своего основания
+        float phase = (SystemClock.uptimeMillis() % 780L) / 780f;
+        float sy = 1f + 0.09f * (float) Math.sin(phase * 2 * Math.PI);
+
         Paint.FontMetrics fm = flamePaint.getFontMetrics();
         float flameBaseline = b.top + (b.height() - (fm.descent - fm.ascent)) / 2f - fm.ascent;
+        canvas.save();
+        canvas.scale(1f, sy, cx, b.bottom); // тянем от основания
         canvas.drawText("🔥", cx, flameBaseline, flamePaint); // 🔥
-        // число — в теле пламени (нижняя часть по центру)
-        float ny = b.top + b.height() * 0.66f - (numPaint.descent() + numPaint.ascent()) / 2f;
+        canvas.restore();
+
+        // число — в теле пламени (нижняя середина), стоит на месте
+        float ny = b.top + b.height() * 0.62f - (numPaint.descent() + numPaint.ascent()) / 2f;
         canvas.drawText(numStr, cx, ny, numPaint);
+
+        // следующий кадр анимации (работает там, где у drawable есть callback-вью)
+        unscheduleSelf(invalidateRunnable);
+        scheduleSelf(invalidateRunnable, SystemClock.uptimeMillis() + 40);
     }
 
     @Override
