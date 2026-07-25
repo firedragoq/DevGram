@@ -112,6 +112,7 @@ import org.telegram.messenger.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
+import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.DevGramConfig;
 import org.telegram.messenger.DevGramMessagesController;
 import org.telegram.messenger.DownloadController;
@@ -1767,6 +1768,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private String nameStatusSlug;
     public AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable currentNameStatusDrawable;
     public AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable currentNameEmojiStatusDrawable;
+    // DevGram: значок бренда СЛЕВА от имени отправителя в сообщении (кликабельный)
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable devgramNameBadge;
+    private boolean drawDevgramNameBadge;
+    private long devgramNameBadgeDialogId;
+    private int devgramNameBadgeCx, devgramNameBadgeCy;
 
     private TLRPC.User currentForwardUser;
     private TLRPC.User currentViaBotUser;
@@ -2258,6 +2264,34 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             nameStatusPressed = false;
         }
         return nameStatusPressed;
+    }
+
+    // DevGram: тап по значку бренда слева от имени отправителя → всплывает подпись
+    private boolean devgramNameBadgePressed;
+    private boolean checkDevgramNameBadgeMotionEvent(MotionEvent event) {
+        if (!drawDevgramNameBadge || devgramNameBadge == null || devgramNameBadgeDialogId == 0) {
+            return false;
+        }
+        int x = (int) getEventX(event);
+        int y = (int) getEventY(event);
+        boolean inside = Math.abs(x - devgramNameBadgeCx) <= dp(12) && Math.abs(y - devgramNameBadgeCy) <= dp(12);
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            if (inside) {
+                devgramNameBadgePressed = true;
+                return true;
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_UP) {
+            if (devgramNameBadgePressed) {
+                devgramNameBadgePressed = false;
+                playSoundEffect(SoundEffectConstants.CLICK);
+                CharSequence nm = currentNameString != null ? currentNameString : "";
+                Toast.makeText(getContext(), DevGramBadges.badgeText(devgramNameBadgeDialogId, nm), Toast.LENGTH_SHORT).show();
+                return true;
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+            devgramNameBadgePressed = false;
+        }
+        return false;
     }
 
     private final Runnable scheduleUpdateRelativeDatesRunnable = this::scheduleUpdateRelativeDates;
@@ -5010,6 +5044,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             result = checkNameStatusMotionEvent(event);
         }
         if (!result) {
+            result = checkDevgramNameBadgeMotionEvent(event);
+        }
+        if (!result) {
             result = checkPinchToZoom(event);
         }
         if (!result) {
@@ -6485,6 +6522,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (currentNameEmojiStatusDrawable != null) {
             currentNameEmojiStatusDrawable.detach();
         }
+        if (devgramNameBadge != null) {
+            devgramNameBadge.detach();
+        }
 
         if (mediaSpoilerEffect2 != null) {
             mediaSpoilerEffect2.detach(this);
@@ -6605,6 +6645,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         if (currentNameEmojiStatusDrawable != null) {
             currentNameEmojiStatusDrawable.attach();
+        }
+        if (devgramNameBadge != null) {
+            devgramNameBadge.attach();
         }
         if (mediaSpoilerEffect2 != null) {
             if (mediaSpoilerEffect2.destroyed) {
@@ -18865,6 +18908,20 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             if (drawTopic && topicButton != null) {
                 nameWidth -= topicButton.width + dp(8);
             }
+            // DevGram: значок бренда слева от имени отправителя (входящие) — резервируем место
+            long devgramFrom = currentUser != null ? currentUser.id : (currentChat != null ? -currentChat.id : 0);
+            drawDevgramNameBadge = !messageObject.isOutOwner() && devgramFrom != 0 && DevGramBadges.isBadged(devgramFrom);
+            if (drawDevgramNameBadge) {
+                devgramNameBadgeDialogId = devgramFrom;
+                nameWidth = Math.max(dp(10), nameWidth - dp(22));
+                if (devgramNameBadge == null) {
+                    devgramNameBadge = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, true, dp(18));
+                    if (attachedToWindow) {
+                        devgramNameBadge.attach();
+                    }
+                }
+                devgramNameBadge.set(DevGramBadges.emojiIdOf(devgramFrom), false);
+            }
             int adminWidth = 0;
             boolean isAdmin = false, isOwner = false;
             SpannableStringBuilder adminString = null;
@@ -21220,6 +21277,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             } else {
                 ny -= dp(2.33f) * avatarAlpha;
             }
+            // DevGram: тот же сдвиг, что и у имени в drawNamesLayout — чтобы эмодзи-статусы совпали
+            if (drawDevgramNameBadge) {
+                nx += dp(22);
+            }
             if (currentNameEmojiStatusDrawable != null) {
                 currentNameEmojiStatusDrawable.setBounds(
                     (int) (Math.abs(nx) - dp(20)),
@@ -22055,6 +22116,17 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 ny += dp(5) * avatarAlpha;
             } else {
                 ny -= dp(2.33f) * avatarAlpha;
+            }
+            // DevGram: значок бренда слева от имени — рисуем в начале, имя сдвигаем вправо на dp(22)
+            if (drawDevgramNameBadge && devgramNameBadge != null) {
+                int bx = (int) (Math.abs(nx) + nameOffsetX);
+                int by = (int) (ny + nameLayout.getHeight() / 2f - dp(9));
+                devgramNameBadge.setBounds(bx, by, bx + dp(18), by + dp(18));
+                devgramNameBadge.setAlpha((int) (0xFF * nameAlpha));
+                devgramNameBadge.draw(canvas);
+                devgramNameBadgeCx = bx + dp(9);
+                devgramNameBadgeCy = by + dp(9);
+                nx += dp(22);
             }
 
             if (!currentMessageObject.isSponsored()) {

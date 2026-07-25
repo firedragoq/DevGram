@@ -27,6 +27,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
@@ -39,6 +40,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.utils.DrawableUtils;
 import org.telegram.tgnet.ConnectionsManager;
@@ -77,6 +79,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
     private int nameRightDrawableResId;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
+    private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable devgramBadge; // DevGram: значок бренда слева от имени участника
     private ImageView closeView;
     protected Theme.ResourcesProvider resourcesProvider;
 
@@ -194,6 +197,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
 
         botVerification = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(nameTextView, dp(20));
         emojiStatus = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(nameTextView, dp(20));
+        devgramBadge = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(nameTextView, dp(18));
 
         statusTextView = new SimpleTextView(context);
         statusTextView.setTextSize(15);
@@ -667,11 +671,22 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
         }
         if (botVerificationIcon == 0) {
             botVerification.set((Drawable) null, false);
-            nameTextView.setLeftDrawable(null);
+            // DevGram: значок бренда слева от имени участника (когда левый слот свободен), кликабельный
+            if (currentUser != null && DevGramBadges.isBadged(currentUser.id)) {
+                devgramBadge.set(DevGramBadges.emojiIdOf(currentUser.id), false);
+                nameTextView.setLeftDrawable(devgramBadge);
+                final long uid = currentUser.id;
+                nameTextView.setLeftDrawableOnClick(v ->
+                        Toast.makeText(getContext(), DevGramBadges.badgeText(uid, nameTextView.getText()), Toast.LENGTH_SHORT).show());
+            } else {
+                nameTextView.setLeftDrawable(null);
+                nameTextView.setLeftDrawableOnClick(null);
+            }
         } else {
             botVerification.set(botVerificationIcon, false);
             botVerification.setColor(Theme.getColor(Theme.key_chats_verifiedBackground, resourcesProvider));
             nameTextView.setLeftDrawable(botVerification);
+            nameTextView.setLeftDrawableOnClick(null);
         }
         if (currentUser != null && MessagesController.getInstance(currentAccount).isPremiumUser(currentUser) && !MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             if (DialogObject.getEmojiStatusDocumentId(currentUser.emoji_status) != 0) {
@@ -833,6 +848,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiLoaded);
         emojiStatus.attach();
         botVerification.attach();
+        devgramBadge.attach();
     }
 
     @Override
@@ -841,6 +857,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
         emojiStatus.detach();
         botVerification.detach();
+        devgramBadge.detach();
         storyParams.onDetachFromWindow();
     }
 
