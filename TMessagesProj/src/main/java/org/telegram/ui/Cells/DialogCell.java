@@ -66,6 +66,7 @@ import org.telegram.messenger.ChatThemeController;
 import org.telegram.messenger.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DevGramBadges;
+import org.telegram.messenger.DevGramStreaks;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
@@ -642,6 +643,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private boolean drawDevgramBadge; // DevGram: значок бренда (кастом-эмодзи) слева от имени
     private int devgramBadgeLeft;     // X начала значка (слева от ника)
     private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable devgramBadgeEmoji;
+    private boolean drawDevgramStreak; // DevGram: огонёк-стрик 🔥N справа от имени
+    private int devgramStreak;
+    private org.telegram.ui.Components.DevGramStreakDrawable devgramStreakDrawable;
     private final View emojiStatusView;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
@@ -1330,6 +1334,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         drawBotVerified = false;
         drawPremium = false;
         drawDevgramBadge = false;
+        drawDevgramStreak = false;
         drawForwardIcon = false;
         drawGiftIcon = false;
         drawScam = 0;
@@ -2438,6 +2443,17 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             nameLeft += w;
             if (devgramBadgeEmoji != null) {
                 devgramBadgeEmoji.set(DevGramBadges.emojiIdOf(currentDialogId), false);
+            }
+        }
+        // DevGram: огонёк-стрик — справа от имени (резервируем ширину, как штатные значки)
+        devgramStreak = currentDialogId > 0 ? DevGramStreaks.getStreak(currentDialogId) : 0;
+        drawDevgramStreak = devgramStreak > 0;
+        if (drawDevgramStreak) {
+            final int w = dp(2 + 20);
+            nameWidth -= w;
+            nameAdditionalsForChannelSubscriber += w;
+            if (LocaleController.isRTL) {
+                nameLeft += w;
             }
         }
         if (drawBotVerified) {
@@ -4607,6 +4623,30 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 final int left = devgramBadgeLeft;
                 devgramBadgeEmoji.setBounds(left, (int) y, left + sz, (int) y + sz);
                 devgramBadgeEmoji.draw(canvas);
+            }
+
+            // DevGram: огонёк-стрик 🔥N справа от имени (после verified/premium), где был значок
+            if (drawDevgramStreak) {
+                if (devgramStreakDrawable == null) {
+                    devgramStreakDrawable = new org.telegram.ui.Components.DevGramStreakDrawable();
+                }
+                devgramStreakDrawable.setCount(devgramStreak);
+                float y = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 12f : 15f);
+                if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
+                    y -= dp(9);
+                }
+                int offset = 0;
+                if (drawVerified) {
+                    offset = Theme.dialogs_verifiedDrawable.getIntrinsicWidth() + dp(4);
+                } else if (drawPremium) {
+                    offset = dp(24);
+                } else if (drawScam != 0) {
+                    offset = Theme.dialogs_scamDrawable.getIntrinsicWidth() + dp(4);
+                }
+                final int sz = dp(20);
+                final int left = nameMuteLeft - dp(1) + offset;
+                devgramStreakDrawable.setBounds(left, (int) y, left + sz, (int) y + sz);
+                devgramStreakDrawable.draw(canvas);
             }
 
             if (drawReorder || reorderIconProgress != 0) {

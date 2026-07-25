@@ -128,6 +128,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerificationDrawable;
     // DevGram: значок бренда рядом с именем в шапке — кастом-эмодзи по document_id роли.
     private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable devgramBadgeDrawable;
+    private DevGramStreakDrawable devgramStreakDrawable; // огоньки-стрик 🔥N
 
     protected boolean useAnimatedSubtitle() {
         return false;
@@ -941,6 +942,17 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
                             .show());
         } else {
             titleTextView.setRightDrawable3(null);
+            titleTextView.setRightDrawable3OnClick(null);
+        }
+        // DevGram: огоньки-стрик 🔥N справа от прем-эмодзи (личные чаты)
+        long devgramStreakDialog = parentFragment != null ? parentFragment.getDialogId() : 0;
+        int devgramStreak = devgramStreakDialog > 0 ? org.telegram.messenger.DevGramStreaks.getStreak(devgramStreakDialog) : 0;
+        if (devgramStreak > 0) {
+            if (devgramStreakDrawable == null) {
+                devgramStreakDrawable = new DevGramStreakDrawable();
+            }
+            devgramStreakDrawable.setCount(devgramStreak);
+            titleTextView.setRightDrawable3(devgramStreakDrawable);
             titleTextView.setRightDrawable3OnClick(null);
         }
         if (!rightDrawableIsScamOrVerified && !rightDrawableIsScam) {

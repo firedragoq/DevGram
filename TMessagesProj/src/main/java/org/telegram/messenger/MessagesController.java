@@ -21857,6 +21857,15 @@ public class MessagesController extends BaseController implements NotificationCe
         if (mode == ChatActivity.MODE_QUICK_REPLIES) {
             QuickRepliesController.getInstance(currentAccount).checkLocalMessages(messages);
         }
+        // DevGram: огоньки-стрик — учитываем новые сообщения (не отложенные, обычный чат)
+        if (!scheduled && mode == 0 && messages != null) {
+            for (int i = 0; i < messages.size(); i++) {
+                MessageObject m = messages.get(i);
+                if (m != null) {
+                    DevGramStreaks.onMessage(currentAccount, dialogId, m.isOut());
+                }
+            }
+        }
         getNotificationCenter().postNotificationName(NotificationCenter.didReceiveNewMessages, dialogId, messages, scheduled, mode);
 
         if (lastMessage == null || scheduled) {

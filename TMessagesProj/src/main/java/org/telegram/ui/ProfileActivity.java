@@ -363,6 +363,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[] botVerificationDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[2];
     // DevGram: значок бренда рядом с именем — кастом-эмодзи (самолёт/галочка) по document_id
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[] devgramBadgeDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[2];
+    // DevGram: огоньки-стрик (🔥N) справа от прем-эмодзи
+    private final org.telegram.ui.Components.DevGramStreakDrawable[] devgramStreakDrawable = new org.telegram.ui.Components.DevGramStreakDrawable[2];
     private final Drawable[] verifiedCheckDrawable = new Drawable[2];
     private final CrossfadeDrawable[] verifiedCrossfadeDrawable = new CrossfadeDrawable[2];
     private final CrossfadeDrawable[] premiumCrossfadeDrawable = new CrossfadeDrawable[2];
@@ -11126,6 +11128,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return devgramBadgeDrawable[a];
     }
 
+    // DevGram: огонёк-стрик 🔥N (справа от прем-эмодзи)
+    private org.telegram.ui.Components.DevGramStreakDrawable getDevGramStreakDrawable(int a, int count) {
+        if (devgramStreakDrawable[a] == null) {
+            devgramStreakDrawable[a] = new org.telegram.ui.Components.DevGramStreakDrawable();
+        }
+        devgramStreakDrawable[a].setCount(count);
+        return devgramStreakDrawable[a];
+    }
+
     // DevGram: датацентр аккаунта по dc_id аватарки — «DC2, Amsterdam, NL».
     // Определяется только когда есть аватарка (в ней лежит dc_id); иначе null → показываем «ID».
     private String devgramDcInfo() {
@@ -11639,6 +11650,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                     .show());
                 } else {
                     nameTextView[a].setRightDrawable3(null);
+                    nameTextView[a].setRightDrawable3OnClick(null);
+                }
+                // DevGram: огоньки-стрик 🔥N справа от прем-эмодзи (где раньше был значок)
+                int devgramStreak = org.telegram.messenger.DevGramStreaks.getStreak(user.id);
+                if (devgramStreak > 0) {
+                    nameTextView[a].setRightDrawable3(getDevGramStreakDrawable(a, devgramStreak));
                     nameTextView[a].setRightDrawable3OnClick(null);
                 }
                 if (user.self && getMessagesController().isPremiumUser(user)) {
