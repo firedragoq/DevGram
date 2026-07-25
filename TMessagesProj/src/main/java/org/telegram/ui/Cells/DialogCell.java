@@ -971,6 +971,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (devgramBadgeEmoji != null) {
             devgramBadgeEmoji.detach();
         }
+        if (devgramStreakDrawable != null) {
+            devgramStreakDrawable.detach();
+        }
         AnimatedEmojiSpan.release(this, animatedEmojiStack);
         AnimatedEmojiSpan.release(this, animatedEmojiStack2);
         AnimatedEmojiSpan.release(this, animatedEmojiStack3);
@@ -999,6 +1002,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         }
         if (devgramBadgeEmoji != null) {
             devgramBadgeEmoji.attach();
+        }
+        if (devgramStreakDrawable != null) {
+            devgramStreakDrawable.attach();
         }
     }
 
@@ -2449,6 +2455,13 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         devgramStreak = currentDialogId > 0 ? DevGramStreaks.getStreak(currentDialogId) : 0;
         drawDevgramStreak = devgramStreak > 0;
         if (drawDevgramStreak) {
+            if (devgramStreakDrawable == null) {
+                devgramStreakDrawable = new org.telegram.ui.Components.DevGramStreakDrawable(this, currentAccount);
+                if (attachedToWindow) {
+                    devgramStreakDrawable.attach();
+                }
+            }
+            devgramStreakDrawable.setCount(devgramStreak);
             final int w = dp(2 + 18);
             nameWidth -= w;
             nameAdditionalsForChannelSubscriber += w;
@@ -4626,11 +4639,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
 
             // DevGram: огонёк-стрик 🔥N справа от имени (после verified/premium), где был значок
-            if (drawDevgramStreak) {
-                if (devgramStreakDrawable == null) {
-                    devgramStreakDrawable = new org.telegram.ui.Components.DevGramStreakDrawable();
-                }
-                devgramStreakDrawable.setCount(devgramStreak);
+            if (drawDevgramStreak && devgramStreakDrawable != null) {
                 float y = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 12f : 15f);
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
                     y -= dp(9);

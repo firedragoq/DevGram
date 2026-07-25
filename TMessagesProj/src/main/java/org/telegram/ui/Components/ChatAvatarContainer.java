@@ -949,7 +949,8 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         int devgramStreak = devgramStreakDialog > 0 ? org.telegram.messenger.DevGramStreaks.getStreak(devgramStreakDialog) : 0;
         if (devgramStreak > 0) {
             if (devgramStreakDrawable == null) {
-                devgramStreakDrawable = new DevGramStreakDrawable();
+                devgramStreakDrawable = new DevGramStreakDrawable(titleTextView, currentAccount);
+                devgramStreakDrawable.attach();
             }
             devgramStreakDrawable.setCount(devgramStreak);
             titleTextView.setRightDrawable3(devgramStreakDrawable);
@@ -1602,6 +1603,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (devgramBadgeDrawable != null) {
             devgramBadgeDrawable.attach();
         }
+        if (devgramStreakDrawable != null) {
+            devgramStreakDrawable.attach();
+        }
     }
 
     @Override
@@ -1622,6 +1626,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         }
         if (devgramBadgeDrawable != null) {
             devgramBadgeDrawable.detach();
+        }
+        if (devgramStreakDrawable != null) {
+            devgramStreakDrawable.detach();
         }
     }
 

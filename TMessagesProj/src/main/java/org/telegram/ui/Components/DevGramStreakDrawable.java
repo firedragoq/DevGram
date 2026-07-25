@@ -1,7 +1,7 @@
 /*
- * DevGram: значок стрика — огонёк 🔥 с числом ВНУТРИ (сколько дней подряд общаетесь).
- * Пламя — системный эмодзи (по центру), число — белым по центру тела пламени. Пламя живо
- * «колышется» (лёгкое мерцание по вертикали), число при этом стоит на месте.
+ * DevGram: значок стрика — АНИМИРОВАННЫЙ кастом-эмодзи «огонь» (document_id ниже) с числом
+ * ВНУТРИ. Число рисуем белым с чёрным контуром, чтобы читалось на любом кадре пламени.
+ * Требует жизненного цикла attach()/detach() (как эмодзи-статус) — вызывать из контейнера.
  */
 
 package org.telegram.ui.Components;
@@ -12,8 +12,8 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.os.SystemClock;
 import android.text.TextPaint;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 
@@ -21,21 +21,39 @@ import org.telegram.messenger.AndroidUtilities;
 
 public class DevGramStreakDrawable extends Drawable {
 
-    private final TextPaint flamePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    // Кастом-эмодзи «огонь» (анимированный), заданный пользователем.
+    public static final long FLAME_EMOJI = 5415735648931848880L;
+
+    private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emoji;
     private final TextPaint numPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private final TextPaint numStroke = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final int size;
     private String numStr = "";
 
-    private final Runnable invalidateRunnable = this::invalidateSelf;
-
-    public DevGramStreakDrawable() {
+    public DevGramStreakDrawable(View parentView, int account) {
         size = AndroidUtilities.dp(18);
-        flamePaint.setTextSize(AndroidUtilities.dp(18));
-        flamePaint.setTextAlign(Paint.Align.CENTER); // пламя строго по центру
+        emoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(parentView, size, AnimatedEmojiDrawable.CACHE_TYPE_EMOJI_STATUS);
+        emoji.setCurrentAccount(account);
+        emoji.set(FLAME_EMOJI, false);
+
         numPaint.setColor(0xFFFFFFFF);
         numPaint.setTypeface(AndroidUtilities.bold());
         numPaint.setTextAlign(Paint.Align.CENTER);
-        numPaint.setShadowLayer(AndroidUtilities.dp(1.2f), 0, 0, 0x99000000);
+
+        numStroke.setColor(0xFF000000);
+        numStroke.setTypeface(AndroidUtilities.bold());
+        numStroke.setTextAlign(Paint.Align.CENTER);
+        numStroke.setStyle(Paint.Style.STROKE);
+        numStroke.setStrokeWidth(AndroidUtilities.dp(1.5f));
+        numStroke.setStrokeJoin(Paint.Join.ROUND);
+    }
+
+    public void attach() {
+        emoji.attach();
+    }
+
+    public void detach() {
+        emoji.detach();
     }
 
     public void setCount(int count) {
@@ -44,8 +62,9 @@ public class DevGramStreakDrawable extends Drawable {
             return;
         }
         numStr = s;
-        // размер числа под количество цифр, чтобы влезало в тело пламени
-        numPaint.setTextSize(AndroidUtilities.dp(numStr.length() >= 3 ? 6.5f : (numStr.length() == 2 ? 7.5f : 8.5f)));
+        float ts = AndroidUtilities.dp(numStr.length() >= 3 ? 6.5f : (numStr.length() == 2 ? 7.5f : 8.5f));
+        numPaint.setTextSize(ts);
+        numStroke.setTextSize(ts);
         invalidateSelf();
     }
 
@@ -55,25 +74,13 @@ public class DevGramStreakDrawable extends Drawable {
         if (b.isEmpty() || numStr.isEmpty()) {
             return;
         }
+        emoji.setBounds(b);
+        emoji.draw(canvas); // анимированное пламя
         float cx = b.exactCenterX();
-        // мерцание: пламя слегка тянется вверх/сжимается от своего основания
-        float phase = (SystemClock.uptimeMillis() % 780L) / 780f;
-        float sy = 1f + 0.09f * (float) Math.sin(phase * 2 * Math.PI);
-
-        Paint.FontMetrics fm = flamePaint.getFontMetrics();
-        float flameBaseline = b.top + (b.height() - (fm.descent - fm.ascent)) / 2f - fm.ascent;
-        canvas.save();
-        canvas.scale(1f, sy, cx, b.bottom); // тянем от основания
-        canvas.drawText("🔥", cx, flameBaseline, flamePaint); // 🔥
-        canvas.restore();
-
-        // число — в теле пламени (нижняя середина), стоит на месте
+        // число — по центру тела пламени (нижняя середина); белое с чёрным контуром
         float ny = b.top + b.height() * 0.62f - (numPaint.descent() + numPaint.ascent()) / 2f;
+        canvas.drawText(numStr, cx, ny, numStroke);
         canvas.drawText(numStr, cx, ny, numPaint);
-
-        // следующий кадр анимации (работает там, где у drawable есть callback-вью)
-        unscheduleSelf(invalidateRunnable);
-        scheduleSelf(invalidateRunnable, SystemClock.uptimeMillis() + 40);
     }
 
     @Override
@@ -88,8 +95,6 @@ public class DevGramStreakDrawable extends Drawable {
 
     @Override
     public void setAlpha(int alpha) {
-        flamePaint.setAlpha(alpha);
-        numPaint.setAlpha(alpha);
     }
 
     @Override

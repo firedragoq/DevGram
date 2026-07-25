@@ -3473,6 +3473,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         devgramBadgeDrawable[i].attach();
                     }
                 }
+                for (int i = 0; i < devgramStreakDrawable.length; ++i) {
+                    if (devgramStreakDrawable[i] != null) {
+                        devgramStreakDrawable[i].attach();
+                    }
+                }
             }
 
             @Override
@@ -3492,6 +3497,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 for (int i = 0; i < devgramBadgeDrawable.length; ++i) {
                     if (devgramBadgeDrawable[i] != null) {
                         devgramBadgeDrawable[i].detach();
+                    }
+                }
+                for (int i = 0; i < devgramStreakDrawable.length; ++i) {
+                    if (devgramStreakDrawable[i] != null) {
+                        devgramStreakDrawable[i].detach();
                     }
                 }
             }
@@ -11131,7 +11141,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     // DevGram: огонёк-стрик 🔥N (справа от прем-эмодзи)
     private org.telegram.ui.Components.DevGramStreakDrawable getDevGramStreakDrawable(int a, int count) {
         if (devgramStreakDrawable[a] == null) {
-            devgramStreakDrawable[a] = new org.telegram.ui.Components.DevGramStreakDrawable();
+            devgramStreakDrawable[a] = new org.telegram.ui.Components.DevGramStreakDrawable(nameTextView[a], currentAccount);
+            if (fragmentViewAttached) {
+                devgramStreakDrawable[a].attach();
+            }
         }
         devgramStreakDrawable[a].setCount(count);
         return devgramStreakDrawable[a];
