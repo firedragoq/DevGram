@@ -39,14 +39,55 @@ public class DevGramBadges {
     public static final int ROLE_CHANNEL = 3;    // обычный канал (верификация DevGram)
 
     // Кастом-эмодзи Telegram, которые рисуются как значок рядом с именем (по document_id).
-    public static final long EMOJI_TEAM_SUPPORTER = 5411424042932543123L; // ✈️ команда и поддержавшие
-    public static final long EMOJI_CHANNEL        = 5413368748289598440L; // ✅ обычные каналы
-    public static final long EMOJI_OFFICIAL       = 5413671801182004970L; // ✈️ официальные каналы DevGram
+    public static final long EMOJI_TEAM      = 5413368748289598440L; // ✅ команда проекта
+    public static final long EMOJI_SUPPORTER = 5411424042932543123L; // ✈️ поддержавшие форк
+    public static final long EMOJI_CHANNEL   = 5413368748289598440L; // ✅ обычные каналы (верификация)
+    public static final long EMOJI_OFFICIAL  = 5413671801182004970L; // ✈️ официальные каналы DevGram
+    public static final long EMOJI_PLUGIN_DEV = 5451743048423748161L; // ⚙️ канал-разработчик плагинов
+    // алиас для совместимости со старым кодом (= эмодзи поддержавших)
+    public static final long EMOJI_TEAM_SUPPORTER = EMOJI_SUPPORTER;
 
     // Базовая команда — зашита в код, снять из интерфейса нельзя.
     private static final HashSet<Long> TEAM_HARDCODED = new HashSet<>(Arrays.asList(
             7101191373L
     ));
+
+    // Значок = произвольный кастом-эмодзи (document_id) + подпись-шаблон. В подписи "{name}"
+    // заменяется на имя профиля при показе плашки. Хранится в облаке как объект {"e":..,"t":".."}.
+    public static class Badge {
+        public final long emojiId;
+        public final String text;
+        public Badge(long emojiId, String text) {
+            this.emojiId = emojiId;
+            this.text = text == null ? "" : text;
+        }
+    }
+
+    // Готовые подписи (шаблоны с {name}) — для быстрого выбора в админке.
+    public static final String[] READY_TEXTS = {
+            "{name} — команда проекта DevGram",
+            "{name} поддержал(а) разработку DevGram и получил(а) уникальный значок",
+            "{name} — канал, верифицированный DevGram",
+            "{name} является официальным ресурсом DevGram",
+            "{name} — проверенный разработчик плагинов DevGram",
+    };
+    public static final String[] READY_TEXT_LABELS = {
+            "Команда проекта", "Поддержавший", "Канал (верификация)", "Официальный ресурс", "Разработчик плагинов",
+    };
+    // Готовые значки-эмодзи — для быстрого выбора.
+    public static final long[] READY_EMOJI = {EMOJI_TEAM, EMOJI_SUPPORTER, EMOJI_OFFICIAL, EMOJI_PLUGIN_DEV};
+    public static final String[] READY_EMOJI_LABELS = {"✅ Команда", "✈️ Поддержавший", "✈️ Официальный", "🧩 Разработчик плагинов"};
+
+    // Значок по умолчанию для старой int-роли (обратная совместимость с облаком).
+    private static Badge defaultBadge(int role) {
+        switch (role) {
+            case ROLE_OFFICIAL:  return new Badge(EMOJI_OFFICIAL, READY_TEXTS[3]);
+            case ROLE_CHANNEL:   return new Badge(EMOJI_CHANNEL, READY_TEXTS[2]);
+            case ROLE_TEAM:      return new Badge(EMOJI_TEAM, READY_TEXTS[0]);
+            case ROLE_SUPPORTER:
+            default:             return new Badge(EMOJI_SUPPORTER, READY_TEXTS[1]);
+        }
+    }
 
     private static SharedPreferences prefs;
 
@@ -71,6 +112,10 @@ public class DevGramBadges {
     private static final String API_KEY = "AIzaSyAj-Fq-7707X54Yr8t51mFAkJmCLEKtYoU";
 
     private static volatile String adminIdToken; // токен админа после входа (нужен для записи)
+    private static volatile String adminUid;     // UID вошедшего (главный админ или модератор)
+
+    // Главный admin-UID (владелец). Только он управляет модераторами и значками.
+    public static final String MAIN_ADMIN_UID = "cZUBpCEJWVNAZEuChkG52gdgs0K2";
     private static boolean syncStarted;
 
     public interface Callback {
@@ -110,7 +155,8 @@ public class DevGramBadges {
                         String k = it.next();
                         try {
                             Long.parseLong(k); // валидируем ключ-dialogId
-                            ed.putInt(k, obj.getInt(k));
+                            // храним сырое значение: старое — int-роль, новое — объект {"e","t"}
+                            ed.putString(k, obj.get(k).toString());
                         } catch (Throwable ignore) {
                         }
                     }
@@ -124,6 +170,8 @@ public class DevGramBadges {
     }
 
     private static Thread streamThread;
+    private static final long POLL_INTERVAL_MS = 150000; // ~2.5 мин — периодический опрос
+    private static boolean pollScheduled;
 
     public static void startSync() {
         if (syncStarted) {
@@ -131,7 +179,23 @@ public class DevGramBadges {
         }
         syncStarted = true;
         syncFromCloud(); // быстрый первый снимок
-        startStream();   // + живой поток: значки обновляются у ВСЕХ сразу, без перезапуска
+        // ВАЖНО: постоянный SSE-стрим держал 1 соединение на устройство (лимит бесплатного
+        // Firebase — 100 одновременных). Заменили на периодический опрос: короткие GET'ы
+        // соединение не держат, поэтому число юзеров лимит соединений не упирает.
+        schedulePoll();
+    }
+
+    private static void schedulePoll() {
+        if (pollScheduled) {
+            return;
+        }
+        pollScheduled = true;
+        final Runnable[] r = new Runnable[1];
+        r[0] = () -> {
+            syncFromCloud();
+            AndroidUtilities.runOnUIThread(r[0], POLL_INTERVAL_MS);
+        };
+        AndroidUtilities.runOnUIThread(r[0], POLL_INTERVAL_MS);
     }
 
     // Живой поток изменений через Firebase REST Server-Sent Events: держим долгую connection к
@@ -229,13 +293,9 @@ public class DevGramBadges {
         }
         if (value == null || value == JSONObject.NULL) {
             ed.remove(key); // значок снят
-        } else if (value instanceof Number) {
-            ed.putInt(key, ((Number) value).intValue());
         } else {
-            try {
-                ed.putInt(key, Integer.parseInt(String.valueOf(value)));
-            } catch (Throwable ignore) {
-            }
+            // сырое значение как строка: int-роль ("0") или объект ({"e":..,"t":".."})
+            ed.putString(key, String.valueOf(value));
         }
     }
 
@@ -243,7 +303,21 @@ public class DevGramBadges {
         return adminIdToken != null;
     }
 
-    // Вход команды: Firebase Auth REST (email/пароль → idToken). Токен держим в памяти сессии.
+    // Токен админа для записи из других модулей (реестр проверенных плагинов).
+    public static String getAdminToken() {
+        return adminIdToken;
+    }
+
+    // UID вошедшего аккаунта (или null). Главный админ, если совпадает с MAIN_ADMIN_UID.
+    public static String getAdminUid() {
+        return adminUid;
+    }
+
+    public static boolean isMainAdmin() {
+        return MAIN_ADMIN_UID.equals(adminUid);
+    }
+
+    // Вход команды/модератора: Firebase Auth REST (email/пароль → idToken + UID). Держим в сессии.
     public static void signIn(String email, String password, Callback cb) {
         Utilities.globalQueue.postRunnable(() -> {
             try {
@@ -258,6 +332,7 @@ public class DevGramBadges {
                     JSONObject r = new JSONObject(resp);
                     if (r.has("idToken")) {
                         adminIdToken = r.getString("idToken");
+                        adminUid = r.optString("localId", null);
                         AndroidUtilities.runOnUIThread(() -> cb.onResult(true, null));
                         return;
                     }
@@ -265,6 +340,42 @@ public class DevGramBadges {
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(false, "неверный email или пароль"));
             } catch (Throwable e) {
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(false, e.getMessage()));
+            }
+        });
+    }
+
+    // Создать аккаунт модератору (Firebase Auth signUp). Возвращает его UID в колбэк (или null+ошибка).
+    // Требует, чтобы вызывающий был вошедшим админом (проверка прав — на уровне RTDB-правил при записи UID).
+    public interface UidCallback {
+        void onResult(String uid, String error);
+    }
+
+    public static void signUpModerator(String email, String password, UidCallback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("email", email);
+                body.put("password", password);
+                body.put("returnSecureToken", true);
+                String resp = httpSend("POST",
+                        "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + API_KEY,
+                        body.toString());
+                if (resp != null) {
+                    JSONObject r = new JSONObject(resp);
+                    if (r.has("localId")) {
+                        final String uid = r.getString("localId");
+                        AndroidUtilities.runOnUIThread(() -> cb.onResult(uid, null));
+                        return;
+                    }
+                    if (r.has("error")) {
+                        final String msg = r.getJSONObject("error").optString("message", "ошибка");
+                        AndroidUtilities.runOnUIThread(() -> cb.onResult(null, msg));
+                        return;
+                    }
+                }
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(null, "не удалось создать аккаунт"));
+            } catch (Throwable e) {
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(null, e.getMessage()));
             }
         });
     }
@@ -312,47 +423,97 @@ public class DevGramBadges {
         }
     }
 
-    // Роль по dialogId (>0 — пользователь, <0 — чат). -1 если значка нет.
-    public static int roleOf(long dialogId) {
-        if (dialogId > 0 && TEAM_HARDCODED.contains(dialogId)) {
-            return ROLE_TEAM;
-        }
+    // Значок диалога ({emoji, text}) или null, если значка нет. (>0 — пользователь, <0 — чат)
+    public static Badge badgeOf(long dialogId) {
+        // Сначала — выданный (кастомный) значок из облака/кэша. Он имеет приоритет над хардкодом,
+        // чтобы можно было выдать себе/команде любой значок и он реально показывался.
         SharedPreferences p = prefs();
-        if (p != null && p.contains(key(dialogId))) {
-            return p.getInt(key(dialogId), -1);
+        if (p != null) {
+            Badge b = parseBadge(p.getAll().get(key(dialogId)));
+            if (b != null) {
+                return b;
+            }
         }
-        return -1;
+        // Фолбэк: базовая команда зашита в код (на случай пустого/недоступного облака).
+        if (dialogId > 0 && TEAM_HARDCODED.contains(dialogId)) {
+            return defaultBadge(ROLE_TEAM);
+        }
+        return null;
+    }
+
+    // Разобрать сырое значение из кэша: объект {"e","t"} (новое) или int-роль (старое).
+    private static Badge parseBadge(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        String s = String.valueOf(raw).trim();
+        if (s.isEmpty() || "null".equals(s)) {
+            return null;
+        }
+        if (s.startsWith("{")) {
+            try {
+                JSONObject o = new JSONObject(s);
+                return new Badge(o.optLong("e", 0), o.optString("t", ""));
+            } catch (Throwable ignore) {
+                return null;
+            }
+        }
+        try {
+            return defaultBadge(Integer.parseInt(s));
+        } catch (Throwable ignore) {
+            return null;
+        }
+    }
+
+    // Грубая роль по эмодзи (для старых геттеров и гейтинга прокси). -1 если значка нет.
+    public static int roleOf(long dialogId) {
+        Badge b = badgeOf(dialogId);
+        if (b == null) {
+            return -1;
+        }
+        if (b.emojiId == EMOJI_CHANNEL) {
+            return ROLE_CHANNEL;
+        }
+        if (b.emojiId == EMOJI_OFFICIAL) {
+            return ROLE_OFFICIAL;
+        }
+        return ROLE_TEAM;
     }
 
     public static boolean isBadged(long dialogId) {
-        return roleOf(dialogId) >= 0;
+        return badgeOf(dialogId) != null;
     }
 
+    // Команда = зашитый список ИЛИ пользователь (id>0) со значком-эмодзи команды (✅).
+    // Каналы с тем же ✅ хранятся под отрицательным id, поэтому с командой не пересекаются.
     public static boolean isTeam(long userId) {
-        return userId > 0 && roleOf(userId) == ROLE_TEAM;
+        if (userId <= 0) {
+            return false;
+        }
+        if (TEAM_HARDCODED.contains(userId)) {
+            return true;
+        }
+        return emojiIdOf(userId) == EMOJI_TEAM;
     }
 
     public static boolean isSupporter(long userId) {
-        return userId > 0 && roleOf(userId) == ROLE_SUPPORTER;
+        return userId > 0 && emojiIdOf(userId) == EMOJI_SUPPORTER;
     }
 
     public static boolean isOfficialChat(long chatId) {
-        return chatId > 0 && roleOf(-chatId) == ROLE_OFFICIAL;
+        return chatId > 0 && emojiIdOf(-chatId) == EMOJI_OFFICIAL;
+    }
+
+    // Канал-разработчик плагинов (значок 🧩): плагины из него считаются проверенными.
+    // dialogId — как в чате (у канала он отрицательный).
+    public static boolean isPluginDevChannel(long dialogId) {
+        return dialogId != 0 && emojiIdOf(dialogId) == EMOJI_PLUGIN_DEV;
     }
 
     // document_id кастом-эмодзи для значка этого диалога (0 — значка нет).
     public static long emojiIdOf(long dialogId) {
-        switch (roleOf(dialogId)) {
-            case ROLE_TEAM:
-            case ROLE_SUPPORTER:
-                return EMOJI_TEAM_SUPPORTER;
-            case ROLE_CHANNEL:
-                return EMOJI_CHANNEL;
-            case ROLE_OFFICIAL:
-                return EMOJI_OFFICIAL;
-            default:
-                return 0;
-        }
+        Badge b = badgeOf(dialogId);
+        return b == null ? 0 : b.emojiId;
     }
 
     // --- управление (экран «Значки DevGram») ---
@@ -360,24 +521,45 @@ public class DevGramBadges {
     // Выдать значок. rawId — то, что ввёл разработчик (без знака); роль определяет тип.
     // Пишем в облако (PUT с токеном админа) — после записи перечитываем облако у себя, а у
     // остальных подтянется при следующей синхронизации. Без токена — локальный фолбэк.
+    // Готовая роль -> дефолтный значок (обёртка над grantBadge).
     public static void grant(long rawId, int role) {
         if (rawId == 0) {
             return;
         }
-        // каналы хранятся как dialogId (<0), пользователи — как id (>0)
         boolean isChannelRole = role == ROLE_OFFICIAL || role == ROLE_CHANNEL;
-        final long dialogId = isChannelRole ? -Math.abs(rawId) : Math.abs(rawId);
-        // оптимистично пишем локально (мгновенная обратная связь) — облако подтянется следом
+        long dialogId = isChannelRole ? -Math.abs(rawId) : Math.abs(rawId);
+        Badge b = defaultBadge(role);
+        grantBadge(dialogId, b.emojiId, b.text);
+    }
+
+    // Выдать произвольный значок: эмодзи (document_id) + подпись-шаблон (с {name}).
+    // dialogId: >0 — пользователь, <0 — чат/канал. Пишем в облако объектом {"e","t"}.
+    public static void grantBadge(long dialogId, long emojiId, String textTemplate) {
+        if (dialogId == 0) {
+            return;
+        }
+        final String json;
+        try {
+            JSONObject o = new JSONObject();
+            o.put("e", emojiId);
+            o.put("t", textTemplate == null ? "" : textTemplate);
+            json = o.toString();
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return;
+        }
+        // оптимистично пишем локально — облако подтянется следом
         SharedPreferences p = prefs();
         if (p != null) {
-            p.edit().putInt(key(dialogId), role).apply();
+            p.edit().putString(key(dialogId), json).apply();
         }
         if (adminIdToken != null) {
             Utilities.globalQueue.postRunnable(() -> {
-                httpSend("PUT", RTDB_BASE + "/badges/" + dialogId + ".json?auth=" + adminIdToken, Integer.toString(role));
+                httpSend("PUT", RTDB_BASE + "/badges/" + dialogId + ".json?auth=" + adminIdToken, json);
                 syncFromCloud();
             });
         }
+        notifyBadgesChanged();
     }
 
     public static void revoke(long dialogId) {
@@ -393,16 +575,15 @@ public class DevGramBadges {
         }
     }
 
-    // Все выданные из интерфейса значки (без зашитой команды): dialogId -> роль.
-    public static ArrayList<long[]> listGranted() {
-        ArrayList<long[]> res = new ArrayList<>();
+    // Все выданные из интерфейса значки (без зашитой команды): список dialogId.
+    // Значок каждого читается через badgeOf(id).
+    public static ArrayList<Long> listGranted() {
+        ArrayList<Long> res = new ArrayList<>();
         SharedPreferences p = prefs();
         if (p != null) {
             for (Map.Entry<String, ?> e : p.getAll().entrySet()) {
                 try {
-                    long id = Long.parseLong(e.getKey());
-                    int role = ((Number) e.getValue()).intValue();
-                    res.add(new long[]{id, role});
+                    res.add(Long.parseLong(e.getKey()));
                 } catch (Throwable ignore) {
                 }
             }
@@ -419,21 +600,48 @@ public class DevGramBadges {
         }
     }
 
-    // Подпись, всплывающая по тапу на значок. Имя подставляется в начало.
+    // Подпись, всплывающая по тапу на значок. В шаблоне "{name}" заменяется на имя профиля.
     public static CharSequence badgeText(long dialogId, CharSequence name) {
-        if (name == null) {
-            name = "";
+        Badge b = badgeOf(dialogId);
+        if (b == null) {
+            return "";
         }
-        switch (roleOf(dialogId)) {
-            case ROLE_OFFICIAL:
-                return name + " является официальным ресурсом DevGram";
-            case ROLE_CHANNEL:
-                return name + " — канал, верифицированный DevGram";
-            case ROLE_TEAM:
-                return name + " — команда проекта DevGram";
-            case ROLE_SUPPORTER:
-            default:
-                return name + " поддержал(а) разработку DevGram и получил(а) уникальный значок";
+        String nm = name == null ? "" : name.toString();
+        return b.text.replace("{name}", nm);
+    }
+
+    // Плашка по тапу на значок: иконка = выданный значок (кастом-эмодзи), текст — многострочный (не режется).
+    public static void showBadgeBulletin(org.telegram.ui.Components.BulletinFactory bf, long dialogId, CharSequence name) {
+        if (bf == null) {
+            return;
         }
+        CharSequence text = badgeText(dialogId, name);
+        long emojiId = emojiIdOf(dialogId);
+        org.telegram.tgnet.TLRPC.Document doc = null;
+        try {
+            doc = org.telegram.ui.Components.AnimatedEmojiDrawable.findDocument(UserConfig.selectedAccount, emojiId);
+        } catch (Throwable ignore) {
+        }
+        org.telegram.ui.Components.Bulletin b;
+        if (doc != null) {
+            // эмодзи-значок как иконка + многострочный текст
+            b = bf.createSimpleMultiBulletin(doc, text);
+        } else {
+            // фолбэк: статичная картинка по роли + делаем текст многострочным вручную
+            int res = emojiId == EMOJI_CHANNEL ? R.drawable.devgram_channel : R.drawable.devgram_supporter;
+            android.graphics.drawable.Drawable d = androidx.core.content.ContextCompat.getDrawable(
+                    ApplicationLoader.applicationContext, res);
+            b = bf.createSimpleBulletin(d, text);
+            try {
+                if (b.getLayout() instanceof org.telegram.ui.Components.Bulletin.LottieLayout) {
+                    android.widget.TextView tv = ((org.telegram.ui.Components.Bulletin.LottieLayout) b.getLayout()).textView;
+                    tv.setSingleLine(false);
+                    tv.setMaxLines(3);
+                    tv.setEllipsize(null);
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+        b.show();
     }
 }

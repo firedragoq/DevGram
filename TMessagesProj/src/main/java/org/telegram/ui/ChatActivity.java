@@ -848,6 +848,7 @@ public class ChatActivity extends BaseFragment implements
     private boolean scrollToTopUnReadOnResume;
     private long dialog_id;
     private Long dialog_id_Long;
+    private boolean devgramStreakLossShown; // DevGram: сообщение о потере серии показано (раз за открытие чата)
     private int lastLoadIndex = 1;
     private SparseArrayWithTouch<MessageObject>[] selectedMessagesIds = new SparseArrayWithTouch[]{
         new SparseArrayWithTouch<MessageObject>(),
@@ -1257,6 +1258,28 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_VIEW_STATISTICS = 115;
 
     public final static int OPTION_DEVGRAM_HISTORY = 990; // DevGram: история изменений сообщения
+    public final static int OPTION_DEVGRAM_PLUGIN_BASE = 100000; // DevGram: пункты меню от плагинов (base + index)
+    private final ArrayList<String[]> devgramPluginMenu = new ArrayList<>(); // pluginId+label по индексу пункта
+
+    // DevGram: добавить в меню сообщения пункты от плагинов (вызывается перед рендером меню)
+    private void devgramAddPluginMenu(ArrayList<Integer> icons, ArrayList<CharSequence> items, ArrayList<Integer> options) {
+        devgramPluginMenu.clear();
+        if (selectedObject == null) {
+            return;
+        }
+        try {
+            for (String s : org.telegram.messenger.DevGramPlugins.menuItems()) {
+                String[] parts = s.split("\u001f", -1);
+                String label = parts.length > 1 ? parts[1] : "?";
+                items.add(label);
+                options.add(OPTION_DEVGRAM_PLUGIN_BASE + devgramPluginMenu.size());
+                icons.add(R.drawable.msg_settings);
+                devgramPluginMenu.add(new String[]{parts.length > 0 ? parts[0] : "", label});
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -30421,6 +30444,40 @@ public class ChatActivity extends BaseFragment implements
 
     Bulletin.Delegate bulletinDelegate;
 
+    // DevGram: если серия с этим человеком потеряна — показываем сообщение прямо в чате с кнопкой «Восстановить»
+    private void maybeShowDevgramStreakLoss() {
+        if (devgramStreakLossShown || currentUser == null || currentChat != null || dialog_id <= 0) {
+            return;
+        }
+        final int lost = org.telegram.messenger.DevGramStreaks.lostRestorableStreak(dialog_id);
+        if (lost <= 0) {
+            return;
+        }
+        devgramStreakLossShown = true;
+        final long did = dialog_id;
+        AndroidUtilities.runOnUIThread(() -> {
+            if (getParentActivity() == null || isFinishing()) {
+                return;
+            }
+            BulletinFactory.of(ChatActivity.this).createSimpleBulletin(
+                    ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
+                    "Огонёк потерян 🔥",
+                    "Восстановить",
+                    () -> {
+                        org.telegram.messenger.DevGramStreaks.restore(currentAccount, did);
+                        if (avatarContainer != null) {
+                            updateTitleIcons();
+                        }
+                        if (getParentActivity() != null) {
+                            BulletinFactory.of(ChatActivity.this).createSimpleBulletin(
+                                    ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
+                                    "Серия восстановлена 🔥").show();
+                        }
+                    }
+            ).show();
+        }, 800);
+    }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -30429,6 +30486,7 @@ public class ChatActivity extends BaseFragment implements
         if (avatarContainer != null) {
             updateTitleIcons();
         }
+        maybeShowDevgramStreakLoss();
         activityResumeTime = System.currentTimeMillis();
         if (openImport && getSendMessagesHelper().getImportingHistory(dialog_id) != null) {
             ImportingAlert alert = new ImportingAlert(getParentActivity(), null, this, themeDelegate);
@@ -32475,6 +32533,7 @@ public class ChatActivity extends BaseFragment implements
                         popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
                     }
                 }
+                devgramAddPluginMenu(icons, items, options); // DevGram: пункты плагинов
                 scrimPopupWindowItems = new ActionBarMenuSubItem[items.size()];
                 for (int a = 0, N = items.size(); a < N; a++) {
                     ActionBarMenuSubItem cell = new ActionBarMenuSubItem(getParentActivity(), a == 0, a == N - 1, themeDelegate);
@@ -33965,6 +34024,18 @@ public class ChatActivity extends BaseFragment implements
         if (selectedObject == null || getParentActivity() == null) {
             return;
         }
+        // DevGram: клик по пункту меню от плагина
+        if (option >= OPTION_DEVGRAM_PLUGIN_BASE) {
+            int idx = option - OPTION_DEVGRAM_PLUGIN_BASE;
+            if (idx >= 0 && idx < devgramPluginMenu.size()) {
+                String[] pm = devgramPluginMenu.get(idx);
+                MessageObject obj = selectedObject;
+                String text = obj != null && obj.messageOwner != null && obj.messageOwner.message != null ? obj.messageOwner.message : "";
+                org.telegram.messenger.DevGramPlugins.menuClick(pm[0], pm[1], text, getDialogId());
+            }
+            closeMenu();
+            return;
+        }
         boolean preserveDim = false;
         switch (option) {
             case OPTION_DEVGRAM_HISTORY: {
@@ -33973,7 +34044,7 @@ public class ChatActivity extends BaseFragment implements
                 closeMenu();
                 if (obj != null) {
                     presentFragment(new DevGramMessageHistoryActivity(getDialogId(), obj.getId(),
-                            obj.messageOwner != null ? obj.messageOwner.message : null));
+                            obj.messageOwner));
                 }
                 break;
             }
@@ -40029,7 +40100,6 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
             final int msgId = msg.getId();
-            final CharSequence curText = msg.messageOwner.message;
 
             ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout =
                     new ActionBarPopupWindow.ActionBarPopupWindowLayout(getParentActivity(), R.drawable.popup_fixed_alert4, themeDelegate, 0);
@@ -40048,7 +40118,7 @@ public class ChatActivity extends BaseFragment implements
 
             item.setOnClickListener(v -> {
                 popupWindow.dismiss();
-                presentFragment(new DevGramMessageHistoryActivity(getDialogId(), msgId, curText));
+                presentFragment(new DevGramMessageHistoryActivity(getDialogId(), msgId, msg.messageOwner));
             });
 
             popupLayout.measure(
@@ -40796,6 +40866,7 @@ public class ChatActivity extends BaseFragment implements
                 ArrayList<CharSequence> items = new ArrayList<>();
                 final ArrayList<Integer> options = new ArrayList<>();
                 fillMessageMenu(messageObject, icons, items, options);
+                devgramAddPluginMenu(icons, items, options); // DevGram: пункты плагинов
                 menu.setupMessageOptions(ChatActivity.this, icons, items, options, ChatActivity.this::processSelectedOption);
                 menu.setOnDismissListener(() -> {
                     selectedObject = null;
@@ -41099,7 +41170,8 @@ public class ChatActivity extends BaseFragment implements
             ArrayList<CharSequence> items = new ArrayList<>();
             final ArrayList<Integer> options = new ArrayList<>();
             fillMessageMenu(messageObject, icons, items, options);
-            menu.setupMessageOptions(ChatActivity.this, icons, items, options, ChatActivity.this::processSelectedOption);
+            devgramAddPluginMenu(icons, items, options); // DevGram: пункты плагинов
+                menu.setupMessageOptions(ChatActivity.this, icons, items, options, ChatActivity.this::processSelectedOption);
             menu.setOnDismissListener(() -> {
                 selectedObject = null;
                 selectedObjectGroup = null;
@@ -42151,6 +42223,43 @@ public class ChatActivity extends BaseFragment implements
                         return;
                     } else {
                         scrollToPositionOnRecreate = -1;
+                    }
+                }
+                // DevGram: файл .plugin (всегда) или .py (если это реально плагин) — лист установки
+                String devgramDocName = message.getDocumentName() != null ? message.getDocumentName().toLowerCase() : "";
+                if (devgramDocName.endsWith(".plugin") || devgramDocName.endsWith(".py")) {
+                    File locFile = null;
+                    if (message.messageOwner.attachPath != null && message.messageOwner.attachPath.length() != 0) {
+                        File f = new File(message.messageOwner.attachPath);
+                        if (f.exists()) {
+                            locFile = f;
+                        }
+                    }
+                    if (locFile == null) {
+                        File f = getFileLoader().getPathToMessage(message.messageOwner);
+                        if (f.exists()) {
+                            locFile = f;
+                        }
+                    }
+                    if (locFile != null && locFile.exists() && locFile.length() < 2 * 1024 * 1024) {
+                        try {
+                            byte[] data = new byte[(int) locFile.length()];
+                            java.io.FileInputStream fis = new java.io.FileInputStream(locFile);
+                            int off = 0, r;
+                            while (off < data.length && (r = fis.read(data, off, data.length - off)) > 0) {
+                                off += r;
+                            }
+                            fis.close();
+                            String src = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+                            // .plugin — всегда показываем лист; .py — только если это плагин DevGram
+                            boolean forcePlugin = devgramDocName.endsWith(".plugin");
+                            if (forcePlugin || !org.telegram.messenger.DevGramPlugins.parseMeta(src).isEmpty()) {
+                                DevGramPluginInstallSheet.show(ChatActivity.this, src, getDialogId());
+                                return;
+                            }
+                        } catch (Throwable e) {
+                            FileLog.e(e);
+                        }
                     }
                 }
                 boolean handled = false;

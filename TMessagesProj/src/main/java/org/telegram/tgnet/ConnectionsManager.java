@@ -673,6 +673,11 @@ public class ConnectionsManager extends BaseController {
 
         if (preferences.getBoolean("proxy_enabled", false) && !TextUtils.isEmpty(proxyAddress)) {
             native_setProxySettings(currentAccount, proxyAddress, proxyPort, proxyUsername, proxyPassword, proxySecret);
+        } else if (preferences.getBoolean("devgram_proxy_on", false)) {
+            // DevGram: скрытый прокси (не виден в стандартном меню) — поднимаем на старте.
+            // Сначала стартуем локальный WS-прокси (127.0.0.1:1443), затем цепляем соединение к нему.
+            org.telegram.messenger.DevGramProxy.ensureLocalStarted();
+            native_setProxySettings(currentAccount, org.telegram.messenger.DevGramProxy.ADDRESS, org.telegram.messenger.DevGramProxy.PORT, "", "", org.telegram.messenger.DevGramProxy.SECRET);
         }
         if (preferences.getBoolean("webSocketTransport", false)) {
             String wsDomain = preferences.getString("webSocketDomain", "").trim();

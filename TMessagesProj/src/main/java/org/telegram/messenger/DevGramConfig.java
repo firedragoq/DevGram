@@ -34,6 +34,15 @@ public class DevGramConfig {
     // для нашего аккаунта, чужим премиум не приписываем.
     public static boolean localPremium = false;
 
+    // Огоньки-стрик (🔥N рядом с именем). По умолчанию включены.
+    public static boolean streaksEnabled = true;
+
+    // Встроенный WireGuard-VPN. По умолчанию выключен.
+    public static boolean vpnEnabled = false;
+
+    // Профиль в стиле iOS (центрированная шапка, стеклянные кнопки/карточки). По умолчанию ВКЛючён.
+    public static boolean iosProfile = true;
+
     // --- сохранение истории ---
     // По умолчанию ВЫКЛЮЧЕНЫ, как и режим призрака: мод не должен ничего менять,
     // пока пользователь сам не включит нужную функцию.
@@ -65,6 +74,9 @@ public class DevGramConfig {
             sendUploadTyping = preferences.getBoolean("sendUploadTyping", true);
             disableAds = preferences.getBoolean("disableAds", false);
             localPremium = preferences.getBoolean("localPremium", false);
+            streaksEnabled = preferences.getBoolean("streaksEnabled", true);
+            vpnEnabled = preferences.getBoolean("vpnEnabled", false);
+            iosProfile = preferences.getBoolean("iosProfile", true);
             saveDeletedMessages = preferences.getBoolean("saveDeletedMessages", false);
             saveMessagesHistory = preferences.getBoolean("saveMessagesHistory", false);
             saveMedia = preferences.getBoolean("saveMedia", false);
@@ -128,6 +140,29 @@ public class DevGramConfig {
     public static void setSaveDeletedMessages(boolean v) {
         saveDeletedMessages = v;
         preferences.edit().putBoolean("saveDeletedMessages", v).apply();
+    }
+
+    public static void setVpnEnabled(boolean v) {
+        vpnEnabled = v;
+        preferences.edit().putBoolean("vpnEnabled", v).apply();
+    }
+
+    public static void setIosProfile(boolean v) {
+        iosProfile = v;
+        preferences.edit().putBoolean("iosProfile", v).apply();
+    }
+
+    public static void setStreaksEnabled(boolean v) {
+        streaksEnabled = v;
+        preferences.edit().putBoolean("streaksEnabled", v).apply();
+        // перерисовать имена, чтобы огоньки появились/исчезли сразу
+        AndroidUtilities.runOnUIThread(() -> {
+            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                if (UserConfig.getInstance(a).isClientActivated()) {
+                    NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME);
+                }
+            }
+        });
     }
 
     public static void setSaveMessagesHistory(boolean v) {

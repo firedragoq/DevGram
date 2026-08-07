@@ -106,6 +106,10 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
     private int nameLockLeft;
     private int nameLockTop;
     private int nameWidth;
+    // DevGram: значок бренда слева от имени (как в списке чатов)
+    private boolean drawDevgramBadge;
+    private int devgramBadgeLeft;
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable devgramBadgeEmoji;
     CanvasButton actionButton;
     private StaticLayout actionLayout;
     private int actionLeft;
@@ -170,6 +174,9 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
 
         statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(20));
         statusDrawable.setCallback(this);
+
+        devgramBadgeEmoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(18));
+        devgramBadgeEmoji.setCallback(this);
     }
 
     private boolean allowBotOpenButton;
@@ -340,6 +347,9 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
         }
         statusDrawable.detach();
         botVerificationDrawable.detach();
+        if (devgramBadgeEmoji != null) {
+            devgramBadgeEmoji.detach();
+        }
     }
 
     @Override
@@ -352,6 +362,9 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
         }
         statusDrawable.attach();
         botVerificationDrawable.attach();
+        if (devgramBadgeEmoji != null) {
+            devgramBadgeEmoji.attach();
+        }
     }
 
     @Override
@@ -625,6 +638,25 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
                 // nameLeft += statusDrawable.getIntrinsicWidth();
             } else {
                 nameWidth -= statusDrawable.getIntrinsicWidth();
+            }
+        }
+
+        // DevGram: значок бренда слева от имени (для чатов/юзеров, кроме «Избранного»)
+        drawDevgramBadge = dialog_id != 0
+                && org.telegram.messenger.DevGramBadges.isBadged(dialog_id)
+                && dialog_id != UserConfig.getInstance(currentAccount).getClientUserId();
+        if (drawDevgramBadge) {
+            final int w = dp(2 + 18);
+            nameWidth -= w;
+            if (LocaleController.isRTL) {
+                nameLeft += 0;
+            } else {
+                devgramBadgeLeft = nameLeft;
+                nameLeft += w;
+            }
+            if (devgramBadgeEmoji != null) {
+                devgramBadgeEmoji.set(org.telegram.messenger.DevGramBadges.emojiIdOf(dialog_id), false);
+                devgramBadgeEmoji.setParticles(true, true);
             }
         }
 
@@ -980,6 +1012,14 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
             canvas.translate(nameLeft, nameTop);
             nameLayout.draw(canvas);
             canvas.restore();
+
+            // DevGram: значок бренда слева от имени
+            if (drawDevgramBadge && devgramBadgeEmoji != null) {
+                int size = dp(18);
+                int by = (int) (nameTop + (nameLayout.getHeight() - size) / 2f);
+                devgramBadgeEmoji.setBounds(devgramBadgeLeft, by, devgramBadgeLeft + size, by + size);
+                devgramBadgeEmoji.draw(canvas);
+            }
 
             if (LocaleController.isRTL) {
                 if (nameLayout.getLineLeft(0) == 0) {

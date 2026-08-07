@@ -8,6 +8,8 @@ package org.telegram.ui.Components;
 
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -22,13 +24,15 @@ import org.telegram.messenger.AndroidUtilities;
 public class DevGramStreakDrawable extends Drawable {
 
     // Кастом-эмодзи «огонь» (анимированный), заданный пользователем.
-    public static final long FLAME_EMOJI = 5415735648931848880L;
+    public static final long FLAME_EMOJI = 5415735648931848880L;      // активный (продлён сегодня)
 
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emoji;
     private final TextPaint numPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint numStroke = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final int size;
     private String numStr = "";
+    private boolean active = true;   // true = цветной огонёк, false = серый (обесцвеченный)
+    private Paint greyPaint;         // серый режим: рисуем огонёк через grayscale-фильтр (надёжнее подмены эмодзи)
 
     public DevGramStreakDrawable(View parentView, int account) {
         size = AndroidUtilities.dp(18);
@@ -56,6 +60,17 @@ public class DevGramStreakDrawable extends Drawable {
         emoji.detach();
     }
 
+    // Переключить огонёк: активный (цветной) <-> серый. Меняется сразу при продлении серии.
+    // Серый делаем обесцвечиванием того же огонька (не подменяем эмодзи — тот серый эмодзи
+    // на клиенте не всегда грузится и остаётся цветной кадр).
+    public void setActive(boolean value) {
+        if (active == value) {
+            return;
+        }
+        active = value;
+        invalidateSelf();
+    }
+
     public void setCount(int count) {
         String s = String.valueOf(Math.max(0, count));
         if (s.equals(numStr)) {
@@ -75,7 +90,26 @@ public class DevGramStreakDrawable extends Drawable {
             return;
         }
         emoji.setBounds(b);
-        emoji.draw(canvas); // анимированное пламя
+        if (active) {
+            emoji.draw(canvas); // анимированное цветное пламя
+        } else {
+            // серый режим: обесцвечиваем огонёк через отдельный слой с grayscale-фильтром
+            if (greyPaint == null) {
+                ColorMatrix cm = new ColorMatrix();
+                cm.setSaturation(0f);              // убираем цвет
+                cm.postConcat(new ColorMatrix(new float[]{
+                        0.85f, 0, 0, 0, 0,
+                        0, 0.85f, 0, 0, 0,
+                        0, 0, 0.85f, 0, 0,
+                        0, 0, 0, 1, 0
+                }));                                // чуть притемняем, чтобы читалось как серый, а не белый
+                greyPaint = new Paint();
+                greyPaint.setColorFilter(new ColorMatrixColorFilter(cm));
+            }
+            int save = canvas.saveLayer(b.left, b.top, b.right, b.bottom, greyPaint);
+            emoji.draw(canvas);
+            canvas.restoreToCount(save);
+        }
         float cx = b.exactCenterX();
         // число — по центру тела пламени (нижняя середина); белое с чёрным контуром
         float ny = b.top + b.height() * 0.62f - (numPaint.descent() + numPaint.ascent()) / 2f;

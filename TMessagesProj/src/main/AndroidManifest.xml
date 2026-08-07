@@ -607,6 +607,8 @@
 
         <receiver android:name=".StopLiveLocationReceiver" android:enabled="true"/>
 
+        <receiver android:name=".DevGramStreakReceiver" android:enabled="true" android:exported="false"/>
+
         <receiver android:name=".PopupReplyReceiver" android:enabled="true"/>
 
         <receiver android:name=".NotificationCallbackReceiver" android:enabled="true" android:exported="false"/>

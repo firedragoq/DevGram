@@ -35,14 +35,14 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
 
     private final long dialogId;
     private final int messageId;
-    private final CharSequence currentText;
+    private final TLRPC.Message currentMessage;
     private final ArrayList<MessageObject> messages = new ArrayList<>();
     private RecyclerListView listView;
 
-    public DevGramMessageHistoryActivity(long dialogId, int messageId, CharSequence currentText) {
+    public DevGramMessageHistoryActivity(long dialogId, int messageId, TLRPC.Message currentMessage) {
         this.dialogId = dialogId;
         this.messageId = messageId;
-        this.currentText = currentText;
+        this.currentMessage = currentMessage;
     }
 
     @Override
@@ -55,35 +55,37 @@ public class DevGramMessageHistoryActivity extends BaseFragment {
         long selfId = getUserConfig().getClientUserId();
         List<TLRPC.Message> revisions = DevGramMessagesController.getInstance().getRevisions(selfId, dialogId, messageId);
 
-        // берём образец (peer_id/from_id/out) из последней ревизии — чтобы текущая версия
-        // встала в бабблах на ту же сторону и с той же аватаркой
-        TLRPC.Message base = null;
         for (TLRPC.Message rev : revisions) {
             if (rev == null) {
                 continue;
             }
-            base = rev;
             try {
                 messages.add(new MessageObject(currentAccount, rev, true, true));
             } catch (Throwable ignore) {
             }
         }
 
-        // текущая (действующая) версия — как последнее сообщение
-        try {
-            TLRPC.TL_message cur = new TLRPC.TL_message();
-            cur.id = messageId;
-            cur.message = currentText != null ? currentText.toString() : "";
-            cur.date = (int) (System.currentTimeMillis() / 1000);
-            if (base != null) {
-                cur.peer_id = base.peer_id;
-                cur.from_id = base.from_id;
-                cur.out = base.out;
-                cur.flags = base.flags;
-                cur.dialog_id = base.dialog_id;
+        // текущая (действующая) версия — как последнее сообщение. Берём весь TLRPC.Message
+        // (с entities), чтобы кастом/премиум-эмодзи отрисовались, а не превращались в текст.
+        if (currentMessage != null) {
+            try {
+                messages.add(new MessageObject(currentAccount, cloneMessage(currentMessage), true, true));
+            } catch (Throwable ignore) {
             }
-            messages.add(new MessageObject(currentAccount, cur, true, true));
-        } catch (Throwable ignore) {
+        }
+    }
+
+    // Клон сообщения (serialize/deserialize) — чтобы не держать ссылку на «живой» объект чата.
+    private static TLRPC.Message cloneMessage(TLRPC.Message m) {
+        try {
+            org.telegram.tgnet.NativeByteBuffer buf = new org.telegram.tgnet.NativeByteBuffer(m.getObjectSize());
+            m.serializeToStream(buf);
+            buf.position(0);
+            TLRPC.Message c = TLRPC.Message.TLdeserialize(buf, buf.readInt32(false), false);
+            buf.reuse();
+            return c != null ? c : m;
+        } catch (Throwable e) {
+            return m;
         }
     }
 

@@ -646,6 +646,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private boolean drawDevgramStreak; // DevGram: огонёк-стрик 🔥N справа от имени
     private int devgramStreak;
     private org.telegram.ui.Components.DevGramStreakDrawable devgramStreakDrawable;
+    private final android.graphics.RectF devgramStreakRect = new android.graphics.RectF(); // область огонька для клика
+    private boolean devgramStreakPressed;
     private final View emojiStatusView;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
@@ -2449,6 +2451,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             nameLeft += w;
             if (devgramBadgeEmoji != null) {
                 devgramBadgeEmoji.set(DevGramBadges.emojiIdOf(currentDialogId), false);
+                devgramBadgeEmoji.setParticles(true, true); // DevGram: звёздочки вокруг значка
             }
         }
         // DevGram: огонёк-стрик — справа от имени (резервируем ширину, как штатные значки)
@@ -2462,6 +2465,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
             }
             devgramStreakDrawable.setCount(devgramStreak);
+            devgramStreakDrawable.setActive(DevGramStreaks.isStreakActiveToday(currentDialogId));
             final int w = dp(2 + 18);
             nameWidth -= w;
             nameAdditionalsForChannelSubscriber += w;
@@ -4656,6 +4660,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 final int left = nameMuteLeft - dp(1) + offset;
                 devgramStreakDrawable.setBounds(left, (int) y, left + sz, (int) y + sz);
                 devgramStreakDrawable.draw(canvas);
+                // запоминаем область (с запасом) для клика по огоньку
+                devgramStreakRect.set(left - dp(4), y - dp(4), left + sz + dp(4), y + sz + dp(4));
+            } else {
+                devgramStreakRect.setEmpty();
             }
 
             if (drawReorder || reorderIconProgress != 0) {
@@ -6247,6 +6255,27 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        // DevGram: клик по огоньку-стрику -> показываем сообщение (как в профиле)
+        if (drawDevgramStreak && !devgramStreakRect.isEmpty()) {
+            final int action = event.getAction();
+            if (action == MotionEvent.ACTION_DOWN && devgramStreakRect.contains(event.getX(), event.getY())) {
+                devgramStreakPressed = true;
+                return true;
+            } else if (action == MotionEvent.ACTION_UP && devgramStreakPressed) {
+                devgramStreakPressed = false;
+                if (devgramStreakRect.contains(event.getX(), event.getY())) {
+                    showDevgramStreakBulletin();
+                }
+                return true;
+            } else if ((action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_MOVE) && devgramStreakPressed) {
+                if (action == MotionEvent.ACTION_CANCEL || !devgramStreakRect.contains(event.getX(), event.getY())) {
+                    devgramStreakPressed = false;
+                }
+                if (action == MotionEvent.ACTION_CANCEL) {
+                    return true;
+                }
+            }
+        }
         if (rightFragmentOpenedProgress == 0 && !isTopic && !isShareToStoryCell && storyParams.checkOnTouchEvent(event, this)) {
             return true;
         }
@@ -6272,6 +6301,29 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         }
         return super.onTouchEvent(event);
+    }
+
+    // DevGram: сообщение про серию при нажатии на огонёк в списке чатов
+    private void showDevgramStreakBulletin() {
+        try {
+            int count = DevGramStreaks.getStreak(currentDialogId);
+            if (count <= 0) {
+                return;
+            }
+            org.telegram.ui.ActionBar.BaseFragment fragment = org.telegram.ui.LaunchActivity.getSafeLastFragment();
+            if (fragment == null) {
+                return;
+            }
+            TLRPC.User u = user != null ? user : MessagesController.getInstance(currentAccount).getUser(currentDialogId);
+            CharSequence name = u != null ? UserObject.getUserName(u) : "";
+            org.telegram.ui.Components.BulletinFactory.of(fragment)
+                    .createSimpleBulletin(
+                            ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
+                            DevGramStreaks.streakText(name, count))
+                    .show();
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
     }
 
 

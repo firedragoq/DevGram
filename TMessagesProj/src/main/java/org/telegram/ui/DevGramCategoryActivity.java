@@ -43,6 +43,10 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_SHOW_CONTACTS = 7;
     private static final int ID_DISABLE_ADS = 14;
     private static final int ID_LOCAL_PREMIUM = 15;
+    private static final int ID_STREAKS = 16;
+    private static final int ID_VPN = 17;
+    private static final int ID_IOS_PROFILE = 18;
+    private static final int ID_VPN_DIAG = 19;
 
     private final int category;
     private UniversalRecyclerView listView;
@@ -113,25 +117,36 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.saveMedia));
             items.add(UItem.asCheck(ID_SAVE_BOTS, "Сохранять в чатах с ботами")
                     .setChecked(DevGramConfig.saveInBotChats));
-            items.add(UItem.asShadow("Удалённые остаются в чате с пометкой «🗑» и в списке чатов. "
-                    + "У изменённых доступна история правок по тапу на текст. Вложения — фото, видео, "
-                    + "кружки, голосовые, стикеры, гифки, файлы — закрепляются отдельно, "
-                    + "иначе их вычистит вместе с кешем."));
+            items.add(UItem.asShadow(null));
         } else {
             items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
                     .setChecked(getUserConfig().showContactsTab));
-            items.add(UItem.asShadow("Кнопку можно скрыть и долгим нажатием по ней в нижнем меню."));
-
             items.add(UItem.asCheck(ID_DISABLE_ADS, "Скрывать рекламу")
                     .setChecked(DevGramConfig.disableAds));
-            items.add(UItem.asShadow("Убирает спонсорские сообщения в каналах и у ботов, а также рекламу "
-                    + "в видеоплеере. Клиент не просто прячет их, а вообще не запрашивает у сервера."));
-
             items.add(UItem.asCheck(ID_LOCAL_PREMIUM, "Локальный премиум")
                     .setChecked(DevGramConfig.localPremium));
-            items.add(UItem.asShadow("Разблокирует клиентские премиум-функции: безлимит папок, "
-                    + "премиум-эмодзи и реакции, статусы, увеличенные лимиты. Работает только локально — "
-                    + "серверные возможности (гигабайтные загрузки, премиум-реакции у собеседников) недоступны."));
+            items.add(UItem.asCheck(ID_STREAKS, "Огоньки (серии)")
+                    .setChecked(DevGramConfig.streaksEnabled));
+            items.add(UItem.asShadow("🔥N рядом с именем — сколько дней подряд вы общаетесь в личке "
+                    + "(показывается от 3 дней). Выключишь — огоньки пропадут у всех."));
+
+            items.add(UItem.asCheck(ID_IOS_PROFILE, "Профиль в стиле iOS")
+                    .setChecked(DevGramConfig.iosProfile));
+            items.add(UItem.asShadow("Аватар и имя по центру, круглые стеклянные кнопки действий и "
+                    + "скруглённые полупрозрачные карточки — как на iOS. Применяется ко всем профилям. "
+                    + "Открой профиль заново, чтобы применить."));
+
+            // Прокси доступен обладателям значка: команда (✅), поддержавшие (✈️), официальные
+            long uid = getUserConfig().getClientUserId();
+            long myBadge = org.telegram.messenger.DevGramBadges.emojiIdOf(uid);
+            boolean hasArrow = org.telegram.messenger.DevGramBadges.isTeam(uid)
+                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_SUPPORTER
+                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_OFFICIAL;
+            if (hasArrow) {
+                items.add(UItem.asCheck(ID_VPN, "Прокси")
+                        .setChecked(org.telegram.messenger.DevGramProxy.isEnabled()));
+                items.add(UItem.asShadow(null));
+            }
         }
     }
 
@@ -156,14 +171,60 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setDisableAds(!DevGramConfig.disableAds);
         } else if (item.id == ID_LOCAL_PREMIUM) {
             DevGramConfig.setLocalPremium(!DevGramConfig.localPremium);
+        } else if (item.id == ID_STREAKS) {
+            DevGramConfig.setStreaksEnabled(!DevGramConfig.streaksEnabled);
+        } else if (item.id == ID_IOS_PROFILE) {
+            DevGramConfig.setIosProfile(!DevGramConfig.iosProfile);
+        } else if (item.id == ID_VPN) {
+            boolean enable = !org.telegram.messenger.DevGramProxy.isEnabled();
+            org.telegram.messenger.DevGramProxy.setEnabled(enable);
+            DevGramConfig.setVpnEnabled(enable);
+        } else if (item.id == ID_VPN_DIAG) {
+            runProxyDiagnostics();
+            return;
         } else if (item.id == ID_SHOW_CONTACTS) {
             getUserConfig().setShowContactsTab(!getUserConfig().showContactsTab);
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
         } else {
             return;
         }
+        refreshList();
+    }
+
+    private void refreshList() {
         if (listView != null && listView.adapter != null) {
             listView.adapter.update(true);
         }
+    }
+
+    // Диагностика прокси: soket-проверка блокирующая → гоним в фоне, результат в диалоге.
+    private void runProxyDiagnostics() {
+        final org.telegram.ui.ActionBar.AlertDialog progress =
+                new org.telegram.ui.ActionBar.AlertDialog(getParentActivity(), org.telegram.ui.ActionBar.AlertDialog.ALERT_TYPE_SPINNER);
+        progress.setCanCancel(false);
+        progress.show();
+        new Thread(() -> {
+            final String report = org.telegram.messenger.DevGramProxy.diagnose();
+            org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> {
+                try {
+                    progress.dismiss();
+                } catch (Throwable ignore) {
+                }
+                if (getParentActivity() == null) {
+                    return;
+                }
+                org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                        new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+                b.setTitle("Диагностика прокси");
+                b.setMessage(report);
+                b.setPositiveButton("Копировать", (d, w) -> {
+                    org.telegram.messenger.AndroidUtilities.addToClipboard(report);
+                    org.telegram.ui.Components.BulletinFactory.of(this)
+                            .createCopyBulletin("Скопировано").show();
+                });
+                b.setNegativeButton("Закрыть", null);
+                showDialog(b.create());
+            });
+        }, "DevGramProxyDiag").start();
     }
 }

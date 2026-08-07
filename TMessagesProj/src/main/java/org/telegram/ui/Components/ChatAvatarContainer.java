@@ -924,22 +924,14 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         final CharSequence devgramBadgeName = titleTextView.getText();
         if (devgramInLeft) {
             titleTextView.setLeftDrawableOnClick(v ->
-                    BulletinFactory.of(parentFragment)
-                            .createSimpleBulletin(
-                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
-                                    DevGramBadges.badgeText(devgramBadgeDialogId, devgramBadgeName))
-                            .show());
+                    DevGramBadges.showBadgeBulletin(BulletinFactory.of(parentFragment), devgramBadgeDialogId, devgramBadgeName));
         } else {
             titleTextView.setLeftDrawableOnClick(null);
         }
         if (devgramBadged && !devgramInLeft) {
             titleTextView.setRightDrawable3(getDevGramBadgeDrawable(devgramBadgeDialogId));
             titleTextView.setRightDrawable3OnClick(v ->
-                    BulletinFactory.of(parentFragment)
-                            .createSimpleBulletin(
-                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
-                                    DevGramBadges.badgeText(devgramBadgeDialogId, devgramBadgeName))
-                            .show());
+                    DevGramBadges.showBadgeBulletin(BulletinFactory.of(parentFragment), devgramBadgeDialogId, devgramBadgeName));
         } else {
             titleTextView.setRightDrawable3(null);
             titleTextView.setRightDrawable3OnClick(null);
@@ -953,8 +945,16 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
                 devgramStreakDrawable.attach();
             }
             devgramStreakDrawable.setCount(devgramStreak);
+            devgramStreakDrawable.setActive(org.telegram.messenger.DevGramStreaks.isStreakActiveToday(devgramStreakDialog));
             titleTextView.setRightDrawable3(devgramStreakDrawable);
-            titleTextView.setRightDrawable3OnClick(null);
+            final CharSequence streakName = titleTextView.getText();
+            final int streakCount = devgramStreak;
+            titleTextView.setRightDrawable3OnClick(v ->
+                    BulletinFactory.of(parentFragment)
+                            .createSimpleBulletin(
+                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
+                                    org.telegram.messenger.DevGramStreaks.streakText(streakName, streakCount))
+                            .show());
         }
         if (!rightDrawableIsScamOrVerified && !rightDrawableIsScam) {
             if (mutedIcon != null) {
@@ -970,6 +970,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     // DevGram: значок бренда для шапки — ставим кастом-эмодзи по роли диалога.
     private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable getDevGramBadgeDrawable(long dialogId) {
         devgramBadgeDrawable.set(DevGramBadges.emojiIdOf(dialogId), false);
+        devgramBadgeDrawable.setParticles(true, true); // DevGram: звёздочки вокруг значка
         return devgramBadgeDrawable;
     }
 

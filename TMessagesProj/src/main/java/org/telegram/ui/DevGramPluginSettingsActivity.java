@@ -1,0 +1,144 @@
+/*
+ * DevGram: экран настроек одного плагина. Плагин описывает строки методом settings(),
+ * значения хранятся через get_setting/set_setting.
+ */
+
+package org.telegram.ui;
+
+import android.content.Context;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.DevGramPlugins;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
+import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.EditTextBoldCursor;
+import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.UItem;
+import org.telegram.ui.Components.UniversalAdapter;
+import org.telegram.ui.Components.UniversalRecyclerView;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class DevGramPluginSettingsActivity extends BaseFragment {
+
+    private final String pluginId;
+    private final String pluginName;
+    private UniversalRecyclerView listView;
+    private final ArrayList<String[]> rows = new ArrayList<>(); // type,key,title по индексу
+
+    public DevGramPluginSettingsActivity(String pluginId, String pluginName) {
+        this.pluginId = pluginId;
+        this.pluginName = pluginName;
+    }
+
+    @Override
+    public View createView(Context context) {
+        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        actionBar.setAllowOverlayTitle(true);
+        actionBar.setTitle(pluginName != null ? pluginName : "Плагин");
+        actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
+            @Override
+            public void onItemClick(int id) {
+                if (id == -1) {
+                    finishFragment();
+                }
+            }
+        });
+        FrameLayout content = new FrameLayout(context);
+        listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, null);
+        listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
+        content.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        actionBar.setAdaptiveBackground(listView);
+        return fragmentView = content;
+    }
+
+    private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
+        rows.clear();
+        List<String> list = DevGramPlugins.pluginSettings(pluginId);
+        for (int i = 0; i < list.size(); i++) {
+            String[] r = list.get(i).split("\u001f", -1); // type, key, title
+            rows.add(r);
+            String type = r.length > 0 ? r[0] : "";
+            String key = r.length > 1 ? r[1] : "";
+            String title = r.length > 2 ? r[2] : "";
+            if ("header".equals(type)) {
+                items.add(UItem.asHeader(title));
+            } else if ("switch".equals(type)) {
+                boolean on = "1".equals(DevGramPlugins.pluginGet(pluginId, key, "0"));
+                items.add(UItem.asCheck(i, title).setChecked(on));
+            } else if ("text".equals(type)) {
+                String val = DevGramPlugins.pluginGet(pluginId, key, "");
+                items.add(UItem.asButton(i, R.drawable.msg_edit, title, val.isEmpty() ? "—" : val));
+            } else if ("button".equals(type)) {
+                items.add(UItem.asButton(i, R.drawable.msg_settings, title));
+            }
+        }
+        if (rows.isEmpty()) {
+            items.add(UItem.asShadow("У этого плагина нет настроек."));
+        }
+    }
+
+    private void onItemClick(UItem item, View view, int position, float x, float y) {
+        int idx = item.id;
+        if (idx < 0 || idx >= rows.size()) {
+            return;
+        }
+        String[] r = rows.get(idx);
+        String type = r.length > 0 ? r[0] : "";
+        String key = r.length > 1 ? r[1] : "";
+        String title = r.length > 2 ? r[2] : "";
+        if ("switch".equals(type)) {
+            boolean on = "1".equals(DevGramPlugins.pluginGet(pluginId, key, "0"));
+            DevGramPlugins.pluginSet(pluginId, key, on ? "0" : "1");
+            refresh();
+        } else if ("button".equals(type)) {
+            DevGramPlugins.pluginSettingClick(pluginId, key);
+        } else if ("text".equals(type)) {
+            editText(key, title);
+        }
+    }
+
+    private void editText(String key, String title) {
+        Context context = getParentActivity();
+        if (context == null) {
+            return;
+        }
+        EditTextBoldCursor et = new EditTextBoldCursor(context);
+        et.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 17);
+        et.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+        et.setCursorColor(Theme.getColor(Theme.key_dialogTextBlack));
+        et.setInputType(InputType.TYPE_CLASS_TEXT);
+        et.setText(DevGramPlugins.pluginGet(pluginId, key, ""));
+        et.setSelection(et.getText().length());
+        LinearLayout box = new LinearLayout(context);
+        box.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(4), AndroidUtilities.dp(24), 0);
+        box.addView(et, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
+        AlertDialog.Builder b = new AlertDialog.Builder(context);
+        b.setTitle(title);
+        b.setView(box);
+        b.setPositiveButton("OK", (d, w) -> {
+            DevGramPlugins.pluginSet(pluginId, key, et.getText().toString());
+            refresh();
+        });
+        b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(b.create());
+        et.requestFocus();
+        AndroidUtilities.showKeyboard(et);
+    }
+
+    private void refresh() {
+        if (listView != null && listView.adapter != null) {
+            listView.adapter.update(true);
+        }
+    }
+}

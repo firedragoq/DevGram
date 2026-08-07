@@ -3,10 +3,12 @@ import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 apply plugin: 'com.android.library'
 apply from: '../utils.gradle'
 apply plugin: 'kotlin-android'
+apply plugin: 'com.chaquo.python' // DevGram: Python-плагины
 
 repositories {
     mavenCentral()
     google()
+    maven { url "https://chaquo.com/maven" } // DevGram: рантайм Chaquopy (Python)
 }
 
 configurations {
@@ -19,6 +21,9 @@ configurations.all {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+
+    // DevGram: Xposed-style хуки Java-методов для плагинов (Pine — чистый Java-API)
+    implementation 'top.canyie.pine:core:0.3.0'
 
     implementation 'androidx.core:core:1.16.0'
     implementation 'androidx.interpolator:interpolator:1.0.0'
@@ -116,7 +121,7 @@ android {
     defaultConfig.versionCode = Integer.parseInt(Utils['getVersionCode']())
 
     defaultConfig {
-        minSdkVersion 21
+        minSdkVersion 24 // DevGram: поднято с 21 ради Chaquopy (Python-плагины)
         targetSdkVersion 35
 
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
@@ -155,6 +160,27 @@ android {
                 } else {
                     abiFilters 'armeabi-v7a', 'arm64-v8a'
                 }
+            }
+        }
+
+        // DevGram: Chaquopy требует явные ndk.abiFilters — зеркалим CMake-логику
+        ndk {
+            if (project.hasProperty("armeabi-v7a")) {
+                abiFilters 'armeabi-v7a'
+            } else if (project.hasProperty("arm64-v8a")) {
+                abiFilters 'arm64-v8a'
+            } else {
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+            }
+        }
+
+        // DevGram: Python-рантайм для плагинов
+        python {
+            version "3.11"
+            // pycryptodome — быстрый C-AES для встроенного WS-прокси (в Chaquopy нет системного
+            // libcrypto; штатный fallback tg-ws-proxy падает). Предсобранный wheel под Android.
+            pip {
+                install "pycryptodome"
             }
         }
     }

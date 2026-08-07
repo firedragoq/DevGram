@@ -135,6 +135,7 @@ import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ChatThemeController;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DevGramBadges;
+import org.telegram.messenger.DevGramConfig;
 import org.telegram.messenger.DevGramRegDate;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
@@ -3989,6 +3990,16 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     case ProfileActionsView.KEY_SETTINGS:
                         presentFragment(new SettingsActivity());
                         break;
+                    case ProfileActionsView.KEY_MORE:
+                        // DevGram: «...» в ряду открывает то же меню, что верхний otherItem, но у кнопки
+                        if (otherItem != null && actionsView != null) {
+                            int[] loc = new int[2];
+                            actionsView.getLocationOnScreen(loc);
+                            int screenX = Math.max(dp(8), loc[0] + (int) x - dp(90));
+                            int screenY = loc[1] + actionsView.getMeasuredHeight() - dp(8);
+                            otherItem.showSubMenuAtScreen(screenX, screenY);
+                        }
+                        break;
                 }
             });
         }
@@ -4063,6 +4074,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         otherItem.addView(ttlIconView, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
         otherItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
 
+        if (DevGramConfig.iosProfile) {
+            otherItem.setVisibility(View.GONE); // убираем верхние 3 точки — их роль у «...» в ряду
+            dgGlassPill(editItem);
+            dgGlassPill(actionBar.getBackButton());
+        }
+
         int scrollTo;
         int scrollToPosition = 0;
         Object writeButtonTag = null;
@@ -4120,6 +4137,65 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 super.invalidate();
                 if (fragmentView != null) {
                     fragmentView.invalidate();
+                }
+            }
+
+            // DevGram: iOS-профиль — скруглённые карточки под группами инфо-строк
+            private final android.graphics.Paint dgCardPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.RectF dgCardRect = new android.graphics.RectF();
+            private final java.util.ArrayList<View> dgInfoCells = new java.util.ArrayList<>();
+
+            private boolean isDgInfoCell(View v) {
+                return v instanceof TextDetailCell || v instanceof AboutLinkCell || v instanceof ProfileHoursCell;
+            }
+
+            @Override
+            protected void dispatchDraw(Canvas canvas) {
+                if (DevGramConfig.iosProfile) {
+                    drawDgInfoCards(canvas);
+                }
+                super.dispatchDraw(canvas);
+            }
+
+            private void drawDgInfoCards(Canvas canvas) {
+                dgInfoCells.clear();
+                for (int i = 0; i < getChildCount(); i++) {
+                    View ch = getChildAt(i);
+                    if (ch != null && ch.getVisibility() == VISIBLE && isDgInfoCell(ch)) {
+                        dgInfoCells.add(ch);
+                    }
+                }
+                if (dgInfoCells.isEmpty()) {
+                    return;
+                }
+                java.util.Collections.sort(dgInfoCells, (a, b) -> Float.compare(a.getY(), b.getY()));
+                final float inset = dp(12);
+                final float radius = dp(12);
+                dgCardPaint.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                dgCardPaint.setAlpha(238);
+                final int n = dgInfoCells.size();
+                int gi = 0;
+                while (gi < n) {
+                    View first = dgInfoCells.get(gi);
+                    float top = first.getY();
+                    float bottom = first.getY() + first.getHeight();
+                    float left = first.getX();
+                    float right = first.getX() + first.getWidth();
+                    int gj = gi + 1;
+                    while (gj < n) {
+                        View nx = dgInfoCells.get(gj);
+                        if (nx.getY() - bottom <= dp(3)) {
+                            bottom = nx.getY() + nx.getHeight();
+                            left = Math.min(left, nx.getX());
+                            right = Math.max(right, nx.getX() + nx.getWidth());
+                            gj++;
+                        } else {
+                            break;
+                        }
+                    }
+                    dgCardRect.set(left + inset, top, right - inset, bottom);
+                    canvas.drawRoundRect(dgCardRect, radius, radius, dgCardPaint);
+                    gi = gj;
                 }
             }
 
@@ -7852,7 +7928,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (editItemVisible) {
                 editItem.setVisibility(View.VISIBLE);
             }
-            otherItem.setVisibility(View.VISIBLE);
+            otherItem.setVisibility(DevGramConfig.iosProfile ? View.GONE : View.VISIBLE);
             if (mediaOptionsItem != null) {
                 mediaOptionsItem.setVisibility(View.GONE);
             }
@@ -8392,6 +8468,32 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (giftsView != null) {
             giftsView.setExpandCoords((actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0) + ActionBar.getCurrentActionBarHeight() + extraHeight + searchTransitionOffset);
         }
+    }
+
+    // DevGram: стеклянная «пилюля» под кнопкой ActionBar (back / Edit) для iOS-профиля
+    private void dgGlassPill(View v) {
+        if (v == null) {
+            return;
+        }
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        gd.setColor(0x3D000000);
+        v.setBackground(gd);
+    }
+
+    // DevGram: обернуть иконку (напр. QR) в круглый полупрозрачный фон
+    private Drawable dgRoundIcon(Drawable icon) {
+        if (icon == null) {
+            return null;
+        }
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bg.setColor(0x3D000000);
+        int size = dp(36);
+        bg.setSize(size, size);
+        // InsetDrawable центрирует иконку внутри круга и работает на всех API
+        Drawable insetIcon = new android.graphics.drawable.InsetDrawable(icon, dp(5));
+        return new android.graphics.drawable.LayerDrawable(new Drawable[]{bg, insetIcon});
     }
 
     private void needLayout(boolean animated) {
@@ -11135,11 +11237,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         }
         devgramBadgeDrawable[a].set(DevGramBadges.emojiIdOf(dialogId), false);
+        devgramBadgeDrawable[a].setParticles(true, true); // DevGram: анимированные звёздочки-искры вокруг значка
         return devgramBadgeDrawable[a];
     }
 
     // DevGram: огонёк-стрик 🔥N (справа от прем-эмодзи)
-    private org.telegram.ui.Components.DevGramStreakDrawable getDevGramStreakDrawable(int a, int count) {
+    private org.telegram.ui.Components.DevGramStreakDrawable getDevGramStreakDrawable(int a, int count, long dialogId) {
         if (devgramStreakDrawable[a] == null) {
             devgramStreakDrawable[a] = new org.telegram.ui.Components.DevGramStreakDrawable(nameTextView[a], currentAccount);
             if (fragmentViewAttached) {
@@ -11147,6 +11250,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         }
         devgramStreakDrawable[a].setCount(count);
+        devgramStreakDrawable[a].setActive(org.telegram.messenger.DevGramStreaks.isStreakActiveToday(dialogId));
         return devgramStreakDrawable[a];
     }
 
@@ -11644,11 +11748,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 final CharSequence devgramBadgeName = UserObject.getUserName(user);
                 if (devgramInLeft) {
                     nameTextView[a].setLeftDrawableOnClick(v ->
-                            BulletinFactory.of(ProfileActivity.this)
-                                    .createSimpleBulletin(
-                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
-                                            DevGramBadges.badgeText(user.id, devgramBadgeName))
-                                    .show());
+                            DevGramBadges.showBadgeBulletin(BulletinFactory.of(ProfileActivity.this), user.id, devgramBadgeName));
                 } else {
                     nameTextView[a].setLeftDrawableOnClick(null);
                 }
@@ -11656,11 +11756,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (devgramBadged && !devgramInLeft) {
                     nameTextView[a].setRightDrawable3(getDevGramBadgeDrawable(a, user.id));
                     nameTextView[a].setRightDrawable3OnClick(v ->
-                            BulletinFactory.of(ProfileActivity.this)
-                                    .createSimpleBulletin(
-                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
-                                            DevGramBadges.badgeText(user.id, devgramBadgeName))
-                                    .show());
+                            DevGramBadges.showBadgeBulletin(BulletinFactory.of(ProfileActivity.this), user.id, devgramBadgeName));
                 } else {
                     nameTextView[a].setRightDrawable3(null);
                     nameTextView[a].setRightDrawable3OnClick(null);
@@ -11668,8 +11764,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 // DevGram: огоньки-стрик 🔥N справа от прем-эмодзи (где раньше был значок)
                 int devgramStreak = org.telegram.messenger.DevGramStreaks.getStreak(user.id);
                 if (devgramStreak > 0) {
-                    nameTextView[a].setRightDrawable3(getDevGramStreakDrawable(a, devgramStreak));
-                    nameTextView[a].setRightDrawable3OnClick(null);
+                    nameTextView[a].setRightDrawable3(getDevGramStreakDrawable(a, devgramStreak, user.id));
+                    final CharSequence streakName = UserObject.getUserName(user);
+                    final int streakCount = devgramStreak;
+                    nameTextView[a].setRightDrawable3OnClick(v ->
+                            BulletinFactory.of(ProfileActivity.this)
+                                    .createSimpleBulletin(
+                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
+                                            org.telegram.messenger.DevGramStreaks.streakText(streakName, streakCount))
+                                    .show());
                 }
                 if (user.self && getMessagesController().isPremiumUser(user)) {
                     nameTextView[a].setRightDrawableOnClick(v -> {
@@ -11995,22 +12098,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (chatBadgeInLeft) {
                     nameTextView[a].setLeftDrawableOnClick(v ->
-                            BulletinFactory.of(ProfileActivity.this)
-                                    .createSimpleBulletin(
-                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
-                                            DevGramBadges.badgeText(-chatId, chatBadgeName))
-                                    .show());
+                            DevGramBadges.showBadgeBulletin(BulletinFactory.of(ProfileActivity.this), -chatId, chatBadgeName));
                 } else {
                     nameTextView[a].setLeftDrawableOnClick(null);
                 }
                 if (chatBadged && !chatBadgeInLeft) {
                     nameTextView[a].setRightDrawable3(getDevGramBadgeDrawable(a, -chatId));
                     nameTextView[a].setRightDrawable3OnClick(v ->
-                            BulletinFactory.of(ProfileActivity.this)
-                                    .createSimpleBulletin(
-                                            ContextCompat.getDrawable(getParentActivity(), R.drawable.devgram_supporter),
-                                            DevGramBadges.badgeText(-chatId, chatBadgeName))
-                                    .show());
+                            DevGramBadges.showBadgeBulletin(BulletinFactory.of(ProfileActivity.this), -chatId, chatBadgeName));
                 } else {
                     nameTextView[a].setRightDrawable3(null);
                     nameTextView[a].setRightDrawable3OnClick(null);
@@ -12837,7 +12932,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         actionBar.onSearchFieldVisibilityChanged(searchTransitionProgress > 0.5f);
         int itemVisibility = searchTransitionProgress > 0.5f ? View.VISIBLE : View.GONE;
         if (otherItem != null) {
-            otherItem.setVisibility(itemVisibility);
+            otherItem.setVisibility(DevGramConfig.iosProfile ? View.GONE : itemVisibility);
         }
         searchItem.setVisibility(itemVisibility);
 
@@ -12890,7 +12985,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             searchItem.getSearchContainer().setVisibility(searchTransitionProgress < 0.5f ? View.VISIBLE : View.GONE);
             int visibility = searchTransitionProgress > 0.5f ? View.VISIBLE : View.GONE;
             if (otherItem != null) {
-                otherItem.setVisibility(visibility);
+                otherItem.setVisibility(DevGramConfig.iosProfile ? View.GONE : visibility);
                 otherItem.setAlpha(progressHalf);
             }
             searchItem.setVisibility(visibility);
@@ -12960,7 +13055,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         if (otherItem != null) {
             otherItem.setAlpha(1f);
-            otherItem.setVisibility(hide);
+            otherItem.setVisibility(DevGramConfig.iosProfile ? View.GONE : hide);
         }
         searchItem.setVisibility(hide);
 
@@ -13642,6 +13737,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            // DevGram: iOS-профиль — прозрачный фон инфо-ячеек, чтобы под ними была видна карточка
+            if (DevGramConfig.iosProfile) {
+                View iv = holder.itemView;
+                if (iv instanceof TextDetailCell || iv instanceof AboutLinkCell || iv instanceof ProfileHoursCell) {
+                    iv.setBackgroundColor(0);
+                }
+            }
             switch (holder.getItemViewType()) {
                 case VIEW_TYPE_HEADER:
                     HeaderCell headerCell = (HeaderCell) holder.itemView;
@@ -13867,7 +13969,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     } else if (containsQr) {
                         Drawable drawable = ContextCompat.getDrawable(detailCell.getContext(), R.drawable.header_qr_24);
                         drawable.setColorFilter(new PorterDuffColorFilter(dontApplyPeerColor(getThemedColor(Theme.key_actionBarDefaultIcon), false), PorterDuff.Mode.MULTIPLY));
-                        detailCell.setImage(drawable, LocaleController.getString(R.string.GetQRCode));
+                        detailCell.setImage(DevGramConfig.iosProfile ? dgRoundIcon(drawable) : drawable, LocaleController.getString(R.string.GetQRCode));
                         detailCell.setImageClickListener(ProfileActivity.this::onTextDetailCellImageClicked);
                     } else if (position == idRow && userId != 0) {
                         // DevGram: календарик справа от ID — примерная дата регистрации

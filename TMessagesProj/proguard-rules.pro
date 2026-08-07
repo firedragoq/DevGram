@@ -121,3 +121,10 @@
 -dontwarn org.osmdroid.**
 
 -dontwarn java.lang.invoke.StringConcatFactory
+
+# DevGram: Pine (Xposed-хуки Java-методов) — вызывается нативно/через рефлексию
+-keep class top.canyie.pine.** { *; }
+-dontwarn top.canyie.pine.**
+# Pine транзитивно тянет Google Tink, а тот ссылается на отсутствующий google-http-client
+-dontwarn com.google.api.client.http.**
+-dontwarn com.google.crypto.tink.**

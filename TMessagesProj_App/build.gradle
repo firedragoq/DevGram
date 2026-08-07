@@ -200,7 +200,7 @@ android {
             sourceSets.standalone {
                 manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_standalone.xml'
             }
-            minSdkVersion 23
+            minSdkVersion 24 // DevGram: поднято ради Chaquopy (Python-плагины)
             ext {
                 abiVersionCode = 2
             }
@@ -300,7 +300,7 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion 21
+        minSdkVersion 24 // DevGram: поднято с 21 ради Chaquopy (Python-плагины)
         targetSdkVersion 35
         versionName Utils['getVersionName']()
         ndkVersion "27.2.12479018"

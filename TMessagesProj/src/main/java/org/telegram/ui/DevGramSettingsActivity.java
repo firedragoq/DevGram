@@ -37,11 +37,16 @@ public class DevGramSettingsActivity extends BaseFragment {
     private static final int ID_CAT_GHOST = 2;
     private static final int ID_CAT_SPY = 3;
     private static final int ID_BADGES = 4; // выдача значков — только для команды
+    private static final int ID_PLUGINS = 5; // менеджер плагинов
     private static final int ID_LINK_CHANNEL = 10;
     private static final int ID_LINK_CHAT = 11;
+    private static final int ID_LINK_DOCS = 12;
+    private static final int ID_LINK_SITE = 13;
 
     private static final String LINK_CHANNEL = "https://t.me/devgramnews";
     private static final String LINK_CHAT = "https://t.me/devgram_chat";
+    private static final String LINK_DOCS = "https://docs.devgram.space";
+    private static final String LINK_SITE = "https://devgram.space";
 
     @Override
     public View createView(Context context) {
@@ -118,12 +123,15 @@ public class DevGramSettingsActivity extends BaseFragment {
         items.add(UItem.asButton(ID_CAT_GENERAL, R.drawable.devgram_cat_general, "Основные"));
         items.add(UItem.asButton(ID_CAT_GHOST, R.drawable.devgram_cat_ghost, "Режим призрака"));
         items.add(UItem.asButton(ID_CAT_SPY, R.drawable.devgram_cat_spy, "Слежка"));
+        items.add(UItem.asButton(ID_PLUGINS, R.drawable.devgram_cat_general, "Плагины"));
         items.add(UItem.asShadow(null));
 
         // Ссылки на официальный канал и чат
         items.add(UItem.asHeader("Ссылки"));
         items.add(UItem.asButton(ID_LINK_CHANNEL, R.drawable.devgram_channel, "Канал", "@DevGramNews"));
         items.add(UItem.asButton(ID_LINK_CHAT, R.drawable.devgram_chat, "Чат", "@DevGram_chat"));
+        items.add(UItem.asButton(ID_LINK_DOCS, R.drawable.msg_info, "Документация", "docs.devgram.space"));
+        items.add(UItem.asButton(ID_LINK_SITE, R.drawable.msg_language, "Сайт", "devgram.space"));
         items.add(UItem.asShadow(null));
 
         // Раздел для команды проекта: выдача значков. Видно только участникам команды.
@@ -141,12 +149,18 @@ public class DevGramSettingsActivity extends BaseFragment {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GHOST));
         } else if (item.id == ID_CAT_SPY) {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
+        } else if (item.id == ID_PLUGINS) {
+            presentFragment(new DevGramPluginsActivity());
         } else if (item.id == ID_BADGES) {
             presentFragment(new DevGramBadgesActivity());
         } else if (item.id == ID_LINK_CHANNEL) {
             Browser.openUrl(getContext(), LINK_CHANNEL);
         } else if (item.id == ID_LINK_CHAT) {
             Browser.openUrl(getContext(), LINK_CHAT);
+        } else if (item.id == ID_LINK_DOCS) {
+            Browser.openUrl(getContext(), LINK_DOCS);
+        } else if (item.id == ID_LINK_SITE) {
+            Browser.openUrl(getContext(), LINK_SITE);
         }
     }
 }

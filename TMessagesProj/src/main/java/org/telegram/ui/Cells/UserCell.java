@@ -677,16 +677,13 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
             // DevGram: значок бренда слева от имени участника (когда левый слот свободен), кликабельный
             if (currentUser != null && DevGramBadges.isBadged(currentUser.id)) {
                 devgramBadge.set(DevGramBadges.emojiIdOf(currentUser.id), false);
+                devgramBadge.setParticles(true, true); // DevGram: звёздочки вокруг значка
                 nameTextView.setLeftDrawable(devgramBadge);
                 final long uid = currentUser.id;
                 nameTextView.setLeftDrawableOnClick(v -> {
                     org.telegram.ui.ActionBar.BaseFragment f = org.telegram.ui.LaunchActivity.getSafeLastFragment();
                     if (f != null) {
-                        BulletinFactory.of(f)
-                                .createSimpleBulletin(
-                                        ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
-                                        DevGramBadges.badgeText(uid, nameTextView.getText()))
-                                .show();
+                        DevGramBadges.showBadgeBulletin(BulletinFactory.of(f), uid, nameTextView.getText());
                     }
                 });
             } else {

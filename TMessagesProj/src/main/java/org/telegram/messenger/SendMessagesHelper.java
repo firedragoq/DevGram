@@ -4240,6 +4240,17 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
     public void sendMessage(SendMessageParams sendMessageParams) {
         String message = sendMessageParams.message;
+        // DevGram: хук плагинов на исходящий текст (только без форматирования, чтобы не сбить entities)
+        if (message != null && (sendMessageParams.entities == null || sendMessageParams.entities.isEmpty())) {
+            CharSequence devgramHooked = DevGramPlugins.onSendMessage(message);
+            if (devgramHooked != null) {
+                if (DevGramPlugins.CANCEL.equals(devgramHooked.toString())) {
+                    return; // плагин отменил отправку
+                }
+                message = devgramHooked.toString();
+                sendMessageParams.message = message;
+            }
+        }
         String caption = sendMessageParams.caption;
         TLRPC.MessageMedia location = sendMessageParams.location;
         TLRPC.TL_photo photo = sendMessageParams.photo;

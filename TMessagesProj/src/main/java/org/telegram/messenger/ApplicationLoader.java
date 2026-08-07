@@ -360,8 +360,15 @@ public class ApplicationLoader extends Application {
         }
 
         DevGramConfig.loadConfig(); // DevGram: гарантируем загрузку конфига с готовым контекстом
+        // DevGram: система плагинов (Python/Chaquopy) — грузим в фоне, чтобы не тормозить старт
+        Utilities.globalQueue.postRunnable(DevGramPlugins::loadAll);
         DevGramBadges.startSync();   // DevGram: подтягиваем значки из облака (Firebase) для всех
         DevGramStreaks.startSync();  // DevGram: подтягиваем свои стрики (огоньки) из облака
+        DevGramStreaks.startLossWatcher(); // DevGram: следим за потерей огонька даже когда сидим в приложении
+        // DevGram: спрятать прокси из стандартного меню (миграция со старых версий) + поднять скрытый
+        AndroidUtilities.runOnUIThread(DevGramProxy::migrate, 2500);
+        // DevGram: уведомление о потерянных огоньках — с задержкой, чтобы юзеры прогрузились
+        AndroidUtilities.runOnUIThread(DevGramStreaks::checkLostStreaks, 6000);
 
         NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
 
@@ -377,6 +384,7 @@ public class ApplicationLoader extends Application {
                 super.onActivityStarted(activity);
                 if (wasInBackground) {
                     ensureCurrentNetworkGet(true);
+                    DevGramStreaks.refresh(); // DevGram: перепроверить огоньки/потери при возврате в приложение
                 }
             }
         };

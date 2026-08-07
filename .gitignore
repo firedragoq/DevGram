@@ -23,3 +23,7 @@ TMessagesProj/jni/ffmpeg/build/
 TMessagesProj/jni/boringssl/build/
 TMessagesProj/jni/tde2e/x86*
 TMessagesProj/jni/tde2e/arm*
+
+# DevGram: Python bytecode
+__pycache__/
+*.pyc

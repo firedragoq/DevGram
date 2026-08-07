@@ -224,6 +224,9 @@ public class ActionBarMenuItem extends FrameLayout {
 
     private float transitionOffset;
     private View showSubMenuFrom;
+    // DevGram: показать это сабменю в произвольной точке экрана (кнопка «...» в ряду iOS-профиля)
+    public boolean dgOverrideLocation;
+    public int dgOverrideX, dgOverrideY;
     private final Theme.ResourcesProvider resourcesProvider;
     public int searchItemPaddingStart;
 
@@ -859,6 +862,19 @@ public class ActionBarMenuItem extends FrameLayout {
 
     public void toggleSubMenu() {
         toggleSubMenu(null, null);
+    }
+
+    // DevGram: показать/скрыть это сабменю в заданной точке экрана (левый-верхний угол попапа)
+    public void showSubMenuAtScreen(int screenX, int screenY) {
+        if (popupWindow != null && popupWindow.isShowing()) {
+            popupWindow.dismiss();
+            return;
+        }
+        dgOverrideLocation = true;
+        dgOverrideX = screenX;
+        dgOverrideY = screenY;
+        toggleSubMenu(null, null);
+        dgOverrideLocation = false;
     }
 
     public void setOnMenuDismiss(Utilities.Callback<Boolean> onMenuDismiss) {
@@ -1859,6 +1875,16 @@ public class ActionBarMenuItem extends FrameLayout {
 
         if (show) {
             popupLayout.scrollToTop();
+        }
+        // DevGram: принудительная позиция попапа в координатах экрана
+        if (dgOverrideLocation) {
+            if (show) {
+                popupWindow.showAtLocation(getRootView(), Gravity.LEFT | Gravity.TOP, dgOverrideX, dgOverrideY);
+            }
+            if (update) {
+                popupWindow.update(dgOverrideX, dgOverrideY, -1, -1);
+            }
+            return;
         }
         View fromView = showSubMenuFrom == null ? this : showSubMenuFrom;
         if (parentMenu != null) {

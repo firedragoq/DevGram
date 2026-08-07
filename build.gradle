@@ -11,6 +11,7 @@ buildscript {
         classpath 'com.android.tools:r8:8.2.33'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath 'com.google.gms:google-services:4.4.2'
+        classpath 'com.chaquo.python:gradle:16.1.0' // DevGram: Python-плагины (Chaquopy)
     }
 }
 repositories {

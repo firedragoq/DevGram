@@ -18377,6 +18377,12 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean processUpdateArray(ArrayList<TLRPC.Update> updates, ArrayList<TLRPC.User> usersArr, ArrayList<TLRPC.Chat> chatsArr, boolean fromGetDifference, int date) {
+        // DevGram: хук плагинов на сырые TL-апдейты (только если кто-то подписан — без нагрузки)
+        if (DevGramPlugins.wantsUpdates()) {
+            for (int i = 0, N = updates.size(); i < N; i++) {
+                DevGramPlugins.onUpdate(updates.get(i));
+            }
+        }
         if (updates.isEmpty()) {
             if (usersArr != null || chatsArr != null) {
                 AndroidUtilities.runOnUIThread(() -> {
@@ -21863,6 +21869,10 @@ public class MessagesController extends BaseController implements NotificationCe
                 MessageObject m = messages.get(i);
                 if (m != null) {
                     DevGramStreaks.onMessage(currentAccount, dialogId, m.isOut());
+                    // DevGram: хук плагинов на входящий текст
+                    if (!m.isOut() && m.messageOwner != null && m.messageOwner.message != null && !m.messageOwner.message.isEmpty()) {
+                        DevGramPlugins.onReceiveMessage(m.messageOwner.message);
+                    }
                 }
             }
         }

@@ -64,7 +64,7 @@ public class UserConfig extends BaseController {
     public boolean syncContacts = false;
     public boolean suggestContacts = true;
     public boolean showCallsTab;
-    public boolean showContactsTab = true;
+    public boolean showContactsTab = false; // DevGram: по умолчанию «Контакты» в нижнем меню скрыты
     public boolean mainTabsHiddenFork = false;
     public boolean hasSecureData;
     public int loginTime;
@@ -334,7 +334,7 @@ public class UserConfig extends BaseController {
             loginTime = preferences.getInt("loginTime", currentAccount);
             syncContacts = preferences.getBoolean("syncContacts", false);
             showCallsTab = preferences.getBoolean("showCallsTab", false);
-            showContactsTab = preferences.getBoolean("showContactsTab", true);
+            showContactsTab = preferences.getBoolean("showContactsTab", false);
             mainTabsHiddenFork = preferences.getBoolean("mainTabsHiddenFork", false);
             suggestContacts = preferences.getBoolean("suggestContacts", true);
             hasSecureData = preferences.getBoolean("hasSecureData", false);
@@ -510,7 +510,7 @@ public class UserConfig extends BaseController {
         contactsReimported = true;
         syncContacts = false;
         showCallsTab = false;
-        showContactsTab = true;
+        showContactsTab = false;
         mainTabsHiddenFork = false;
         suggestContacts = true;
         unreadDialogsLoaded = true;

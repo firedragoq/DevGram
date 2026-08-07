@@ -2290,11 +2290,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 CharSequence nm = currentNameString != null ? currentNameString : "";
                 BaseFragment f = LaunchActivity.getSafeLastFragment();
                 if (f != null) {
-                    BulletinFactory.of(f)
-                            .createSimpleBulletin(
-                                    ContextCompat.getDrawable(getContext(), R.drawable.devgram_supporter),
-                                    DevGramBadges.badgeText(devgramNameBadgeDialogId, nm))
-                            .show();
+                    DevGramBadges.showBadgeBulletin(BulletinFactory.of(f), devgramNameBadgeDialogId, nm);
                 }
                 return true;
             }
@@ -4219,6 +4215,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     // DevGram: тап по тексту изменённого сообщения → открыть историю изменений
     private boolean checkDevGramEditedMotionEvent(MotionEvent event) {
+        // DevGram: тап по изменённому сообщению больше НЕ показывает отдельную кнопку
+        // «История изменений» — она доступна только в основном меню сообщения (по долгому тапу).
+        if (true) {
+            return false;
+        }
         if (currentMessageObject == null || currentMessageObject.messageOwner == null) {
             return false;
         }
@@ -18931,6 +18932,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
                 }
                 devgramNameBadge.set(DevGramBadges.emojiIdOf(devgramFrom), false);
+                devgramNameBadge.setParticles(true, true); // DevGram: звёздочки вокруг значка
             }
             int adminWidth = 0;
             boolean isAdmin = false, isOwner = false;

@@ -59,6 +59,7 @@ public class ProfileActionsView extends View {
     private final List<Action> actions = new ArrayList<>();
     private final Paint paint = new Paint();
     private final Paint shaderPaint = new Paint();
+    private float layoutHeight; // DevGram: высота ряда с последней раскладки (для круглого радиуса)
     private float parentExpanded;
 
     public boolean isAnimatingCallAction = false;
@@ -107,6 +108,7 @@ public class ProfileActionsView extends View {
     public static final int KEY_EDIT_USERNAME = 15;
     public static final int KEY_EDIT_INFO = 16;
     public static final int KEY_SETTINGS = 17;
+    public static final int KEY_MORE = 18; // DevGram: «...» в ряду (iOS-профиль)
 
     private boolean isApplying;
     private boolean isNotificationsEnabled;
@@ -251,9 +253,18 @@ public class ProfileActionsView extends View {
         }
 
         final float betweenPadding = xpadding / 2f;
-        final float width = getItemWidth();
+        layoutHeight = height;
+        // DevGram: iOS-профиль — кнопки-круги (квадрат + радиус в половину), ряд по центру
+        final boolean dgIos = org.telegram.messenger.DevGramConfig.iosProfile;
+        float width = getItemWidth();
         float left = xpadding;
         float r = getRoundRadius();
+        if (dgIos && activeCount > 0) {
+            width = height;
+            r = height / 2f;
+            float total = width * activeCount + betweenPadding * Math.max(0, activeCount - 1);
+            left = Math.max(xpadding, (getMeasuredWidth() - total) / 2f);
+        }
 
         if (renderNode != null) {
             clipPath.rewind();
@@ -392,6 +403,16 @@ public class ProfileActionsView extends View {
 
         action.text.setMaxWidth(action.rect.width() - dp(2));
         action.textScale = action.text.getLineCount() >= 3 ? 0.75f : action.text.getLineCount() >= 2 ? 0.85f : 1.0f;
+        if (org.telegram.messenger.DevGramConfig.iosProfile) {
+            // iOS-профиль: иконка по центру круга (без подписи)
+            action.setBounds(
+                (int) (cx - drawableR),
+                (int) (cy - drawableR),
+                (int) (cx + drawableR),
+                (int) (cy + drawableR)
+            );
+            return;
+        }
         final float drawableTop = Math.max(0, (targetHeight - action.text.getHeight() * action.textScale) / 3f + dpf2(1.33f));
         action.setBounds(
             (int) (cx - drawableR),
@@ -431,11 +452,13 @@ public class ProfileActionsView extends View {
 
         updateBounds(action);
 
-        final float textY = action.bounds.bottom + action.bounds.top - action.text.getHeight() * action.textScale / 2.0f - dp(4.66f);
-        canvas.save();
-        canvas.scale(action.textScale, action.textScale, cx, textY + action.text.getHeight() * action.textScale / 2.0f);
-        action.text.draw(canvas, cx - action.text.getWidth() / 2f, textY, textColor, alpha);
-        canvas.restore();
+        if (!org.telegram.messenger.DevGramConfig.iosProfile) {
+            final float textY = action.bounds.bottom + action.bounds.top - action.text.getHeight() * action.textScale / 2.0f - dp(4.66f);
+            canvas.save();
+            canvas.scale(action.textScale, action.textScale, cx, textY + action.text.getHeight() * action.textScale / 2.0f);
+            action.text.draw(canvas, cx - action.text.getWidth() / 2f, textY, textColor, alpha);
+            canvas.restore();
+        }
 
         if (action.iconTranslationY != 0) {
             canvas.translate(0, action.iconTranslationY);
@@ -510,6 +533,9 @@ public class ProfileActionsView extends View {
     }
 
     public float getRoundRadius() {
+        if (org.telegram.messenger.DevGramConfig.iosProfile && layoutHeight > 0) {
+            return layoutHeight / 2f; // круглые кнопки
+        }
         return dp(16);
     }
 
@@ -703,6 +729,9 @@ public class ProfileActionsView extends View {
     private void applyVisibleActions() {
         if (isApplying) return;
         if (mode == MODE_MY_PROFILE) {
+            if (org.telegram.messenger.DevGramConfig.iosProfile && find(KEY_MORE) == null) {
+                actions.add(getOrCreate(KEY_MORE)); // «...» последней в ряду
+            }
             activeCount = actions.size();
             invalidate();
             return;
@@ -766,6 +795,10 @@ public class ProfileActionsView extends View {
                 insertIfAvailable(out, KEY_SHARE);
                 out.add(getOrCreate(KEY_STOP));
                 break;
+        }
+
+        if (org.telegram.messenger.DevGramConfig.iosProfile && find(out, KEY_MORE) == null) {
+            out.add(getOrCreate(KEY_MORE)); // «...» последней в ряду (iOS-профиль)
         }
 
         AndroidUtilities.runOnUIThread(() -> {
@@ -893,6 +926,9 @@ public class ProfileActionsView extends View {
             case KEY_NOTIFICATION:
                 newAction = new Action();
                 updateNotification(newAction, false);
+                break;
+            case KEY_MORE:
+                newAction = new Action(ActionButton.MORE);
                 break;
         }
 
@@ -1232,7 +1268,8 @@ public class ProfileActionsView extends View {
         SET_PHOTO(R.string.ProfileActionsEditPhoto2, R.drawable.filled_profile_photo, R.drawable.outline_profile_photo),
         EDIT_USERNAME(R.string.ProfileActionsEditUsername, R.drawable.filled_profile_edit_24, R.drawable.outline_profile_edit_24),
         EDIT_INFO(R.string.ProfileActionsEditInfo, R.drawable.filled_profile_edit_24, R.drawable.outline_profile_edit_24),
-        SETTINGS(R.string.Settings, R.drawable.filled_profile_settings, R.drawable.outline_profile_settings),;
+        SETTINGS(R.string.Settings, R.drawable.filled_profile_settings, R.drawable.outline_profile_settings),
+        MORE(R.string.AccDescrMoreOptions, R.drawable.ic_ab_other, R.drawable.ic_ab_other),;
 
         final @StringRes int title;
         final @DrawableRes int filledIcon;
