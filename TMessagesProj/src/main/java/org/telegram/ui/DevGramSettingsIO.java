@@ -34,10 +34,12 @@ public class DevGramSettingsIO {
             {"crashlyticsEnabled", "Google Crashlytics"},
             {"disableNumberRounding", "Отключить округление чисел"},
             {"squareFab", "Квадратная кнопка (FAB)"},
-            {"glassMenu", "Стеклянное меню сообщения"},
+            {"glassMenu", "Стеклянные меню"},
+            {"hideEmojiCategories", "Скрыть категории в поиске эмодзи"},
             {"disableMarkdown", "Отключить Markdown"},
             {"hideKeyboardOnScroll", "Скрывать клавиатуру при прокрутке"},
             {"disableGreetingSticker", "Скрыть приветственный стикер"},
+            {"addCommaAfterMention", "Запятая после упоминания"},
     };
 
     // Записать текущие настройки в файл .devgram (в кэше). Возвращает File или null.
@@ -175,9 +177,11 @@ public class DevGramSettingsIO {
             case "disableNumberRounding": return DevGramConfig.disableNumberRounding;
             case "squareFab": return DevGramConfig.squareFab;
             case "glassMenu": return DevGramConfig.glassMenu;
+            case "hideEmojiCategories": return DevGramConfig.hideEmojiCategories;
             case "disableMarkdown": return DevGramConfig.disableMarkdown;
             case "hideKeyboardOnScroll": return DevGramConfig.hideKeyboardOnScroll;
             case "disableGreetingSticker": return DevGramConfig.disableGreetingSticker;
+            case "addCommaAfterMention": return DevGramConfig.addCommaAfterMention;
             default: return false;
         }
     }

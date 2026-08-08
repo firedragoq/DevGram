@@ -64,11 +64,14 @@ public class DevGramConfig {
     public static boolean squareFab = true;
     // Стеклянное меню сообщения (размытый снимок чата под меню) — как exteraGram GlassMessageMenu.
     public static boolean glassMenu = true;
+    // Скрыть строку категорий в поиске эмодзи/стикеров — в exteraGram ВКЛ по умолчанию (hideCategories).
+    public static boolean hideEmojiCategories = true;
 
     // --- раздел «Чаты» (порт из exteraGram) ---
     public static boolean disableMarkdown = false;       // не преобразовывать **/`code` в форматирование
     public static boolean hideKeyboardOnScroll = true;   // скрывать клавиатуру при прокрутке чата (в exteraGram ВКЛ по умолчанию)
     public static boolean disableGreetingSticker = false; // не показывать приветственный стикер в пустом чате
+    public static boolean addCommaAfterMention = true;    // запятая после @упоминания в начале строки (в exteraGram ВКЛ)
 
     // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
     private static final Object readSync = new Object();
@@ -105,9 +108,11 @@ public class DevGramConfig {
             disableNumberRounding = preferences.getBoolean("disableNumberRounding", false);
             squareFab = preferences.getBoolean("squareFab", true);
             glassMenu = preferences.getBoolean("glassMenu", true);
+            hideEmojiCategories = preferences.getBoolean("hideEmojiCategories", true);
             disableMarkdown = preferences.getBoolean("disableMarkdown", false);
             hideKeyboardOnScroll = preferences.getBoolean("hideKeyboardOnScroll", true);
             disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
+            addCommaAfterMention = preferences.getBoolean("addCommaAfterMention", true);
             loaded = true;
         }
     }
@@ -150,6 +155,13 @@ public class DevGramConfig {
         }
     }
 
+    public static void setHideEmojiCategories(boolean v) {
+        hideEmojiCategories = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("hideEmojiCategories", v).apply();
+        }
+    }
+
     public static void setDisableMarkdown(boolean v) {
         disableMarkdown = v;
         if (preferences != null) {
@@ -169,6 +181,23 @@ public class DevGramConfig {
         if (preferences != null) {
             preferences.edit().putBoolean("disableGreetingSticker", v).apply();
         }
+    }
+
+    public static void setAddCommaAfterMention(boolean v) {
+        addCommaAfterMention = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("addCommaAfterMention", v).apply();
+        }
+    }
+
+    // Формат времени сообщений с секундами. Флаг живёт в глобальных настройках (getGlobalMainSettings),
+    // оттуда его читает LocaleController — как форма аватара. Держим тут обёртку для нашего меню.
+    public static boolean isFormatWithSeconds() {
+        return MessagesController.getGlobalMainSettings().getBoolean("formatWithSeconds", false);
+    }
+
+    public static void setFormatWithSeconds(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("formatWithSeconds", v).apply();
     }
 
     // Сбор данных БЕЗ Google-SDK (они ломали запуск — см. reference_devgram_no_firebase_sdk):
@@ -201,9 +230,11 @@ public class DevGramConfig {
             disableNumberRounding = false;
             squareFab = true;
             glassMenu = true;
+            hideEmojiCategories = true;
             disableMarkdown = false;
             hideKeyboardOnScroll = true;
             disableGreetingSticker = false;
+            addCommaAfterMention = true;
             if (preferences != null) {
                 preferences.edit().clear().apply();
             }
@@ -232,9 +263,11 @@ public class DevGramConfig {
             o.put("disableNumberRounding", disableNumberRounding);
             o.put("squareFab", squareFab);
             o.put("glassMenu", glassMenu);
+            o.put("hideEmojiCategories", hideEmojiCategories);
             o.put("disableMarkdown", disableMarkdown);
             o.put("hideKeyboardOnScroll", hideKeyboardOnScroll);
             o.put("disableGreetingSticker", disableGreetingSticker);
+            o.put("addCommaAfterMention", addCommaAfterMention);
         } catch (Throwable ignore) {
         }
         return o.toString();
@@ -264,9 +297,11 @@ public class DevGramConfig {
             setDisableNumberRounding(o.optBoolean("disableNumberRounding", disableNumberRounding));
             setSquareFab(o.optBoolean("squareFab", squareFab));
             setGlassMenu(o.optBoolean("glassMenu", glassMenu));
+            setHideEmojiCategories(o.optBoolean("hideEmojiCategories", hideEmojiCategories));
             setDisableMarkdown(o.optBoolean("disableMarkdown", disableMarkdown));
             setHideKeyboardOnScroll(o.optBoolean("hideKeyboardOnScroll", hideKeyboardOnScroll));
             setDisableGreetingSticker(o.optBoolean("disableGreetingSticker", disableGreetingSticker));
+            setAddCommaAfterMention(o.optBoolean("addCommaAfterMention", addCommaAfterMention));
             return true;
         } catch (Throwable e) {
             return false;

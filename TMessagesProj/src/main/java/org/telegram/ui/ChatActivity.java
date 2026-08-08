@@ -1292,6 +1292,12 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    // DevGram (как exteraGram, addCommaAfterMention): запятая после @упоминания, но только когда оно
+    // в начале строки ("@user, "), иначе обычный пробел.
+    private String devgramMentionSuffix(int start) {
+        return (org.telegram.messenger.DevGramConfig.addCommaAfterMention && start == 0) ? ", " : " ";
+    }
+
     // DevGram (как exteraGram): скопировать фото сообщения в буфер обмена как изображение.
     private void devgramCopyPhoto(MessageObject obj) {
         if (obj == null || getParentActivity() == null) {
@@ -7649,7 +7655,7 @@ public class ChatActivity extends BaseFragment implements
                 } else {
                     String username = ChatObject.getPublicUsername(chat);
                     if (username != null) {
-                        chatActivityEnterView.replaceWithText(start, len, "@" + username + " ", false);
+                        chatActivityEnterView.replaceWithText(start, len, "@" + username + devgramMentionSuffix(start), false);
                     }
                 }
             } else if (object instanceof TLRPC.User) {
@@ -7660,7 +7666,7 @@ public class ChatActivity extends BaseFragment implements
                     SharedPreferences preferences = MessagesController.getGlobalMainSettings();
                     final boolean mentionByName = !user.bot && preferences.getBoolean("mentionByName", false);
                     if (UserObject.getPublicUsername(user) != null && !mentionByName) {
-                        chatActivityEnterView.replaceWithText(start, len, "@" + UserObject.getPublicUsername(user) + " ", false);
+                        chatActivityEnterView.replaceWithText(start, len, "@" + UserObject.getPublicUsername(user) + devgramMentionSuffix(start), false);
                     } else {
                         String name = UserObject.getFirstName(user, false);
                         Spannable spannable = new SpannableString(name + " ");

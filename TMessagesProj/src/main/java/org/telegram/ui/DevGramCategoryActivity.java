@@ -54,10 +54,13 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_AVATAR_SHAPE = 21; // форма аватара (перенос из скрытых Fork-настроек)
     private static final int ID_SQUARE_FAB = 25;   // квадратная кнопка (FAB)
     private static final int ID_GLASS_MENU = 26;   // стеклянное меню сообщения
+    private static final int ID_HIDE_EMOJI_CATEGORIES = 27; // скрыть строку категорий в поиске эмодзи
     // Чаты
     private static final int ID_DISABLE_MARKDOWN = 22;
     private static final int ID_HIDE_KEYBOARD_ON_SCROLL = 23;
     private static final int ID_DISABLE_GREETING = 24;
+    private static final int ID_COMMA_AFTER_MENTION = 28;
+    private static final int ID_TIME_WITH_SECONDS = 29;
 
     private final int category;
     private UniversalRecyclerView listView;
@@ -144,34 +147,31 @@ public class DevGramCategoryActivity extends BaseFragment {
                         org.telegram.messenger.MessagesController.getGlobalMainSettings()
                                 .edit().putInt("avatarCorners", index).apply();
                     }).setId(ID_AVATAR_SHAPE));
-            items.add(UItem.asShadow("Применяется к аватаркам по всему приложению. Открой экран заново, "
-                    + "чтобы применить везде."));
+            items.add(UItem.asShadow(null));
 
             items.add(UItem.asCheck(ID_NUMBER_ROUNDING, "Отключить округление чисел")
                     .setChecked(DevGramConfig.disableNumberRounding));
-            items.add(UItem.asShadow("Счётчики (подписчики, просмотры, реакции) будут показываться "
-                    + "полностью: 1 234 вместо 1.2K."));
-
             items.add(UItem.asCheck(ID_SQUARE_FAB, "Квадратная кнопка")
                     .setChecked(DevGramConfig.squareFab));
-            items.add(UItem.asShadow("Плавающая кнопка (написать/камера) будет со скруглёнными углами "
-                    + "вместо круга. Открой список чатов заново, чтобы применить."));
-
-            items.add(UItem.asCheck(ID_GLASS_MENU, "Стеклянное меню сообщения")
+            items.add(UItem.asCheck(ID_GLASS_MENU, "Стеклянные меню")
                     .setChecked(DevGramConfig.glassMenu));
-            items.add(UItem.asShadow("Меню сообщения становится матовым стеклом — под ним размытый "
-                    + "снимок чата. Выключи, если мешает или тормозит."));
+            items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
+                    .setChecked(DevGramConfig.hideEmojiCategories));
+            items.add(UItem.asShadow("Стеклянные меню: выпадающие меню и панель реакций становятся "
+                    + "матовым стеклом. Выключи, если тормозит."));
         } else if (category == CATEGORY_CHATS) {
             items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
                     .setChecked(DevGramConfig.disableMarkdown));
-            items.add(UItem.asShadow("Символы **жирный**, `код`, ``` не будут автоматически "
-                    + "превращаться в форматирование. Ручное форматирование через меню выделения остаётся."));
             items.add(UItem.asCheck(ID_HIDE_KEYBOARD_ON_SCROLL, "Скрывать клавиатуру при прокрутке")
                     .setChecked(DevGramConfig.hideKeyboardOnScroll));
-            items.add(UItem.asShadow("Клавиатура прячется, когда прокручиваешь список сообщений."));
             items.add(UItem.asCheck(ID_DISABLE_GREETING, "Скрыть приветственный стикер")
                     .setChecked(DevGramConfig.disableGreetingSticker));
-            items.add(UItem.asShadow("Большой стикер-приветствие в пустом чате показываться не будет."));
+            items.add(UItem.asCheck(ID_COMMA_AFTER_MENTION, "Запятая после упоминания")
+                    .setChecked(DevGramConfig.addCommaAfterMention));
+            items.add(UItem.asCheck(ID_TIME_WITH_SECONDS, "Время с секундами")
+                    .setChecked(DevGramConfig.isFormatWithSeconds()));
+            items.add(UItem.asShadow("Markdown: символы **жирный** и `код` не превращаются в "
+                    + "форматирование автоматически (ручное через меню выделения остаётся)."));
         } else {
             items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
                     .setChecked(getUserConfig().showContactsTab));
@@ -245,12 +245,18 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setSquareFab(!DevGramConfig.squareFab);
         } else if (item.id == ID_GLASS_MENU) {
             DevGramConfig.setGlassMenu(!DevGramConfig.glassMenu);
+        } else if (item.id == ID_HIDE_EMOJI_CATEGORIES) {
+            DevGramConfig.setHideEmojiCategories(!DevGramConfig.hideEmojiCategories);
         } else if (item.id == ID_DISABLE_MARKDOWN) {
             DevGramConfig.setDisableMarkdown(!DevGramConfig.disableMarkdown);
         } else if (item.id == ID_HIDE_KEYBOARD_ON_SCROLL) {
             DevGramConfig.setHideKeyboardOnScroll(!DevGramConfig.hideKeyboardOnScroll);
         } else if (item.id == ID_DISABLE_GREETING) {
             DevGramConfig.setDisableGreetingSticker(!DevGramConfig.disableGreetingSticker);
+        } else if (item.id == ID_COMMA_AFTER_MENTION) {
+            DevGramConfig.setAddCommaAfterMention(!DevGramConfig.addCommaAfterMention);
+        } else if (item.id == ID_TIME_WITH_SECONDS) {
+            DevGramConfig.setFormatWithSeconds(!DevGramConfig.isFormatWithSeconds());
         } else {
             return;
         }
