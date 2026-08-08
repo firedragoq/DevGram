@@ -1226,6 +1226,59 @@ public class DevGramPlugins {
         });
     }
 
+    public interface BoolCallback {
+        void onResult(boolean value);
+    }
+
+    // Плагин уже «в обработке», повторно публиковать незачем: на модерации (plugins_pending),
+    // одобрен (plugins_catalog), отклонён (plugins_rejected) или заблокирован по файлу (plugins_blocked).
+    // Лёгкая shallow-проверка по ключу (id / хеш источника), результат — на UI-потоке.
+    public static void isPluginSubmitted(final String id, final String source, final BoolCallback cb) {
+        if (id == null || id.trim().isEmpty()) {
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(false));
+            return;
+        }
+        final String key = safeKey(id.trim());
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean hit = nodeHasKey("plugins_pending", key)
+                    || nodeHasKey("plugins_catalog", key)
+                    || nodeHasKey("plugins_rejected", key)
+                    || (source != null && !source.isEmpty() && nodeHasKey("plugins_blocked", sha256(source)));
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(hit));
+        });
+    }
+
+    // true, если по пути RTDB/node/key есть значение (shallow — тянет только сам ключ, не весь узел).
+    private static boolean nodeHasKey(String node, String key) {
+        if (key == null || key.isEmpty()) {
+            return false;
+        }
+        java.net.HttpURLConnection c = null;
+        try {
+            c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/" + node + "/" + key + ".json?shallow=true").openConnection();
+            c.setConnectTimeout(12000);
+            c.setReadTimeout(12000);
+            if (c.getResponseCode() == 200) {
+                java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) {
+                    sb.append(line);
+                }
+                br.close();
+                String s = sb.toString().trim();
+                return !s.isEmpty() && !"null".equals(s);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        } finally {
+            if (c != null) {
+                c.disconnect();
+            }
+        }
+        return false;
+    }
+
     private static org.json.JSONObject entryJson(CatalogEntry e) throws Exception {
         org.json.JSONObject o = new org.json.JSONObject();
         o.put("id", e.id);
@@ -1277,6 +1330,7 @@ public class DevGramPlugins {
             Utilities.globalQueue.postRunnable(() -> {
                 httpVerified("PUT", RTDB + "/plugins_catalog/" + key + ".json?auth=" + token, body);
                 httpVerified("DELETE", RTDB + "/plugins_pending/" + key + ".json?auth=" + token, null);
+                httpVerified("DELETE", RTDB + "/plugins_rejected/" + key + ".json?auth=" + token, null);
             });
             return true;
         } catch (Throwable ex) {
@@ -1300,6 +1354,8 @@ public class DevGramPlugins {
         }
         Utilities.globalQueue.postRunnable(() -> {
             httpVerified("DELETE", RTDB + "/plugins_pending/" + key + ".json?auth=" + token, null);
+            // метка «отклонён» (по id) — чтобы кнопка «Опубликовать» больше не показывалась
+            httpVerified("PUT", RTDB + "/plugins_rejected/" + key + ".json?auth=" + token, "true");
             if (hash != null) {
                 httpVerified("PUT", RTDB + "/plugins_blocked/" + hash + ".json?auth=" + token, "\"blocked\"");
             }

@@ -1,0 +1,15 @@
+<!-- DevGram: иконка Boosty — белая скруглённая плашка + оранжевая молния (лого Boosty). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#E3E3E6"
+        android:strokeWidth="1"
+        android:pathData="M6,0.5 L18,0.5 A5.5,5.5 0 0 1 23.5,6 L23.5,18 A5.5,5.5 0 0 1 18,23.5 L6,23.5 A5.5,5.5 0 0 1 0.5,18 L0.5,6 A5.5,5.5 0 0 1 6,0.5 Z" />
+    <path
+        android:fillColor="#F15B29"
+        android:pathData="M13.5,3.5 L6.5,13 L11,13 L9.5,20.5 L17.5,9.5 L12.8,9.5 Z" />
+</vector>

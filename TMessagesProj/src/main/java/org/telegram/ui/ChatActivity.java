@@ -42262,6 +42262,29 @@ public class ChatActivity extends BaseFragment implements
                         }
                     }
                 }
+                // DevGram: файл настроек мода .devgram — сравнить с текущими и предложить применить
+                if (devgramDocName.endsWith(".devgram")) {
+                    File locFile = null;
+                    if (message.messageOwner.attachPath != null && message.messageOwner.attachPath.length() != 0) {
+                        File f = new File(message.messageOwner.attachPath);
+                        if (f.exists()) {
+                            locFile = f;
+                        }
+                    }
+                    if (locFile == null) {
+                        File f = getFileLoader().getPathToMessage(message.messageOwner);
+                        if (f.exists()) {
+                            locFile = f;
+                        }
+                    }
+                    if (locFile != null && locFile.exists()) {
+                        String content = DevGramSettingsIO.readFile(locFile);
+                        if (content != null) {
+                            DevGramSettingsIO.handleImport(ChatActivity.this, content, null);
+                            return;
+                        }
+                    }
+                }
                 boolean handled = false;
                 if (message.canPreviewDocument()) {
                     PhotoViewer.getInstance().setParentActivity(ChatActivity.this, themeDelegate);

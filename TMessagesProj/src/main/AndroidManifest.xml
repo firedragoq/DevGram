@@ -123,6 +123,15 @@
             android:name="com.samsung.android.icon_container.has_icon_container"
             android:value="true" />
 
+        <!-- DevGram: сбор аналитики/крашей ВЫКЛ по умолчанию. Включается тумблерами в настройках
+             (DevGramConfig.applyFirebaseCollection на старте + при переключении). -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
+            android:value="false" />
+
         <activity-alias
             android:enabled="true"
             android:name="org.telegram.messenger.DefaultIcon"

@@ -25,8 +25,8 @@ import org.telegram.ui.Components.UniversalRecyclerView;
 
 import java.util.ArrayList;
 
-// DevGram: экран настроек мода (аналог «exteraGram Settings»): шапка + секции с опциями.
-// Только те опции, которые уже реализованы.
+// DevGram: главный экран настроек мода: шапка + категории + ссылки. Поддержка/сбор данных/сервис —
+// в отдельном разделе «Другое» (DevGramOtherActivity).
 public class DevGramSettingsActivity extends BaseFragment {
 
     private UniversalRecyclerView listView;
@@ -38,6 +38,7 @@ public class DevGramSettingsActivity extends BaseFragment {
     private static final int ID_CAT_SPY = 3;
     private static final int ID_BADGES = 4; // выдача значков — только для команды
     private static final int ID_PLUGINS = 5; // менеджер плагинов
+    private static final int ID_OTHER = 6;   // раздел «Другое» (поддержка/сбор данных/сервис)
     private static final int ID_LINK_CHANNEL = 10;
     private static final int ID_LINK_CHAT = 11;
     private static final int ID_LINK_DOCS = 12;
@@ -118,12 +119,13 @@ public class DevGramSettingsActivity extends BaseFragment {
             items.add(UItem.asCustom(headerView));
         }
 
-        // Только список категорий — сами опции живут внутри разделов
+        // Категории — сами опции живут внутри разделов
         items.add(UItem.asHeader("Категории"));
         items.add(UItem.asButton(ID_CAT_GENERAL, R.drawable.devgram_cat_general, "Основные"));
         items.add(UItem.asButton(ID_CAT_GHOST, R.drawable.devgram_cat_ghost, "Режим призрака"));
         items.add(UItem.asButton(ID_CAT_SPY, R.drawable.devgram_cat_spy, "Слежка"));
         items.add(UItem.asButton(ID_PLUGINS, R.drawable.devgram_cat_general, "Плагины"));
+        items.add(UItem.asButton(ID_OTHER, R.drawable.msg_settings, "Другое"));
         items.add(UItem.asShadow(null));
 
         // Ссылки на официальный канал и чат
@@ -151,6 +153,8 @@ public class DevGramSettingsActivity extends BaseFragment {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
         } else if (item.id == ID_PLUGINS) {
             presentFragment(new DevGramPluginsActivity());
+        } else if (item.id == ID_OTHER) {
+            presentFragment(new DevGramOtherActivity());
         } else if (item.id == ID_BADGES) {
             presentFragment(new DevGramBadgesActivity());
         } else if (item.id == ID_LINK_CHANNEL) {

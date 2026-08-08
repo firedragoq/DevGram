@@ -360,6 +360,9 @@ public class ApplicationLoader extends Application {
         }
 
         DevGramConfig.loadConfig(); // DevGram: гарантируем загрузку конфига с готовым контекстом
+        // DevGram: своя телеметрия (analytics/crashes в RTDB через REST, без Google-SDK) — ставит
+        // обработчик крашей и выгружает накопленное; сбор идёт только если включены тумблеры «Google»
+        DevGramTelemetry.init();
         // DevGram: система плагинов (Python/Chaquopy) — грузим в фоне, чтобы не тормозить старт
         Utilities.globalQueue.postRunnable(DevGramPlugins::loadAll);
         DevGramBadges.startSync();   // DevGram: подтягиваем значки из облака (Firebase) для всех

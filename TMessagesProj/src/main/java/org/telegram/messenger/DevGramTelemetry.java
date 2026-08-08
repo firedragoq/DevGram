@@ -1,0 +1,243 @@
+package org.telegram.messenger;
+
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+
+// DevGram: своя телеметрия БЕЗ Google-SDK (SDK ломали запуск — см. reference_devgram_no_firebase_sdk).
+// Пишем анонимно в твой RTDB devgram-d03e4 через чистый REST, как значки/каталог.
+//   Analytics (analyticsEnabled)  -> /analytics/installs/{iid} = {ver,build,android,model,lang,opens,last}
+//   Crashlytics (crashlyticsEnabled) -> краш сохраняется в файл при падении, выгружается на след. старте
+//                                       в /crashes/{iid}/{ts} = {ver,build,android,model,thread,trace}
+// installId — случайный анонимный UUID (в prefs), НЕ привязан к Telegram-аккаунту.
+public class DevGramTelemetry {
+
+    private static final String RTDB = "https://devgram-d03e4-default-rtdb.europe-west1.firebasedatabase.app";
+    private static final String PREFS = "devgram_telemetry";
+
+    // Мастер-гейт сбора крашей (кил-свитч). true — краши собираются и отправляются, когда включён
+    // тумблер «Отчёты о сбоях» (он ВКЛ по умолчанию). Поставить false, чтобы разом заглушить сбор.
+    private static final boolean COLLECT_CRASHES = true;
+
+    private static volatile boolean crashHandlerInstalled = false;
+    private static volatile String installId;
+
+    // Реально ли сейчас собираем краши: мастер-гейт И тумблер пользователя.
+    private static boolean crashesActive() {
+        return COLLECT_CRASHES && DevGramConfig.crashlyticsEnabled;
+    }
+
+    // Вызвать один раз на старте приложения (ApplicationLoader).
+    public static void init() {
+        installCrashHandler(); // ставим всегда (чтобы работало и после включения тумблера без перезапуска)
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                if (crashesActive()) {
+                    uploadPendingCrashes();
+                }
+                if (DevGramConfig.analyticsEnabled) {
+                    logAppOpen(true);
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    // Вызывается при переключении тумблеров «Сбор данных».
+    public static void onSettingsChanged() {
+        installCrashHandler();
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                if (DevGramConfig.analyticsEnabled) {
+                    logAppOpen(false); // при включении — обновить запись без накрутки счётчика открытий
+                }
+                if (crashesActive()) {
+                    uploadPendingCrashes();
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    private static SharedPreferences prefs() {
+        return ApplicationLoader.applicationContext.getSharedPreferences(PREFS, 0);
+    }
+
+    private static synchronized String installId() {
+        if (installId != null) {
+            return installId;
+        }
+        try {
+            SharedPreferences p = prefs();
+            String id = p.getString("iid", null);
+            if (id == null) {
+                id = java.util.UUID.randomUUID().toString().replace("-", "");
+                p.edit().putString("iid", id).apply();
+            }
+            installId = id;
+        } catch (Throwable e) {
+            installId = "unknown";
+        }
+        return installId;
+    }
+
+    // Запись об установке/открытии. incrementOpens=true — считаем это открытием приложения.
+    private static void logAppOpen(boolean incrementOpens) {
+        try {
+            SharedPreferences p = prefs();
+            int opens = p.getInt("opens", 0);
+            if (incrementOpens) {
+                opens++;
+                p.edit().putInt("opens", opens).apply();
+            }
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("ver", verName());
+            o.put("build", verCode());
+            o.put("android", android.os.Build.VERSION.SDK_INT);
+            o.put("model", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
+            o.put("lang", java.util.Locale.getDefault().getLanguage());
+            o.put("opens", opens);
+            o.put("last", System.currentTimeMillis());
+            put(RTDB + "/analytics/installs/" + installId() + ".json", o.toString());
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    // ---- краши ----
+    private static synchronized void installCrashHandler() {
+        if (crashHandlerInstalled) {
+            return;
+        }
+        crashHandlerInstalled = true;
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            try {
+                if (crashesActive()) {
+                    saveCrashToDisk(t, e); // на диск синхронно — надёжнее, чем сеть в умирающем процессе
+                }
+            } catch (Throwable ignore) {
+            }
+            if (prev != null) {
+                prev.uncaughtException(t, e); // цепочка — краш не глотаем, штатная обработка остаётся
+            }
+        });
+    }
+
+    private static java.io.File crashesDir() {
+        java.io.File d = new java.io.File(ApplicationLoader.applicationContext.getCacheDir(), "devgram_crashes");
+        d.mkdirs();
+        return d;
+    }
+
+    private static void saveCrashToDisk(Thread t, Throwable e) {
+        try {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            e.printStackTrace(new java.io.PrintWriter(sw));
+            String trace = sw.toString();
+            if (trace.length() > 8000) {
+                trace = trace.substring(0, 8000);
+            }
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("ver", verName());
+            o.put("build", verCode());
+            o.put("android", android.os.Build.VERSION.SDK_INT);
+            o.put("model", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
+            o.put("thread", t != null ? t.getName() : "?");
+            o.put("trace", trace);
+            o.put("ts", System.currentTimeMillis());
+            java.io.File f = new java.io.File(crashesDir(), System.currentTimeMillis() + ".json");
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+            fos.write(o.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            fos.close();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static void uploadPendingCrashes() {
+        try {
+            java.io.File[] files = crashesDir().listFiles();
+            if (files == null) {
+                return;
+            }
+            for (java.io.File f : files) {
+                if (!f.getName().endsWith(".json")) {
+                    continue;
+                }
+                String body = readFile(f);
+                if (body == null) {
+                    f.delete();
+                    continue;
+                }
+                String ts = f.getName().replace(".json", "");
+                if (put(RTDB + "/crashes/" + installId() + "/" + ts + ".json", body)) {
+                    f.delete();
+                }
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    // ---- утилиты ----
+    private static String verName() {
+        try {
+            PackageInfo pi = ApplicationLoader.applicationContext.getPackageManager()
+                    .getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+            return pi.versionName;
+        } catch (Throwable e) {
+            return "?";
+        }
+    }
+
+    private static int verCode() {
+        try {
+            PackageInfo pi = ApplicationLoader.applicationContext.getPackageManager()
+                    .getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+            return pi.versionCode;
+        } catch (Throwable e) {
+            return 0;
+        }
+    }
+
+    private static String readFile(java.io.File f) {
+        try {
+            byte[] data = new byte[(int) f.length()];
+            java.io.FileInputStream fis = new java.io.FileInputStream(f);
+            int off = 0, r;
+            while (off < data.length && (r = fis.read(data, off, data.length - off)) > 0) {
+                off += r;
+            }
+            fis.close();
+            return new String(data, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    // PUT в RTDB (без auth — узлы analytics/crashes открыты на запись, как streaks). true при 2xx.
+    private static boolean put(String url, String body) {
+        java.net.HttpURLConnection c = null;
+        try {
+            c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(15000);
+            c.setRequestMethod("PUT");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            java.io.OutputStream os = c.getOutputStream();
+            os.write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            os.close();
+            int code = c.getResponseCode();
+            return code >= 200 && code < 300;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
+        } finally {
+            if (c != null) {
+                c.disconnect();
+            }
+        }
+    }
+}

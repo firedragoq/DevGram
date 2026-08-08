@@ -220,8 +220,14 @@ public class DevGramPluginInstallSheet {
             root.addView(teamBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
         }
 
-        // Опубликовать в каталог — команда ИЛИ разработчик (плагин открыт из своего 🧩-канала)
-        if (team || fromDevChannel) {
+        // Опубликовать в каталог — команда ИЛИ АДМИН канала-разработчика (🧩).
+        // Обычный подписчик дев-канала кнопку НЕ видит (только тот, кто может там постить).
+        boolean channelAdmin = false;
+        if (fromDevChannel && sourceDialogId < 0) {
+            org.telegram.tgnet.TLRPC.Chat pubChat = fragment.getMessagesController().getChat(-sourceDialogId);
+            channelAdmin = org.telegram.messenger.ChatObject.hasAdminRights(pubChat);
+        }
+        if (team || channelAdmin) {
             TextView pubBtn = new TextView(context);
             pubBtn.setGravity(Gravity.CENTER);
             pubBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -243,6 +249,15 @@ public class DevGramPluginInstallSheet {
                 choosePublishFilter(fragment, ce);
             });
             root.addView(pubBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
+
+            // Плагин уже на модерации / одобрен / отклонён / заблокирован — прячем кнопку (дубликат не нужен).
+            // Показываем сразу (мгновенно для новой публикации), скрываем асинхронно после проверки состояния.
+            final TextView pubBtnRef = pubBtn;
+            DevGramPlugins.isPluginSubmitted(fId, fSource, submitted -> {
+                if (submitted) {
+                    pubBtnRef.setVisibility(android.view.View.GONE);
+                }
+            });
         }
 
         ScrollView scroll = new ScrollView(context);

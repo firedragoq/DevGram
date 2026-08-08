@@ -51,6 +51,12 @@ public class DevGramConfig {
     public static boolean saveMedia = false;           // сохранять вложения удалённых
     public static boolean saveInBotChats = false;      // сохранять и в диалогах с ботами
 
+    // --- раздел «Сбор данных» ---
+    // analytics — ВЫКЛ по умолчанию; crashes — ВКЛ по умолчанию, но реальный сбор пока заглушён
+    // мастер-гейтом DevGramTelemetry.COLLECT_CRASHES (см. «не собирай пока что»).
+    public static boolean analyticsEnabled = false;
+    public static boolean crashlyticsEnabled = true;
+
     // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
     private static final Object readSync = new Object();
     private static boolean allowReadVal;
@@ -81,7 +87,110 @@ public class DevGramConfig {
             saveMessagesHistory = preferences.getBoolean("saveMessagesHistory", false);
             saveMedia = preferences.getBoolean("saveMedia", false);
             saveInBotChats = preferences.getBoolean("saveInBotChats", false);
+            analyticsEnabled = preferences.getBoolean("analyticsEnabled", false);
+            crashlyticsEnabled = preferences.getBoolean("crashlyticsEnabled", true);
             loaded = true;
+        }
+    }
+
+    // --- раздел «Google»: тумблеры сбора данных ---
+    public static void setAnalyticsEnabled(boolean v) {
+        analyticsEnabled = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("analyticsEnabled", v).apply();
+        }
+        applyFirebaseCollection();
+    }
+
+    public static void setCrashlyticsEnabled(boolean v) {
+        crashlyticsEnabled = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("crashlyticsEnabled", v).apply();
+        }
+        applyFirebaseCollection();
+    }
+
+    // Сбор данных БЕЗ Google-SDK (они ломали запуск — см. reference_devgram_no_firebase_sdk):
+    // своя телеметрия пишет анонимно в RTDB devgram-d03e4 через REST. Здесь просто дёргаем её,
+    // когда тумблеры «Google» меняются.
+    public static void applyFirebaseCollection() {
+        try {
+            DevGramTelemetry.onSettingsChanged();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    // Сброс всех настроек мода к значениям по умолчанию.
+    public static void resetToDefaults() {
+        synchronized (sync) {
+            sendReadPackets = true;
+            sendOnlinePackets = true;
+            sendUploadTyping = true;
+            disableAds = false;
+            localPremium = false;
+            streaksEnabled = true;
+            vpnEnabled = false;
+            iosProfile = true;
+            saveDeletedMessages = false;
+            saveMessagesHistory = false;
+            saveMedia = false;
+            saveInBotChats = false;
+            analyticsEnabled = false;
+            crashlyticsEnabled = true;
+            if (preferences != null) {
+                preferences.edit().clear().apply();
+            }
+        }
+        applyFirebaseCollection();
+    }
+
+    // --- экспорт/импорт настроек мода (JSON) ---
+    public static String exportToJson() {
+        org.json.JSONObject o = new org.json.JSONObject();
+        try {
+            o.put("sendReadPackets", sendReadPackets);
+            o.put("sendOnlinePackets", sendOnlinePackets);
+            o.put("sendUploadTyping", sendUploadTyping);
+            o.put("disableAds", disableAds);
+            o.put("localPremium", localPremium);
+            o.put("streaksEnabled", streaksEnabled);
+            o.put("vpnEnabled", vpnEnabled);
+            o.put("iosProfile", iosProfile);
+            o.put("saveDeletedMessages", saveDeletedMessages);
+            o.put("saveMessagesHistory", saveMessagesHistory);
+            o.put("saveMedia", saveMedia);
+            o.put("saveInBotChats", saveInBotChats);
+            o.put("analyticsEnabled", analyticsEnabled);
+            o.put("crashlyticsEnabled", crashlyticsEnabled);
+        } catch (Throwable ignore) {
+        }
+        return o.toString();
+    }
+
+    // Применить настройки из JSON. true — успех.
+    public static boolean importFromJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(json.trim());
+            setSendReadPackets(o.optBoolean("sendReadPackets", sendReadPackets));
+            setSendOnlinePackets(o.optBoolean("sendOnlinePackets", sendOnlinePackets));
+            setSendUploadTyping(o.optBoolean("sendUploadTyping", sendUploadTyping));
+            setDisableAds(o.optBoolean("disableAds", disableAds));
+            setLocalPremium(o.optBoolean("localPremium", localPremium));
+            setStreaksEnabled(o.optBoolean("streaksEnabled", streaksEnabled));
+            setVpnEnabled(o.optBoolean("vpnEnabled", vpnEnabled));
+            setIosProfile(o.optBoolean("iosProfile", iosProfile));
+            setSaveDeletedMessages(o.optBoolean("saveDeletedMessages", saveDeletedMessages));
+            setSaveMessagesHistory(o.optBoolean("saveMessagesHistory", saveMessagesHistory));
+            setSaveMedia(o.optBoolean("saveMedia", saveMedia));
+            setSaveInBotChats(o.optBoolean("saveInBotChats", saveInBotChats));
+            setAnalyticsEnabled(o.optBoolean("analyticsEnabled", analyticsEnabled));
+            setCrashlyticsEnabled(o.optBoolean("crashlyticsEnabled", crashlyticsEnabled));
+            return true;
+        } catch (Throwable e) {
+            return false;
         }
     }
 
