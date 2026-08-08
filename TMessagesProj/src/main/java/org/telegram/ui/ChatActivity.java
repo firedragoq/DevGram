@@ -31848,16 +31848,7 @@ public class ChatActivity extends BaseFragment implements
             Drawable shadowDrawable = getParentActivity().getResources().getDrawable(R.drawable.popup_fixed_alert4).mutate();
             shadowDrawable.getPadding(backgroundPaddings);
             popupLayout.setBackgroundColor(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground));
-            // DevGram (как exteraGram, GlassMessageMenu): «матовое стекло» — размытый снимок чата под меню
-            if (org.telegram.messenger.DevGramConfig.glassMenu) {
-                android.graphics.Bitmap glassBmp = org.telegram.ui.Components.DevGramGlassMenu.snapshot(contentView);
-                if (glassBmp != null) {
-                    popupLayout.setBackgroundDrawable(new org.telegram.ui.Components.DevGramGlassMenu.GlassDrawable(
-                            glassBmp, popupLayout, contentView,
-                            getThemedColor(Theme.key_actionBarDefaultSubmenuBackground),
-                            org.telegram.ui.Components.DevGramGlassMenu.defaultRadius(), backgroundPaddings));
-                }
-            }
+            // DevGram: стекло меню теперь централизовано в ActionBarPopupWindowLayout (применяется ко всем попапам)
             MessageSeenView messageSeenView = null;
 
             boolean addGap = false;

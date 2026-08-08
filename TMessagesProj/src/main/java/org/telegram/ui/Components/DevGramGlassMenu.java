@@ -121,4 +121,53 @@ public class DevGramGlassMenu {
     public static float defaultRadius() {
         return AndroidUtilities.dp(10);
     }
+
+    // Переиспользуемый «стеклянный» рисовальщик для вью, которые рисуют фон сами (напр. панель
+    // реакций). Держит один снимок, выравнивает его по позиции host на экране.
+    public static class GlassPainter {
+        private Bitmap bitmap;
+        private BitmapShader shader;
+        private final Paint blurPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint tintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Matrix matrix = new Matrix();
+        private final int[] h = new int[2], cc = new int[2];
+        private final int tintColor;
+
+        public GlassPainter(int tintColor) {
+            this.tintColor = tintColor;
+            tintPaint.setColor(Color.argb(150, Color.red(tintColor), Color.green(tintColor), Color.blue(tintColor)));
+        }
+
+        public boolean ready() {
+            return bitmap != null && !bitmap.isRecycled();
+        }
+
+        // Снять контент один раз (ленивая инициализация).
+        public void ensure(View contentRoot) {
+            if (bitmap == null && contentRoot != null) {
+                bitmap = snapshot(contentRoot);
+                if (bitmap != null) {
+                    shader = new BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                    blurPaint.setShader(shader);
+                }
+            }
+        }
+
+        // Нарисовать стекло в скруглённый rect (в локальных координатах host).
+        public void draw(Canvas canvas, View host, View contentRoot, RectF rect, float radius, int alpha) {
+            if (!ready() || host == null || contentRoot == null) {
+                return;
+            }
+            host.getLocationOnScreen(h);
+            contentRoot.getLocationOnScreen(cc);
+            matrix.reset();
+            matrix.setScale(DOWNSCALE, DOWNSCALE);
+            matrix.postTranslate(cc[0] - h[0], cc[1] - h[1]);
+            shader.setLocalMatrix(matrix);
+            blurPaint.setAlpha(alpha);
+            tintPaint.setAlpha(alpha * 150 / 255);
+            canvas.drawRoundRect(rect, radius, radius, blurPaint);
+            canvas.drawRoundRect(rect, radius, radius, tintPaint);
+        }
+    }
 }

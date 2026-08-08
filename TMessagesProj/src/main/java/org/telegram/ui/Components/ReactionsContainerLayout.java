@@ -612,6 +612,31 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
         listAdapter.updateItems(animated);
     }
 
+    // DevGram: стеклянный фон панели реакций (как exteraGram). Снимок берётся лениво один раз.
+    private DevGramGlassMenu.GlassPainter devgramGlass;
+    private View devgramContentRoot;
+
+    private boolean devgramGlassReady() {
+        if (devgramContentRoot == null) {
+            android.content.Context c = getContext();
+            while (c instanceof android.content.ContextWrapper && !(c instanceof android.app.Activity)) {
+                c = ((android.content.ContextWrapper) c).getBaseContext();
+            }
+            if (c instanceof android.app.Activity) {
+                devgramContentRoot = ((android.app.Activity) c).findViewById(android.R.id.content);
+            }
+        }
+        if (devgramContentRoot == null) {
+            return false;
+        }
+        if (devgramGlass == null) {
+            devgramGlass = new DevGramGlassMenu.GlassPainter(
+                    Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
+        }
+        devgramGlass.ensure(devgramContentRoot);
+        return devgramGlass.ready();
+    }
+
     @Override
     protected void dispatchDraw(Canvas canvas) {
         long dt = Math.min(16, System.currentTimeMillis() - lastUpdate);
@@ -699,6 +724,9 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
             }
             if (type == TYPE_STORY || delegate.drawBackground()) {
                 delegate.drawRoundRect(canvas, rect, radius, getX(), getY(), 255, false);
+            } else if (org.telegram.messenger.DevGramConfig.glassMenu && devgramGlassReady()) {
+                // DevGram (как exteraGram): стеклянная панель реакций в пару к меню сообщения
+                devgramGlass.draw(canvas, this, devgramContentRoot, rect, radius, bgPaint.getAlpha());
             } else {
                 canvas.drawRoundRect(rect, radius, radius, bgPaint);
             }

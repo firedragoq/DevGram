@@ -170,6 +170,22 @@ public class ActionBarPopupWindow extends PopupWindow {
                 setBackgroundColor(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground));
             }
 
+            // DevGram (как exteraGram, GlassMessageMenu): стекло для ВСЕХ меню-попапов сразу —
+            // снимок окна → размытие → фон попапа, выровненный по его позиции на экране.
+            if (org.telegram.messenger.DevGramConfig.glassMenu && backgroundDrawable != null && context instanceof android.app.Activity) {
+                try {
+                    android.view.View root = ((android.app.Activity) context).findViewById(android.R.id.content);
+                    android.graphics.Bitmap bmp = org.telegram.ui.Components.DevGramGlassMenu.snapshot(root);
+                    if (bmp != null) {
+                        android.graphics.Rect pad = new android.graphics.Rect(bgPaddings);
+                        backgroundDrawable = new org.telegram.ui.Components.DevGramGlassMenu.GlassDrawable(
+                                bmp, this, root, getThemedColor(Theme.key_actionBarDefaultSubmenuBackground),
+                                org.telegram.ui.Components.DevGramGlassMenu.defaultRadius(), pad);
+                        backgroundDrawable.getPadding(bgPaddings);
+                    }
+                } catch (Throwable ignore) {
+                }
+            }
 
             setWillNotDraw(false);
 
