@@ -36,6 +36,8 @@ public class DevGramSettingsActivity extends BaseFragment {
     private static final int ID_CAT_GENERAL = 1;
     private static final int ID_CAT_GHOST = 2;
     private static final int ID_CAT_SPY = 3;
+    private static final int ID_CAT_APPEARANCE = 7;
+    private static final int ID_CAT_CHATS = 8;
     private static final int ID_BADGES = 4; // выдача значков — только для команды
     private static final int ID_PLUGINS = 5; // менеджер плагинов
     private static final int ID_OTHER = 6;   // раздел «Другое» (поддержка/сбор данных/сервис)
@@ -124,6 +126,8 @@ public class DevGramSettingsActivity extends BaseFragment {
         items.add(UItem.asButton(ID_CAT_GENERAL, R.drawable.devgram_cat_general, "Основные"));
         items.add(UItem.asButton(ID_CAT_GHOST, R.drawable.devgram_cat_ghost, "Режим призрака"));
         items.add(UItem.asButton(ID_CAT_SPY, R.drawable.devgram_cat_spy, "Слежка"));
+        items.add(UItem.asButton(ID_CAT_APPEARANCE, R.drawable.msg_photo_settings, "Внешний вид"));
+        items.add(UItem.asButton(ID_CAT_CHATS, R.drawable.msg_discussion, "Чаты"));
         items.add(UItem.asButton(ID_PLUGINS, R.drawable.devgram_cat_general, "Плагины"));
         items.add(UItem.asButton(ID_OTHER, R.drawable.msg_settings, "Другое"));
         items.add(UItem.asShadow(null));
@@ -151,6 +155,10 @@ public class DevGramSettingsActivity extends BaseFragment {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GHOST));
         } else if (item.id == ID_CAT_SPY) {
             presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
+        } else if (item.id == ID_CAT_APPEARANCE) {
+            presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_APPEARANCE));
+        } else if (item.id == ID_CAT_CHATS) {
+            presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_CHATS));
         } else if (item.id == ID_PLUGINS) {
             presentFragment(new DevGramPluginsActivity());
         } else if (item.id == ID_OTHER) {

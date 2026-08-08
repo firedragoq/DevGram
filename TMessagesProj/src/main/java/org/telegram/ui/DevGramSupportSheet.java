@@ -140,7 +140,7 @@ public class DevGramSupportSheet {
             @Override
             public void updateDrawState(android.text.TextPaint ds) {
                 super.updateDrawState(ds);
-                ds.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+                ds.setColor(Theme.getColor(Theme.key_dialogTextGray3)); // как обычный текст (серый)
                 ds.setUnderlineText(false);
             }
         }, oStart, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -165,7 +165,7 @@ public class DevGramSupportSheet {
             @Override
             public void updateDrawState(android.text.TextPaint ds) {
                 super.updateDrawState(ds);
-                ds.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText)); // ник — акцентом
+                ds.setColor(Theme.getColor(Theme.key_dialogTextGray3)); // как обычный текст (серый)
                 ds.setUnderlineText(false);
             }
         }, idx, idx + OWNER.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);

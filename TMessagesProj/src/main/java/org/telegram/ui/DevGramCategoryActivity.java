@@ -28,6 +28,8 @@ public class DevGramCategoryActivity extends BaseFragment {
     public static final int CATEGORY_GENERAL = 0;
     public static final int CATEGORY_GHOST = 1;
     public static final int CATEGORY_SPY = 2;
+    public static final int CATEGORY_APPEARANCE = 3;
+    public static final int CATEGORY_CHATS = 4;
 
     // Режим призрака
     private static final int ID_GHOST_MASTER = 1;
@@ -47,6 +49,15 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_VPN = 17;
     private static final int ID_IOS_PROFILE = 18;
     private static final int ID_VPN_DIAG = 19;
+    // Внешний вид
+    private static final int ID_NUMBER_ROUNDING = 20;
+    private static final int ID_AVATAR_SHAPE = 21; // форма аватара (перенос из скрытых Fork-настроек)
+    private static final int ID_SQUARE_FAB = 25;   // квадратная кнопка (FAB)
+    private static final int ID_GLASS_MENU = 26;   // стеклянное меню сообщения
+    // Чаты
+    private static final int ID_DISABLE_MARKDOWN = 22;
+    private static final int ID_HIDE_KEYBOARD_ON_SCROLL = 23;
+    private static final int ID_DISABLE_GREETING = 24;
 
     private final int category;
     private UniversalRecyclerView listView;
@@ -61,6 +72,10 @@ public class DevGramCategoryActivity extends BaseFragment {
                 return "Режим призрака";
             case CATEGORY_SPY:
                 return "Слежка";
+            case CATEGORY_APPEARANCE:
+                return "Внешний вид";
+            case CATEGORY_CHATS:
+                return "Чаты";
             default:
                 return "Основные";
         }
@@ -118,6 +133,45 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asCheck(ID_SAVE_BOTS, "Сохранять в чатах с ботами")
                     .setChecked(DevGramConfig.saveInBotChats));
             items.add(UItem.asShadow(null));
+        } else if (category == CATEGORY_APPEARANCE) {
+            // Форма аватара (перенесено из скрытого экрана Fork). Пишем pref avatarCorners,
+            // который читает AndroidUtilities.avatarCornersType() по всему приложению.
+            items.add(UItem.asHeader("Форма аватара"));
+            items.add(UItem.asSlideView(
+                    new String[]{"Круг", "Скруглённый", "Квадрат"},
+                    org.telegram.messenger.AndroidUtilities.avatarCornersType(),
+                    index -> {
+                        org.telegram.messenger.MessagesController.getGlobalMainSettings()
+                                .edit().putInt("avatarCorners", index).apply();
+                    }).setId(ID_AVATAR_SHAPE));
+            items.add(UItem.asShadow("Применяется к аватаркам по всему приложению. Открой экран заново, "
+                    + "чтобы применить везде."));
+
+            items.add(UItem.asCheck(ID_NUMBER_ROUNDING, "Отключить округление чисел")
+                    .setChecked(DevGramConfig.disableNumberRounding));
+            items.add(UItem.asShadow("Счётчики (подписчики, просмотры, реакции) будут показываться "
+                    + "полностью: 1 234 вместо 1.2K."));
+
+            items.add(UItem.asCheck(ID_SQUARE_FAB, "Квадратная кнопка")
+                    .setChecked(DevGramConfig.squareFab));
+            items.add(UItem.asShadow("Плавающая кнопка (написать/камера) будет со скруглёнными углами "
+                    + "вместо круга. Открой список чатов заново, чтобы применить."));
+
+            items.add(UItem.asCheck(ID_GLASS_MENU, "Стеклянное меню сообщения")
+                    .setChecked(DevGramConfig.glassMenu));
+            items.add(UItem.asShadow("Меню сообщения становится матовым стеклом — под ним размытый "
+                    + "снимок чата. Выключи, если мешает или тормозит."));
+        } else if (category == CATEGORY_CHATS) {
+            items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
+                    .setChecked(DevGramConfig.disableMarkdown));
+            items.add(UItem.asShadow("Символы **жирный**, `код`, ``` не будут автоматически "
+                    + "превращаться в форматирование. Ручное форматирование через меню выделения остаётся."));
+            items.add(UItem.asCheck(ID_HIDE_KEYBOARD_ON_SCROLL, "Скрывать клавиатуру при прокрутке")
+                    .setChecked(DevGramConfig.hideKeyboardOnScroll));
+            items.add(UItem.asShadow("Клавиатура прячется, когда прокручиваешь список сообщений."));
+            items.add(UItem.asCheck(ID_DISABLE_GREETING, "Скрыть приветственный стикер")
+                    .setChecked(DevGramConfig.disableGreetingSticker));
+            items.add(UItem.asShadow("Большой стикер-приветствие в пустом чате показываться не будет."));
         } else {
             items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
                     .setChecked(getUserConfig().showContactsTab));
@@ -185,6 +239,18 @@ public class DevGramCategoryActivity extends BaseFragment {
         } else if (item.id == ID_SHOW_CONTACTS) {
             getUserConfig().setShowContactsTab(!getUserConfig().showContactsTab);
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+        } else if (item.id == ID_NUMBER_ROUNDING) {
+            DevGramConfig.setDisableNumberRounding(!DevGramConfig.disableNumberRounding);
+        } else if (item.id == ID_SQUARE_FAB) {
+            DevGramConfig.setSquareFab(!DevGramConfig.squareFab);
+        } else if (item.id == ID_GLASS_MENU) {
+            DevGramConfig.setGlassMenu(!DevGramConfig.glassMenu);
+        } else if (item.id == ID_DISABLE_MARKDOWN) {
+            DevGramConfig.setDisableMarkdown(!DevGramConfig.disableMarkdown);
+        } else if (item.id == ID_HIDE_KEYBOARD_ON_SCROLL) {
+            DevGramConfig.setHideKeyboardOnScroll(!DevGramConfig.hideKeyboardOnScroll);
+        } else if (item.id == ID_DISABLE_GREETING) {
+            DevGramConfig.setDisableGreetingSticker(!DevGramConfig.disableGreetingSticker);
         } else {
             return;
         }

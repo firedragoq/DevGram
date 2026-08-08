@@ -101,8 +101,8 @@ public class DevGramOtherActivity extends BaseFragment {
     // Серая подпись под реквизитами: часть «Поддержите разработку» кликабельна (цвет как у всего
     // текста подписи, без выделения), открывает лист «Поддержать DevGram».
     private CharSequence supportCaption() {
-        String full = "Поддержите разработку и получите уникальный значок!";
-        String link = "Поддержите разработку";
+        String full = "Поддержи DevGram донатом и забери эксклюзивный значок в профиль.";
+        String link = "Поддержи DevGram донатом";
         android.text.SpannableString sp = new android.text.SpannableString(full);
         sp.setSpan(new android.text.style.ClickableSpan() {
             @Override
@@ -113,7 +113,9 @@ public class DevGramOtherActivity extends BaseFragment {
             @Override
             public void updateDrawState(android.text.TextPaint ds) {
                 super.updateDrawState(ds);
-                ds.setUnderlineText(false); // цвет/жирность не трогаем — как у обычного текста подписи
+                // явно красим в серый цвет footer-текста, иначе ячейка красит ссылку в синий
+                ds.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+                ds.setUnderlineText(false);
             }
         }, 0, link.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return sp;

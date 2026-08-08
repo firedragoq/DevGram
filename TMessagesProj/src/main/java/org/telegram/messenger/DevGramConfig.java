@@ -57,6 +57,19 @@ public class DevGramConfig {
     public static boolean analyticsEnabled = false;
     public static boolean crashlyticsEnabled = true;
 
+    // --- раздел «Внешний вид» ---
+    // Отключить округление чисел (1.2K -> 1 234) — как в exteraGram (DisableNumberRounding).
+    public static boolean disableNumberRounding = false;
+    // Квадратная кнопка (FAB) — в exteraGram ВКЛ по умолчанию (squareFab).
+    public static boolean squareFab = true;
+    // Стеклянное меню сообщения (размытый снимок чата под меню) — как exteraGram GlassMessageMenu.
+    public static boolean glassMenu = true;
+
+    // --- раздел «Чаты» (порт из exteraGram) ---
+    public static boolean disableMarkdown = false;       // не преобразовывать **/`code` в форматирование
+    public static boolean hideKeyboardOnScroll = true;   // скрывать клавиатуру при прокрутке чата (в exteraGram ВКЛ по умолчанию)
+    public static boolean disableGreetingSticker = false; // не показывать приветственный стикер в пустом чате
+
     // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
     private static final Object readSync = new Object();
     private static boolean allowReadVal;
@@ -89,6 +102,12 @@ public class DevGramConfig {
             saveInBotChats = preferences.getBoolean("saveInBotChats", false);
             analyticsEnabled = preferences.getBoolean("analyticsEnabled", false);
             crashlyticsEnabled = preferences.getBoolean("crashlyticsEnabled", true);
+            disableNumberRounding = preferences.getBoolean("disableNumberRounding", false);
+            squareFab = preferences.getBoolean("squareFab", true);
+            glassMenu = preferences.getBoolean("glassMenu", true);
+            disableMarkdown = preferences.getBoolean("disableMarkdown", false);
+            hideKeyboardOnScroll = preferences.getBoolean("hideKeyboardOnScroll", true);
+            disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
             loaded = true;
         }
     }
@@ -108,6 +127,48 @@ public class DevGramConfig {
             preferences.edit().putBoolean("crashlyticsEnabled", v).apply();
         }
         applyFirebaseCollection();
+    }
+
+    public static void setDisableNumberRounding(boolean v) {
+        disableNumberRounding = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("disableNumberRounding", v).apply();
+        }
+    }
+
+    public static void setSquareFab(boolean v) {
+        squareFab = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("squareFab", v).apply();
+        }
+    }
+
+    public static void setGlassMenu(boolean v) {
+        glassMenu = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("glassMenu", v).apply();
+        }
+    }
+
+    public static void setDisableMarkdown(boolean v) {
+        disableMarkdown = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("disableMarkdown", v).apply();
+        }
+    }
+
+    public static void setHideKeyboardOnScroll(boolean v) {
+        hideKeyboardOnScroll = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("hideKeyboardOnScroll", v).apply();
+        }
+    }
+
+    public static void setDisableGreetingSticker(boolean v) {
+        disableGreetingSticker = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("disableGreetingSticker", v).apply();
+        }
     }
 
     // Сбор данных БЕЗ Google-SDK (они ломали запуск — см. reference_devgram_no_firebase_sdk):
@@ -137,6 +198,12 @@ public class DevGramConfig {
             saveInBotChats = false;
             analyticsEnabled = false;
             crashlyticsEnabled = true;
+            disableNumberRounding = false;
+            squareFab = true;
+            glassMenu = true;
+            disableMarkdown = false;
+            hideKeyboardOnScroll = true;
+            disableGreetingSticker = false;
             if (preferences != null) {
                 preferences.edit().clear().apply();
             }
@@ -162,6 +229,12 @@ public class DevGramConfig {
             o.put("saveInBotChats", saveInBotChats);
             o.put("analyticsEnabled", analyticsEnabled);
             o.put("crashlyticsEnabled", crashlyticsEnabled);
+            o.put("disableNumberRounding", disableNumberRounding);
+            o.put("squareFab", squareFab);
+            o.put("glassMenu", glassMenu);
+            o.put("disableMarkdown", disableMarkdown);
+            o.put("hideKeyboardOnScroll", hideKeyboardOnScroll);
+            o.put("disableGreetingSticker", disableGreetingSticker);
         } catch (Throwable ignore) {
         }
         return o.toString();
@@ -188,6 +261,12 @@ public class DevGramConfig {
             setSaveInBotChats(o.optBoolean("saveInBotChats", saveInBotChats));
             setAnalyticsEnabled(o.optBoolean("analyticsEnabled", analyticsEnabled));
             setCrashlyticsEnabled(o.optBoolean("crashlyticsEnabled", crashlyticsEnabled));
+            setDisableNumberRounding(o.optBoolean("disableNumberRounding", disableNumberRounding));
+            setSquareFab(o.optBoolean("squareFab", squareFab));
+            setGlassMenu(o.optBoolean("glassMenu", glassMenu));
+            setDisableMarkdown(o.optBoolean("disableMarkdown", disableMarkdown));
+            setHideKeyboardOnScroll(o.optBoolean("hideKeyboardOnScroll", hideKeyboardOnScroll));
+            setDisableGreetingSticker(o.optBoolean("disableGreetingSticker", disableGreetingSticker));
             return true;
         } catch (Throwable e) {
             return false;

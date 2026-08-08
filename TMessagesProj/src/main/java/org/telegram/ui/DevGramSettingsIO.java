@@ -32,6 +32,12 @@ public class DevGramSettingsIO {
             {"saveInBotChats", "Сохранять в чатах с ботами"},
             {"analyticsEnabled", "Google Analytics"},
             {"crashlyticsEnabled", "Google Crashlytics"},
+            {"disableNumberRounding", "Отключить округление чисел"},
+            {"squareFab", "Квадратная кнопка (FAB)"},
+            {"glassMenu", "Стеклянное меню сообщения"},
+            {"disableMarkdown", "Отключить Markdown"},
+            {"hideKeyboardOnScroll", "Скрывать клавиатуру при прокрутке"},
+            {"disableGreetingSticker", "Скрыть приветственный стикер"},
     };
 
     // Записать текущие настройки в файл .devgram (в кэше). Возвращает File или null.
@@ -166,6 +172,12 @@ public class DevGramSettingsIO {
             case "saveInBotChats": return DevGramConfig.saveInBotChats;
             case "analyticsEnabled": return DevGramConfig.analyticsEnabled;
             case "crashlyticsEnabled": return DevGramConfig.crashlyticsEnabled;
+            case "disableNumberRounding": return DevGramConfig.disableNumberRounding;
+            case "squareFab": return DevGramConfig.squareFab;
+            case "glassMenu": return DevGramConfig.glassMenu;
+            case "disableMarkdown": return DevGramConfig.disableMarkdown;
+            case "hideKeyboardOnScroll": return DevGramConfig.hideKeyboardOnScroll;
+            case "disableGreetingSticker": return DevGramConfig.disableGreetingSticker;
             default: return false;
         }
     }

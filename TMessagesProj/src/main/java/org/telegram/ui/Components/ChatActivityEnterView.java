@@ -10757,6 +10757,10 @@ public class ChatActivityEnterView extends FrameLayout implements
     }
 
     private CharSequence parseFieldMarkdown(CharSequence text) {
+        // DevGram (как exteraGram): если Markdown отключён — не преобразуем **/`code` в форматирование
+        if (org.telegram.messenger.DevGramConfig.disableMarkdown) {
+            return text;
+        }
         if (TextUtils.isEmpty(text) || TextUtils.indexOf(text, '`') < 0) {
             return text;
         }

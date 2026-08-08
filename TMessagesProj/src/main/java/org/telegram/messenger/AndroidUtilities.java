@@ -4066,6 +4066,10 @@ public class AndroidUtilities {
         if (v == 0) {
             return "0";
         }
+        // DevGram (как exteraGram): если отключено округление — показываем полное число (1 234 вместо 1.2K)
+        if (DevGramConfig.disableNumberRounding) {
+            return formatCount(v);
+        }
         float num_ = v;
         int count = 0;
         if (dif == 0) dif = v;

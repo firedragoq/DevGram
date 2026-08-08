@@ -1258,6 +1258,7 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_VIEW_STATISTICS = 115;
 
     public final static int OPTION_DEVGRAM_HISTORY = 990; // DevGram: история изменений сообщения
+    public final static int OPTION_DEVGRAM_COPY_PHOTO = 991; // DevGram: копировать фото в буфер (как exteraGram)
     public final static int OPTION_DEVGRAM_PLUGIN_BASE = 100000; // DevGram: пункты меню от плагинов (base + index)
     private final ArrayList<String[]> devgramPluginMenu = new ArrayList<>(); // pluginId+label по индексу пункта
 
@@ -1266,6 +1267,16 @@ public class ChatActivity extends BaseFragment implements
         devgramPluginMenu.clear();
         if (selectedObject == null) {
             return;
+        }
+        // DevGram (как exteraGram): «Копировать фото» — для сообщений-фотографий
+        try {
+            if (selectedObject.isPhoto() && !selectedObject.isSticker() && selectedObjectGroup == null) {
+                items.add("Копировать фото");
+                options.add(OPTION_DEVGRAM_COPY_PHOTO);
+                icons.add(R.drawable.msg_copy);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
         }
         try {
             for (String s : org.telegram.messenger.DevGramPlugins.menuItems()) {
@@ -1278,6 +1289,45 @@ public class ChatActivity extends BaseFragment implements
             }
         } catch (Throwable e) {
             FileLog.e(e);
+        }
+    }
+
+    // DevGram (как exteraGram): скопировать фото сообщения в буфер обмена как изображение.
+    private void devgramCopyPhoto(MessageObject obj) {
+        if (obj == null || getParentActivity() == null) {
+            return;
+        }
+        try {
+            java.io.File file = null;
+            if (obj.messageOwner != null && obj.messageOwner.attachPath != null && obj.messageOwner.attachPath.length() != 0) {
+                java.io.File f = new java.io.File(obj.messageOwner.attachPath);
+                if (f.exists()) {
+                    file = f;
+                }
+            }
+            if (file == null && obj.messageOwner != null) {
+                java.io.File f = getFileLoader().getPathToMessage(obj.messageOwner);
+                if (f != null && f.exists()) {
+                    file = f;
+                }
+            }
+            if (file == null || !file.exists()) {
+                BulletinFactory.of(this).createErrorBulletin("Сначала загрузите фото").show();
+                return;
+            }
+            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                    getParentActivity(), ApplicationLoader.getApplicationId() + ".provider", file);
+            android.content.ClipData clip = android.content.ClipData.newUri(
+                    getParentActivity().getContentResolver(), "photo", uri);
+            android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    getParentActivity().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(clip);
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.copy, "Фото скопировано").show();
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+            BulletinFactory.of(this).createErrorBulletin("Не удалось скопировать фото").show();
         }
     }
 
@@ -7053,6 +7103,11 @@ public class ChatActivity extends BaseFragment implements
                         scrollingFloatingTopic = true;
                         checkTextureViewPosition = true;
                         scrollingChatListView = true;
+                        // DevGram (как exteraGram): скрывать клавиатуру при прокрутке списка сообщений
+                        if (org.telegram.messenger.DevGramConfig.hideKeyboardOnScroll && isKeyboardVisible()
+                                && getParentActivity() != null && getParentActivity().getCurrentFocus() != null) {
+                            AndroidUtilities.hideKeyboard(getParentActivity().getCurrentFocus());
+                        }
                     }
                     if (SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
                         scrolling = false;
@@ -31793,6 +31848,16 @@ public class ChatActivity extends BaseFragment implements
             Drawable shadowDrawable = getParentActivity().getResources().getDrawable(R.drawable.popup_fixed_alert4).mutate();
             shadowDrawable.getPadding(backgroundPaddings);
             popupLayout.setBackgroundColor(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground));
+            // DevGram (как exteraGram, GlassMessageMenu): «матовое стекло» — размытый снимок чата под меню
+            if (org.telegram.messenger.DevGramConfig.glassMenu) {
+                android.graphics.Bitmap glassBmp = org.telegram.ui.Components.DevGramGlassMenu.snapshot(contentView);
+                if (glassBmp != null) {
+                    popupLayout.setBackgroundDrawable(new org.telegram.ui.Components.DevGramGlassMenu.GlassDrawable(
+                            glassBmp, popupLayout, contentView,
+                            getThemedColor(Theme.key_actionBarDefaultSubmenuBackground),
+                            org.telegram.ui.Components.DevGramGlassMenu.defaultRadius(), backgroundPaddings));
+                }
+            }
             MessageSeenView messageSeenView = null;
 
             boolean addGap = false;
@@ -33251,7 +33316,7 @@ public class ChatActivity extends BaseFragment implements
             businessLinksEmptyView = new BusinessLinksEmptyView(getContext(), this, businessLink, getResourceProvider());
             businessLinksEmptyView.setBackground(Theme.createServiceDrawable(AndroidUtilities.dp(16), businessLinksEmptyView, contentView, getThemedPaint(Theme.key_paint_chatActionBackground)));
             emptyViewContainer.addView(businessLinksEmptyView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
-        } else if (preloadedGreetingsSticker != null && currentUser != null && !userBlocked || userInfo != null && getDialogId() != getUserConfig().getClientUserId() && (userInfo.contact_require_premium && !getUserConfig().isPremium() || userInfo.send_paid_messages_stars > StarsController.getInstance(currentAccount).getBalance().amount)) {
+        } else if (!org.telegram.messenger.DevGramConfig.disableGreetingSticker && preloadedGreetingsSticker != null && currentUser != null && !userBlocked || userInfo != null && getDialogId() != getUserConfig().getClientUserId() && (userInfo.contact_require_premium && !getUserConfig().isPremium() || userInfo.send_paid_messages_stars > StarsController.getInstance(currentAccount).getBalance().amount)) {
             greetingsViewContainer = new ChatGreetingsView(getContext(), currentUser, currentAccount, preloadedGreetingsSticker, themeDelegate) {
                 @Override
                 protected void onLayout(boolean changed, int l, int t, int r, int b) {
@@ -34046,6 +34111,13 @@ public class ChatActivity extends BaseFragment implements
                     presentFragment(new DevGramMessageHistoryActivity(getDialogId(), obj.getId(),
                             obj.messageOwner));
                 }
+                break;
+            }
+            case OPTION_DEVGRAM_COPY_PHOTO: {
+                // DevGram: копировать фото в буфер обмена (как exteraGram)
+                MessageObject obj = selectedObject;
+                closeMenu();
+                devgramCopyPhoto(obj);
                 break;
             }
             case OPTION_RETRY: {

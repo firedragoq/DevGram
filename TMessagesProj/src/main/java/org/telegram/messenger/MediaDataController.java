@@ -7338,6 +7338,11 @@ public class MediaDataController extends BaseController {
         if (message == null || message[0] == null) {
             return null;
         }
+        // DevGram (как exteraGram): отключение авто-Markdown (**/`code`/```). Ручное форматирование
+        // через меню выделения (span-стили) сохраняется — глушим только разбор синтаксиса.
+        if (DevGramConfig.disableMarkdown) {
+            parseMarkdown = false;
+        }
         ArrayList<TLRPC.MessageEntity> entities = null;
         int index;
         int start = -1;
