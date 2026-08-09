@@ -320,12 +320,29 @@ public class AndroidUtilities {
     public static final int AVATAR_CORNERS_SQUARE = 2;
     private static final RectF avatarCornersRect = new RectF();
 
+    // DevGram (как exteraGram): непрерывное закругление аватарок 0..30 (Квадрат..Круг).
+    // Если pref avatarCornersF >= 0 — используем непрерывную модель; иначе старую 3-вариантную.
+    public static float avatarCornersF() {
+        return MessagesController.getGlobalMainSettings().getFloat("avatarCornersF", -1f);
+    }
+
     public static int avatarCornersType() {
+        float f = avatarCornersF();
+        if (f >= 0) {
+            float frac = Math.min(1f, f / 30f);
+            if (frac >= 0.98f) return AVATAR_CORNERS_ROUND;
+            if (frac <= 0.02f) return AVATAR_CORNERS_SQUARE;
+            return AVATAR_CORNERS_FORUM;
+        }
         SharedPreferences preferences = MessagesController.getGlobalMainSettings();
         return preferences.getInt("avatarCorners", preferences.getBoolean("squareAvatars", false) ? AVATAR_CORNERS_SQUARE : AVATAR_CORNERS_ROUND);
     }
 
     public static float avatarCornerRadius(float size) {
+        float f = avatarCornersF();
+        if (f >= 0) {
+            return (size / 2f) * Math.min(1f, f / 30f);
+        }
         switch (avatarCornersType()) {
             case AVATAR_CORNERS_FORUM:
                 return size * 0.32f;
