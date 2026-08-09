@@ -2416,7 +2416,36 @@ public class AndroidUtilities {
         return result;
     }
 
+    // DevGram: системные шрифты вместо встроенного Roboto (dg_systemFonts). Применяется к перезапуску.
+    private static Boolean devgramSystemFonts;
+
+    public static void invalidateDevgramSystemFonts() {
+        devgramSystemFonts = null;
+        mediumTypeface = null;
+    }
+
+    private static boolean devgramSystemFonts() {
+        if (devgramSystemFonts == null) {
+            try {
+                devgramSystemFonts = MessagesController.getGlobalMainSettings().getBoolean("dg_systemFonts", false);
+            } catch (Throwable e) {
+                devgramSystemFonts = false;
+            }
+        }
+        return devgramSystemFonts;
+    }
+
+    private static Typeface devgramSystemTypeface(String assetPath) {
+        boolean bold = assetPath.contains("medium") || assetPath.contains("bold");
+        boolean italic = assetPath.contains("italic");
+        int style = bold && italic ? Typeface.BOLD_ITALIC : bold ? Typeface.BOLD : italic ? Typeface.ITALIC : Typeface.NORMAL;
+        return Typeface.create(Typeface.DEFAULT, style);
+    }
+
     public static Typeface getTypeface(String assetPath) {
+        if (devgramSystemFonts()) {
+            return devgramSystemTypeface(assetPath);
+        }
         synchronized (typefaceCache) {
             if (!typefaceCache.containsKey(assetPath)) {
                 try {

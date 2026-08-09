@@ -454,6 +454,7 @@ public class DevGramCategoryActivity extends BaseFragment {
             if (foldersPreview != null) foldersPreview.invalidate();
         } else if (item.id == ID_SYSTEM_FONTS) {
             gToggle("dg_systemFonts", false);
+            org.telegram.messenger.AndroidUtilities.invalidateDevgramSystemFonts();
         } else if (item.id == ID_GOOEY) {
             gToggle("dg_gooey", false);
         } else if (item.id == ID_CUSTOM_THEMES) {

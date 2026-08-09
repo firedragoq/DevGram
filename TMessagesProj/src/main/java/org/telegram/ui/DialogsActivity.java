@@ -14193,7 +14193,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         final float factor0 = isSupportSearch() ? 1 : 0;
         final float factor1 = (1f - actionModeVisible) * (1f - animatorDoneButtonVisible.getFloatValue());
-        final float factor2 = Math.max(searchFieldVisible, alphaByScrollOffset * (1f - getRightSlidingProgress()));
+        final boolean hideSearchBar = MessagesController.getGlobalMainSettings().getBoolean("dg_hideSearchBar", false);
+        final float scrollReveal = hideSearchBar ? 0 : (alphaByScrollOffset * (1f - getRightSlidingProgress()));
+        final float factor2 = Math.max(searchFieldVisible, scrollReveal);
 
         final float alpha = factor0 * factor1 * factor2;
 

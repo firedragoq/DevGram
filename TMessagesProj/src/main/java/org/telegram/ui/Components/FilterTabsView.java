@@ -141,6 +141,9 @@ public class FilterTabsView extends FrameLayout {
                 if (c < 0) {
                     c = 0;
                 }
+                if (!MessagesController.getGlobalMainSettings().getBoolean("dg_tabCounter", true)) {
+                    c = 0;
+                }
                 if (store) {
                     counter = c;
                 }

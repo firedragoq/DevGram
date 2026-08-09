@@ -1054,6 +1054,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
 
 
     public void setSubtitle(CharSequence value) {
+        if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false)) {
+            value = "";
+        }
         if (lastSubtitle == null) {
             if (subtitleTextView != null) {
                 subtitleTextView.setText(value);
@@ -1549,7 +1552,8 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             if (avatarImageView != null) {
                 avatarImageView.setAnimatedEmojiDrawable(null);
                 avatarImageView.setForUserOrChat(chat, avatarDrawable);
-                avatarImageView.setRoundRadius(chat.forum ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21));
+                boolean singleCorner = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_singleCorner", false);
+                avatarImageView.setRoundRadius(chat.forum && !singleCorner ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21));
             }
         }
 
