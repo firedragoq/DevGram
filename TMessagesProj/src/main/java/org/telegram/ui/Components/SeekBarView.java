@@ -540,8 +540,9 @@ public class SeekBarView extends FrameLayout {
             return;
         }
         if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", true)) {
+            // Material 3: тумблер — узкая высокая вертикальная планка
             float w = AndroidUtilities.dp(4);
-            float h = radius * 2.4f;
+            float h = Math.max(radius * 3f, AndroidUtilities.dp(20));
             rect.set(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
             canvas.drawRoundRect(rect, w / 2f, w / 2f, paint);
         } else {

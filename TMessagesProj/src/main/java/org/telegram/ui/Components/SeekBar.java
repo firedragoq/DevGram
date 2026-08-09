@@ -239,7 +239,7 @@ public class SeekBar {
         float dgCx = (pressed ? draggingThumbX : thumbX) + thumbWidth / 2f;
         if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", true)) {
             float w = AndroidUtilities.dp(4);
-            float h = currentRadius * 2.4f;
+            float h = Math.max(currentRadius * 3f, AndroidUtilities.dp(20));
             rect.set(dgCx - w / 2f, height / 2f - h / 2f, dgCx + w / 2f, height / 2f + h / 2f);
             canvas.drawRoundRect(rect, w / 2f, w / 2f, paint);
         } else {
