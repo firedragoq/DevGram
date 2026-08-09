@@ -442,6 +442,7 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("dg_singleCorner", false);
         } else if (item.id == ID_HIDE_STATUS) {
             gToggle("dg_hideStatus", false);
+            if (chatListPreview != null) chatListPreview.invalidate();
         } else if (item.id == ID_HIDE_STORIES) {
             gToggle("dg_hideStories", false);
         } else if (item.id == ID_HIDE_FAB) {
@@ -450,6 +451,7 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("dg_hideSearchBar", false);
         } else if (item.id == ID_TAB_COUNTER) {
             gToggle("dg_tabCounter", true);
+            if (foldersPreview != null) foldersPreview.invalidate();
         } else if (item.id == ID_SYSTEM_FONTS) {
             gToggle("dg_systemFonts", false);
         } else if (item.id == ID_GOOEY) {

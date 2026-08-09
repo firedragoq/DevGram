@@ -11,13 +11,15 @@ import android.view.View;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DevGramConfig;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessagesController;
 import org.telegram.ui.ActionBar.Theme;
 
-// DevGram: превью списка чатов (как ChatListPreviewCell в exteraGram) — макет шапки с заголовком
-// (слева или по центру, отражает centerTitle) + пара строк чатов с аватарками в текущей форме.
+// DevGram: превью «Список чатов» (как ChatListPreviewCell в exteraGram) — макет верхней панели
+// диалогов: заголовок + эмодзи-статус + меню ⋮. Отражает «Заголовок по центру» и «Скрыть статус».
 public class DevGramChatListPreviewCell extends View {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint dots = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint titlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
 
@@ -26,59 +28,59 @@ public class DevGramChatListPreviewCell extends View {
         setWillNotDraw(false);
         setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         titlePaint.setTypeface(AndroidUtilities.bold());
-        titlePaint.setTextSize(AndroidUtilities.dp(16));
+        titlePaint.setTextSize(AndroidUtilities.dp(17));
+    }
+
+    private static boolean hideStatus() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false);
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(168), MeasureSpec.EXACTLY));
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(72), MeasureSpec.EXACTLY));
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
-        int accent = Theme.getColor(Theme.key_switchTrack);
-        int r = Color.red(accent), g = Color.green(accent), b = Color.blue(accent);
+        int grey = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText);
+        int gr = Color.red(grey), gg = Color.green(grey), gb = Color.blue(grey);
         float w = getMeasuredWidth();
+        float cy = getMeasuredHeight() / 2f;
         boolean rtl = LocaleController.isRTL;
 
-        // рамка-«карточка»
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(18, r, g, b));
-        rect.set(AndroidUtilities.dp(14), AndroidUtilities.dp(10), w - AndroidUtilities.dp(14), getMeasuredHeight() - AndroidUtilities.dp(14));
+        // карточка
+        paint.setColor(Color.argb(20, gr, gg, gb));
+        rect.set(AndroidUtilities.dp(14), AndroidUtilities.dp(10), w - AndroidUtilities.dp(14),
+                getMeasuredHeight() - AndroidUtilities.dp(10));
         canvas.drawRoundRect(rect, AndroidUtilities.dp(12), AndroidUtilities.dp(12), paint);
 
-        float pad = AndroidUtilities.dp(26);
-        float barTop = AndroidUtilities.dp(22);
+        float sidePad = AndroidUtilities.dp(30);
+        boolean showStatus = !hideStatus();
 
-        // шапка: заголовок "DevGram" слева или по центру (centerTitle)
+        // меню ⋮ у правого края
+        dots.setColor(Theme.getColor(Theme.key_actionBarDefaultIcon));
+        float dotX = rtl ? sidePad : w - sidePad;
+        for (int i = -1; i <= 1; i++) {
+            canvas.drawCircle(dotX, cy + i * AndroidUtilities.dp(6), AndroidUtilities.dp(2), dots);
+        }
+
+        // заголовок + эмодзи-статус
         titlePaint.setColor(Theme.getColor(Theme.key_actionBarDefaultTitle));
         String title = "DevGram";
         float tw = titlePaint.measureText(title);
-        float tx = DevGramConfig.centerTitle ? (w - tw) / 2f : (rtl ? w - pad - tw : pad);
-        canvas.drawText(title, tx, barTop + AndroidUtilities.dp(6), titlePaint);
+        float emojiSize = showStatus ? AndroidUtilities.dp(18) : 0;
+        float emojiGap = showStatus ? AndroidUtilities.dp(6) : 0;
+        float blockW = tw + emojiGap + emojiSize;
 
-        // две строки чатов
-        float rowH = AndroidUtilities.dp(56);
-        float first = barTop + AndroidUtilities.dp(20);
-        for (int i = 0; i < 2; i++) {
-            float cy = first + i * rowH + rowH / 2f;
-            float avR = AndroidUtilities.dp(20);
-            float avCx = rtl ? w - pad - avR : pad + avR;
-            float avTop = cy - avR, avLeft = avCx - avR;
-            paint.setColor(Color.argb(255, r, g, b));
-            rect.set(avLeft, avTop, avLeft + avR * 2, avTop + avR * 2);
-            float rad = AndroidUtilities.avatarCornerRadius(avR * 2);
-            canvas.drawRoundRect(rect, rad, rad, paint);
-
-            float lx = rtl ? pad : avCx + avR + AndroidUtilities.dp(14);
-            float lxEnd = rtl ? avLeft - AndroidUtilities.dp(14) : w - pad;
-            float lh = AndroidUtilities.dp(8);
-            paint.setColor(Color.argb(200, r, g, b));
-            rect.set(lx, cy - AndroidUtilities.dp(13), Math.min(lxEnd, lx + AndroidUtilities.dp(110)), cy - AndroidUtilities.dp(13) + lh);
-            canvas.drawRoundRect(rect, lh / 2f, lh / 2f, paint);
-            paint.setColor(Color.argb(90, r, g, b));
-            rect.set(lx, cy + AndroidUtilities.dp(5), Math.min(lxEnd, lx + AndroidUtilities.dp(170)), cy + AndroidUtilities.dp(5) + lh);
-            canvas.drawRoundRect(rect, lh / 2f, lh / 2f, paint);
+        float bx = DevGramConfig.centerTitle ? (w - blockW) / 2f
+                : (rtl ? w - sidePad - blockW : sidePad);
+        canvas.drawText(title, bx, cy + AndroidUtilities.dp(6), titlePaint);
+        if (showStatus) {
+            // эмодзи-статус (премиум) — цветная скруглённая плашка рядом с именем
+            paint.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+            float ex = bx + tw + emojiGap;
+            rect.set(ex, cy - emojiSize / 2f, ex + emojiSize, cy + emojiSize / 2f);
+            canvas.drawRoundRect(rect, AndroidUtilities.dp(4), AndroidUtilities.dp(4), paint);
         }
     }
 }
