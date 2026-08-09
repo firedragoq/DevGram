@@ -4935,9 +4935,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             canvas.restore();
         }
 
-        if (useSeparator && !MessagesController.getGlobalMainSettings().getBoolean("dg_hideDividers", false)) {
+        int dgDividerStyle = MessagesController.getGlobalMainSettings().getInt("dg_dividerStyle", 0); // 0 линия, 1 сегменты, 2 скрыть
+        if (useSeparator && dgDividerStyle != 2) {
             int left;
-            if (MessagesController.getGlobalMainSettings().getBoolean("dg_fullDividers", false)
+            if (dgDividerStyle == 1
                     || fullSeparator || currentDialogFolderId != 0 && archiveHidden && !fullSeparator2 || fullSeparator2 && !archiveHidden) {
                 left = 0;
             } else {

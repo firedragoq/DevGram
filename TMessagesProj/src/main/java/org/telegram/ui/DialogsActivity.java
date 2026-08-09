@@ -3553,7 +3553,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 SpannableStringBuilder ssb = new SpannableStringBuilder(getString(R.string.AppName));
                 ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 actionBar.setTitle(ssb, statusDrawable);
-                actionBar.setTitle(MessagesController.getGlobalMainSettings().getString("forkCustomTitle", "DevGram"));
+                // DevGram: «Текст в заголовке» — Название приложения / Имя / Имя пользователя
+                int dgTitleMode = MessagesController.getGlobalMainSettings().getInt("dg_actionBarTitle", 0);
+                CharSequence dgTitle = MessagesController.getGlobalMainSettings().getString("forkCustomTitle", "DevGram");
+                TLRPC.User dgSelf = UserConfig.getInstance(currentAccount).getCurrentUser();
+                if (dgTitleMode == 1 && dgSelf != null) {
+                    dgTitle = UserObject.getUserName(dgSelf);
+                } else if (dgTitleMode == 2 && dgSelf != null && !TextUtils.isEmpty(UserObject.getPublicUsername(dgSelf))) {
+                    dgTitle = "@" + UserObject.getPublicUsername(dgSelf);
+                }
+                actionBar.setTitle(dgTitle);
                 actionBar.setTitleLongClickListener(v -> {
                     boolean mainTabsHidden = !UserConfig.getInstance(currentAccount).getMainTabsHiddenFork();
                     UserConfig.getInstance(currentAccount).setMainTabsHiddenFork(mainTabsHidden);
@@ -7142,8 +7151,21 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             filterTabsView.forceRecalcTabs();
         }
         updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
+        if (actionBar != null && folderId == 0 && communityId == 0 && !onlySelect) {
+            int dgTitleMode = MessagesController.getGlobalMainSettings().getInt("dg_actionBarTitle", 0);
+            TLRPC.User dgSelf = UserConfig.getInstance(currentAccount).getCurrentUser();
+            if (dgTitleMode == 1 && dgSelf != null) {
+                actionBar.setTitle(UserObject.getUserName(dgSelf));
+            } else if (dgTitleMode == 2 && dgSelf != null && !TextUtils.isEmpty(UserObject.getPublicUsername(dgSelf))) {
+                actionBar.setTitle("@" + UserObject.getPublicUsername(dgSelf));
+            } else {
+                actionBar.setTitle(MessagesController.getGlobalMainSettings().getString("forkCustomTitle", "DevGram"));
+            }
+        }
         updateStoriesVisibility(false);
         updateFloatingButtonVisibility(false);
+        if (floatingButton3 != null) floatingButton3.updateColors();
+        if (floatingButtonStories != null) floatingButtonStories.updateColors();
         checkUi_searchFieldVisibility();
         updateVisibleRows(0);
         if (dialogStoriesCell != null) {

@@ -48,11 +48,35 @@ public class DevGramGlassMenu {
     }
 
     // Фон-drawable «стекло»: рисует размытый снимок, выровненный под попапом, + подложку-тинт.
+    // DevGram: «Обводка стекла» — 0 Скрыта, 1 Сплошная, 2 Блики (яркая сверху)
+    private static void drawGlassOutline(Canvas canvas, RectF rect, float radius, Paint p) {
+        int style = org.telegram.messenger.MessagesController.getGlobalMainSettings().getInt("dg_glassOutline", 1);
+        if (style == 0) {
+            return;
+        }
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(org.telegram.messenger.AndroidUtilities.dp(1));
+        if (style == 2) {
+            // Блики: вертикальный градиент от яркого к прозрачному
+            android.graphics.Shader sh = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom,
+                    new int[]{Color.argb(150, 255, 255, 255), Color.argb(20, 255, 255, 255)},
+                    null, android.graphics.Shader.TileMode.CLAMP);
+            p.setShader(sh);
+            p.setColor(Color.WHITE);
+        } else {
+            p.setShader(null);
+            p.setColor(Color.argb(60, 255, 255, 255));
+        }
+        float inset = org.telegram.messenger.AndroidUtilities.dp(0.5f);
+        canvas.drawRoundRect(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset, radius, radius, p);
+    }
+
     public static class GlassDrawable extends Drawable {
         private final Bitmap bitmap;
         private final BitmapShader shader;
         private final Paint blurPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint tintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Matrix matrix = new Matrix();
         private final RectF rectF = new RectF();
         private final float radius;
@@ -90,6 +114,7 @@ public class DevGramGlassMenu {
             rectF.set(b.left, b.top, b.right, b.bottom);
             canvas.drawRoundRect(rectF, radius, radius, blurPaint);
             canvas.drawRoundRect(rectF, radius, radius, tintPaint);
+            drawGlassOutline(canvas, rectF, radius, outlinePaint);
         }
 
         @Override
@@ -129,6 +154,7 @@ public class DevGramGlassMenu {
         private BitmapShader shader;
         private final Paint blurPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint tintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Matrix matrix = new Matrix();
         private final int[] h = new int[2], cc = new int[2];
         private final int tintColor;
@@ -168,6 +194,7 @@ public class DevGramGlassMenu {
             tintPaint.setAlpha(alpha * 150 / 255);
             canvas.drawRoundRect(rect, radius, radius, blurPaint);
             canvas.drawRoundRect(rect, radius, radius, tintPaint);
+            drawGlassOutline(canvas, rect, radius, outlinePaint);
         }
     }
 }

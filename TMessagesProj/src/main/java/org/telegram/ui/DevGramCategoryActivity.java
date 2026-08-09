@@ -103,6 +103,32 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_SEPARATE_HEADERS = 49;
     private static final int ID_HIDE_DIVIDERS = 57;
     private static final int ID_FULL_DIVIDERS = 58;
+    private static final int ID_ACTIONBAR_TITLE = 59;
+    private static final int ID_DIVIDER_STYLE = 60;
+    private static final int ID_GLASS_OUTLINE = 61;
+
+    // Варианты для строк-селекторов (как в exteraGram)
+    private static final String[] ACTIONBAR_TITLE_OPTIONS = {"Название приложения", "Имя", "Имя пользователя"};
+    private static final String[] DIVIDER_STYLE_OPTIONS = {"Линия", "Сегменты", "Скрыть"};
+    private static final String[] GLASS_OUTLINE_OPTIONS = {"Скрыта", "Сплошная", "Блики"};
+
+    // Показать меню выбора; пишет int-ключ, обновляет список
+    private void showChoice(String title, String[] options, String key, int def) {
+        if (getParentActivity() == null) return;
+        org.telegram.ui.ActionBar.AlertDialog.Builder b = new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle(title);
+        int cur = gInt(key, def);
+        CharSequence[] labels = new CharSequence[options.length];
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = (i == cur ? "• " : "    ") + options[i];
+        }
+        b.setItems(labels, (d, which) -> {
+            org.telegram.messenger.MessagesController.getGlobalMainSettings().edit().putInt(key, which).apply();
+            refreshList();
+        });
+        b.setNegativeButton("Отмена", null);
+        showDialog(b.create());
+    }
     private static final int ID_GLARE = 50;
     private static final int ID_MD3 = 51;
     private static final int ID_MD3_PROGRESS = 52;
@@ -275,6 +301,8 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(gPref("dg_hideSearchBar", false)));
             items.add(UItem.asCheck(ID_MINI_AVATARS, "Мини-аватарки отправителей")
                     .setChecked(!gPref("disableThumbsInDialogList", false)));
+            items.add(UItem.asButton(ID_ACTIONBAR_TITLE, "Текст в заголовке",
+                    ACTIONBAR_TITLE_OPTIONS[gInt("dg_actionBarTitle", 0)]));
             items.add(UItem.asShadow("Падающий снег появится в верхней панели."));
 
             // — Папки с чатами —
@@ -329,19 +357,20 @@ public class DevGramCategoryActivity extends BaseFragment {
                             .edit().putInt("dg_sectionRadius", val).apply()).setId(ID_STICKER_SIZE + 100));
             items.add(UItem.asCheck(ID_SEPARATE_HEADERS, "Отделить заголовки")
                     .setChecked(gPref("dg_separateHeaders", false)));
-            items.add(UItem.asCheck(ID_HIDE_DIVIDERS, "Скрыть разделители")
-                    .setChecked(gPref("dg_hideDividers", false)));
-            items.add(UItem.asCheck(ID_FULL_DIVIDERS, "Разделители во всю ширину")
-                    .setChecked(gPref("dg_fullDividers", false)));
+            items.add(UItem.asButton(ID_DIVIDER_STYLE, "Тип разделителей",
+                    DIVIDER_STYLE_OPTIONS[gInt("dg_dividerStyle", 0)]));
             items.add(UItem.asShadow(null));
 
             // — Настройки размытия —
             items.add(UItem.asHeader("Настройки размытия"));
-            items.add(UItem.asCheck(ID_GLARE, "Блики на элементах")
-                    .setChecked(gPref("dg_glare", true)));
+            items.add(UItem.asCheck(ID_GLASS_MENU, "Стеклянное меню сообщения")
+                    .setChecked(DevGramConfig.glassMenu));
+            items.add(UItem.asButton(ID_GLASS_OUTLINE, "Обводка стекла",
+                    GLASS_OUTLINE_OPTIONS[gInt("dg_glassOutline", 1)]));
             items.add(UItem.asCheck(ID_CHAT_BLUR, "Принудительное размытие")
                     .setChecked(org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_CHAT_BLUR)));
-            items.add(UItem.asShadow("Эффекты размытия будут применяться ко всем темам."));
+            items.add(UItem.asShadow("Меню сообщения и панель реакций становятся матовым стеклом. "
+                    + "Стеклу нужно размытие — включите «Принудительное размытие»."));
         } else if (category == CATEGORY_CHATS) {
             items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
                     .setChecked(DevGramConfig.disableMarkdown));
@@ -469,10 +498,15 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("dg_gooey", false);
         } else if (item.id == ID_CUSTOM_THEMES) {
             gToggle("dg_customThemes", false);
-        } else if (item.id == ID_HIDE_DIVIDERS) {
-            gToggle("dg_hideDividers", false);
-        } else if (item.id == ID_FULL_DIVIDERS) {
-            gToggle("dg_fullDividers", false);
+        } else if (item.id == ID_ACTIONBAR_TITLE) {
+            showChoice("Текст в заголовке", ACTIONBAR_TITLE_OPTIONS, "dg_actionBarTitle", 0);
+            return;
+        } else if (item.id == ID_DIVIDER_STYLE) {
+            showChoice("Тип разделителей", DIVIDER_STYLE_OPTIONS, "dg_dividerStyle", 0);
+            return;
+        } else if (item.id == ID_GLASS_OUTLINE) {
+            showChoice("Обводка стекла", GLASS_OUTLINE_OPTIONS, "dg_glassOutline", 1);
+            return;
         } else if (item.id == ID_SEPARATE_HEADERS) {
             gToggle("dg_separateHeaders", false);
         } else if (item.id == ID_GLARE) {
