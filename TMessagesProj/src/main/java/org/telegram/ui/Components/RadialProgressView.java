@@ -68,7 +68,9 @@ public class RadialProgressView extends View {
         progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         progressPaint.setStyle(Paint.Style.STROKE);
         progressPaint.setStrokeCap(Paint.Cap.ROUND);
-        progressPaint.setStrokeWidth(AndroidUtilities.dp(3));
+        // DevGram (MD3): более толстый индикатор загрузки
+        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", true);
+        progressPaint.setStrokeWidth(AndroidUtilities.dp(md3 ? 4 : 3));
         progressPaint.setColor(progressColor);
     }
 

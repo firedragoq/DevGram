@@ -102,6 +102,7 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_CUSTOM_THEMES = 48;
     private static final int ID_SEPARATE_HEADERS = 49;
     private static final int ID_HIDE_DIVIDERS = 57;
+    private static final int ID_FULL_DIVIDERS = 58;
     private static final int ID_GLARE = 50;
     private static final int ID_MD3 = 51;
     private static final int ID_MD3_PROGRESS = 52;
@@ -327,9 +328,11 @@ public class DevGramCategoryActivity extends BaseFragment {
                     val -> org.telegram.messenger.MessagesController.getGlobalMainSettings()
                             .edit().putInt("dg_sectionRadius", val).apply()).setId(ID_STICKER_SIZE + 100));
             items.add(UItem.asCheck(ID_SEPARATE_HEADERS, "Отделить заголовки")
-                    .setChecked(gPref("dg_separateHeaders", true)));
+                    .setChecked(gPref("dg_separateHeaders", false)));
             items.add(UItem.asCheck(ID_HIDE_DIVIDERS, "Скрыть разделители")
                     .setChecked(gPref("dg_hideDividers", false)));
+            items.add(UItem.asCheck(ID_FULL_DIVIDERS, "Разделители во всю ширину")
+                    .setChecked(gPref("dg_fullDividers", false)));
             items.add(UItem.asShadow(null));
 
             // — Настройки размытия —
@@ -468,8 +471,10 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("dg_customThemes", false);
         } else if (item.id == ID_HIDE_DIVIDERS) {
             gToggle("dg_hideDividers", false);
+        } else if (item.id == ID_FULL_DIVIDERS) {
+            gToggle("dg_fullDividers", false);
         } else if (item.id == ID_SEPARATE_HEADERS) {
-            gToggle("dg_separateHeaders", true);
+            gToggle("dg_separateHeaders", false);
         } else if (item.id == ID_GLARE) {
             gToggle("dg_glare", true);
         } else if (item.id == ID_MD3) {

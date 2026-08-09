@@ -4937,7 +4937,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
         if (useSeparator && !MessagesController.getGlobalMainSettings().getBoolean("dg_hideDividers", false)) {
             int left;
-            if (fullSeparator || currentDialogFolderId != 0 && archiveHidden && !fullSeparator2 || fullSeparator2 && !archiveHidden) {
+            if (MessagesController.getGlobalMainSettings().getBoolean("dg_fullDividers", false)
+                    || fullSeparator || currentDialogFolderId != 0 && archiveHidden && !fullSeparator2 || fullSeparator2 && !archiveHidden) {
                 left = 0;
             } else {
                 left = dp(messagePaddingStart);

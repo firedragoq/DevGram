@@ -377,10 +377,15 @@ public class Switch extends View {
             return;
         }
 
+        // DevGram (MD3): более высокий трек-пилюля + мелкий тумблер в выкл / крупный во вкл
+        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_switch", true);
+        float trackH = md3 ? AndroidUtilities.dpf2(20) : AndroidUtilities.dpf2(14);
+        float trackR = md3 ? AndroidUtilities.dpf2(10) : AndroidUtilities.dpf2(7);
+
         int width = AndroidUtilities.dp(31);
         int thumb = AndroidUtilities.dp(20);
         int x = (getMeasuredWidth() - width) / 2;
-        float y = (getMeasuredHeight() - AndroidUtilities.dpf2(14)) / 2;
+        float y = (getMeasuredHeight() - trackH) / 2;
         int tx = x + AndroidUtilities.dp(7) + (int) (AndroidUtilities.dp(17) * progress);
         int ty = getMeasuredHeight() / 2;
 
@@ -445,8 +450,8 @@ public class Switch extends View {
             paint.setColor(color);
             paint2.setColor(color);
 
-            rectF.set(x, y, x + width, y + AndroidUtilities.dpf2(14));
-            canvasToDraw.drawRoundRect(rectF, AndroidUtilities.dpf2(7), AndroidUtilities.dpf2(7), paint);
+            rectF.set(x, y, x + width, y + trackH);
+            canvasToDraw.drawRoundRect(rectF, trackR, trackR, paint);
             canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dpf2(10), paint);
 
             if (a == 0 && rippleDrawable != null) {
@@ -494,7 +499,8 @@ public class Switch extends View {
             alpha = (int) (a1 + (a2 - a1) * colorProgress);
             paint.setColor(((alpha & 0xff) << 24) | ((red & 0xff) << 16) | ((green & 0xff) << 8) | (blue & 0xff));
 
-            canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dp(8), paint);
+            float thumbR = md3 ? AndroidUtilities.dpf2(8) + AndroidUtilities.dpf2(2) * progress : AndroidUtilities.dp(8);
+            canvasToDraw.drawCircle(tx, ty, thumbR, paint);
 
             if (a == 0) {
                 if (iconDrawable != null) {
