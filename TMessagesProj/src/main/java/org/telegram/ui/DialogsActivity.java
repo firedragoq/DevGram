@@ -3029,13 +3029,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (statusDrawable == null || actionBar == null) {
             return;
         }
-        // DevGram: «Скрыть статус» — прячем эмодзи-статус в шапке списка чатов
-        if (MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false)) {
-            statusDrawable.set((Drawable) null, animated);
-            statusDrawable.setParticles(false, animated);
-            actionBar.setRightDrawableOnClick(null);
-            return;
-        }
         Long emojiStatusId = UserObject.getEmojiStatusDocumentId(user);
         statusDrawableGiftId = null;
         if (emojiStatusId != null) {

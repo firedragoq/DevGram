@@ -533,6 +533,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             return;
         }
         titleTextView[i] = new SimpleTextView(getContext());
+        titleTextView[i].devgramHideStatusGate = true; // DevGram: «Скрыть статус» прячет эмодзи-статус в шапке
         if (org.telegram.messenger.DevGramConfig.centerTitle) { // DevGram (как exteraGram): заголовок по центру
             isCenterTitle = true;
         }

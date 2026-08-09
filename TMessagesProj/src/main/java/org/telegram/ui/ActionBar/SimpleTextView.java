@@ -65,6 +65,12 @@ public class SimpleTextView extends View implements Drawable.Callback {
     private SpannableStringBuilder spannableStringBuilder;
     private Drawable leftDrawable;
     private Drawable rightDrawable;
+    // DevGram: гейт правого drawable заголовка ActionBar (эмодзи-статус) — «Скрыть статус».
+    // Как getVisibleTitleRightDrawable в exteraGram: живо прячем без пере-установки.
+    public boolean devgramHideStatusGate = false;
+    private boolean devgramRightHidden() {
+        return devgramHideStatusGate && org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false);
+    }
     private Drawable rightDrawable2;
     private Drawable rightDrawable3; // DevGram: третий слот (значок форка), рисуется после rightDrawable2
     public int rightDrawable3X;
@@ -366,7 +372,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
             offsetX += getPaddingLeft();
             int rightDrawableWidth = 0;
             if (rightDrawableInside) {
-                if (rightDrawable != null && !rightDrawableOutside) {
+                if (rightDrawable != null && !rightDrawableOutside && !devgramRightHidden()) {
                     rightDrawableWidth += (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
                 }
                 if (rightDrawable2 != null && !rightDrawableOutside) {
@@ -402,7 +408,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
                 }
                 int rightDrawableWidth = 0;
                 if (!rightDrawableInside) {
-                    if (rightDrawable != null && !rightDrawableOutside) {
+                    if (rightDrawable != null && !rightDrawableOutside && !devgramRightHidden()) {
                         rightDrawableWidth += (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
                         width -= rightDrawableWidth;
                         width -= drawablePadding;
@@ -840,7 +846,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
             }
             int rightDrawableWidth = 0;
             if (!rightDrawableInside) {
-                if (rightDrawable != null && !rightDrawableOutside) {
+                if (rightDrawable != null && !rightDrawableOutside && !devgramRightHidden()) {
                     rightDrawableWidth = (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
                     width -= rightDrawableWidth;
                     width -= drawablePadding;
@@ -1015,7 +1021,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
                 leftDrawable.setBounds(x, y, x + leftDrawable.getIntrinsicWidth(), y + leftDrawable.getIntrinsicHeight());
                 leftDrawable.draw(canvas);
             }
-            if (rightDrawable != null && !rightDrawableOutside) {
+            if (rightDrawable != null && !rightDrawableOutside && !devgramRightHidden()) {
                 int dw = (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
                 int dh = (int) (rightDrawable.getIntrinsicHeight() * rightDrawableScale);
                 int x = textOffsetX + textWidth + drawablePadding + (int) -scrollingOffset + nextScrollX;

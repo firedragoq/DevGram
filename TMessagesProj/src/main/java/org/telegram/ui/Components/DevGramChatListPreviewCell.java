@@ -109,14 +109,16 @@ public class DevGramChatListPreviewCell extends View {
         titlePaint.setColor(Theme.getColor(Theme.key_actionBarDefaultTitle));
         String title = "DevGram";
         float tw = titlePaint.measureText(title);
-        float statusSize = statusDrawable != null ? AndroidUtilities.dp(20) : 0;
-        float statusGap = statusDrawable != null ? AndroidUtilities.dp(6) : 0;
+        boolean hide = MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false);
+        boolean drawStatus = statusDrawable != null && !hide;
+        float statusSize = drawStatus ? AndroidUtilities.dp(20) : 0;
+        float statusGap = drawStatus ? AndroidUtilities.dp(6) : 0;
         float blockW = tw + statusGap + statusSize;
 
         float bx = DevGramConfig.centerTitle ? (w - blockW) / 2f
                 : (rtl ? w - sidePad - blockW : sidePad);
         canvas.drawText(title, bx, cy + AndroidUtilities.dp(6), titlePaint);
-        if (statusDrawable != null) {
+        if (drawStatus) {
             float ex = bx + tw + statusGap;
             statusDrawable.setBounds((int) ex, (int) (cy - statusSize / 2f),
                     (int) (ex + statusSize), (int) (cy + statusSize / 2f));

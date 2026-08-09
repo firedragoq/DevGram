@@ -2161,12 +2161,15 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
         if (statusDrawable == null || actionBar == null) {
             return;
         }
-        Long emojiStatusId = UserObject.getEmojiStatusDocumentId(user);
+        // DevGram: «Скрыть статус» — прячем эмодзи-статус и на своей истории
+        Long emojiStatusId = MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false)
+                ? null : UserObject.getEmojiStatusDocumentId(user);
+        boolean forceHide = MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false);
         if (emojiStatusId != null) {
             final boolean isCollectible = user.emoji_status instanceof TLRPC.TL_emojiStatusCollectible;
             statusDrawable.set(emojiStatusId, animated);
             statusDrawable.setParticles(isCollectible, animated);
-        } else if (user != null && MessagesController.getInstance(currentAccount).isPremiumUser(user)) {
+        } else if (!forceHide && user != null && MessagesController.getInstance(currentAccount).isPremiumUser(user)) {
             if (premiumStar == null) {
                 premiumStar = getContext().getResources().getDrawable(R.drawable.msg_premium_liststar).mutate();
                 premiumStar = new AnimatedEmojiDrawable.WrapSizeDrawable(premiumStar, dp(18), dp(18)) {
