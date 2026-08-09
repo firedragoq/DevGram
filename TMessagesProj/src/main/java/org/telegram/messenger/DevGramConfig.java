@@ -68,6 +68,8 @@ public class DevGramConfig {
     public static boolean hideEmojiCategories = true;
     // Снег поверх шапки всегда (exteraGram ForceSnow).
     public static boolean forceSnow = false;
+    // Заголовок по центру шапки (exteraGram centerTitle).
+    public static boolean centerTitle = false;
 
     // --- раздел «Чаты» (порт из exteraGram) ---
     public static boolean disableMarkdown = false;       // не преобразовывать **/`code` в форматирование
@@ -112,6 +114,7 @@ public class DevGramConfig {
             glassMenu = preferences.getBoolean("glassMenu", true);
             hideEmojiCategories = preferences.getBoolean("hideEmojiCategories", true);
             forceSnow = preferences.getBoolean("forceSnow", false);
+            centerTitle = preferences.getBoolean("centerTitle", false);
             disableMarkdown = preferences.getBoolean("disableMarkdown", false);
             hideKeyboardOnScroll = preferences.getBoolean("hideKeyboardOnScroll", true);
             disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
@@ -169,6 +172,13 @@ public class DevGramConfig {
         forceSnow = v;
         if (preferences != null) {
             preferences.edit().putBoolean("forceSnow", v).apply();
+        }
+    }
+
+    public static void setCenterTitle(boolean v) {
+        centerTitle = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("centerTitle", v).apply();
         }
     }
 
@@ -270,6 +280,7 @@ public class DevGramConfig {
             glassMenu = true;
             hideEmojiCategories = true;
             forceSnow = false;
+            centerTitle = false;
             disableMarkdown = false;
             hideKeyboardOnScroll = true;
             disableGreetingSticker = false;
@@ -304,6 +315,7 @@ public class DevGramConfig {
             o.put("glassMenu", glassMenu);
             o.put("hideEmojiCategories", hideEmojiCategories);
             o.put("forceSnow", forceSnow);
+            o.put("centerTitle", centerTitle);
             o.put("disableMarkdown", disableMarkdown);
             o.put("hideKeyboardOnScroll", hideKeyboardOnScroll);
             o.put("disableGreetingSticker", disableGreetingSticker);
@@ -339,6 +351,7 @@ public class DevGramConfig {
             setGlassMenu(o.optBoolean("glassMenu", glassMenu));
             setHideEmojiCategories(o.optBoolean("hideEmojiCategories", hideEmojiCategories));
             setForceSnow(o.optBoolean("forceSnow", forceSnow));
+            setCenterTitle(o.optBoolean("centerTitle", centerTitle));
             setDisableMarkdown(o.optBoolean("disableMarkdown", disableMarkdown));
             setHideKeyboardOnScroll(o.optBoolean("hideKeyboardOnScroll", hideKeyboardOnScroll));
             setDisableGreetingSticker(o.optBoolean("disableGreetingSticker", disableGreetingSticker));

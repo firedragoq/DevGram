@@ -533,6 +533,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             return;
         }
         titleTextView[i] = new SimpleTextView(getContext());
+        if (org.telegram.messenger.DevGramConfig.centerTitle) { // DevGram (как exteraGram): заголовок по центру
+            isCenterTitle = true;
+        }
         titleTextView[i].setGravity(isCenterTitle ? Gravity.CENTER : Gravity.LEFT | Gravity.CENTER_VERTICAL);
         if (titleColorToSet != 0) {
             titleTextView[i].setTextColor(titleColorToSet);

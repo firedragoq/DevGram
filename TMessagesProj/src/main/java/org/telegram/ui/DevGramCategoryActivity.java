@@ -59,14 +59,23 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_FORCE_SNOW = 31;
     private static final int ID_FOLDER_TABS_STYLE = 32;
     private static final int ID_STICKER_SIZE = 33;
+    private static final int ID_CENTER_TITLE = 34;
 
     private org.telegram.ui.Components.DevGramAvatarPreviewCell avatarPreview;
+    private org.telegram.ui.Components.DevGramChatListPreviewCell chatListPreview;
 
     private View getAvatarPreview() {
         if (avatarPreview == null) {
             avatarPreview = new org.telegram.ui.Components.DevGramAvatarPreviewCell(getContext());
         }
         return avatarPreview;
+    }
+
+    private View getChatListPreview() {
+        if (chatListPreview == null) {
+            chatListPreview = new org.telegram.ui.Components.DevGramChatListPreviewCell(getContext());
+        }
+        return chatListPreview;
     }
     // Чаты
     private static final int ID_DISABLE_MARKDOWN = 22;
@@ -152,6 +161,14 @@ public class DevGramCategoryActivity extends BaseFragment {
         } else if (category == CATEGORY_APPEARANCE) {
             // Форма аватара (перенесено из скрытого экрана Fork). Пишем pref avatarCorners,
             // который читает AndroidUtilities.avatarCornersType() по всему приложению.
+            // — Список чатов —
+            items.add(UItem.asHeader("Список чатов"));
+            items.add(UItem.asCustom(getChatListPreview()));
+            items.add(UItem.asCheck(ID_CENTER_TITLE, "Заголовок по центру")
+                    .setChecked(DevGramConfig.centerTitle));
+            items.add(UItem.asShadow("Открой экран заново, чтобы применить заголовок."));
+
+            // — Аватар —
             items.add(UItem.asHeader("Форма аватара"));
             items.add(UItem.asCustom(getAvatarPreview()));
             items.add(UItem.asSlideView(
@@ -161,9 +178,27 @@ public class DevGramCategoryActivity extends BaseFragment {
                         org.telegram.messenger.MessagesController.getGlobalMainSettings()
                                 .edit().putInt("avatarCorners", index).apply();
                         if (avatarPreview != null) avatarPreview.invalidate();
+                        if (chatListPreview != null) chatListPreview.invalidate();
                     }).setId(ID_AVATAR_SHAPE));
             items.add(UItem.asShadow(null));
 
+            // — Папки —
+            items.add(UItem.asHeader("Стиль вкладок папок"));
+            items.add(UItem.asSlideView(
+                    new String[]{"Текст", "Значок + текст", "Значок"},
+                    DevGramConfig.getFolderTabsStyle(),
+                    index -> DevGramConfig.setFolderTabsStyle(index)).setId(ID_FOLDER_TABS_STYLE));
+            items.add(UItem.asShadow(null));
+
+            // — Стикеры —
+            items.add(UItem.asHeader("Размер стикеров"));
+            items.add(UItem.asIntSlideView(1, 2, (int) DevGramConfig.getStickerSize(), 14,
+                    val -> String.valueOf(val),
+                    val -> DevGramConfig.setStickerSize(val)).setId(ID_STICKER_SIZE));
+            items.add(UItem.asShadow(null));
+
+            // — Общее —
+            items.add(UItem.asHeader("Общее"));
             items.add(UItem.asCheck(ID_NUMBER_ROUNDING, "Отключить округление чисел")
                     .setChecked(DevGramConfig.disableNumberRounding));
             items.add(UItem.asCheck(ID_SQUARE_FAB, "Квадратная кнопка")
@@ -178,19 +213,6 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.forceSnow));
             items.add(UItem.asShadow("Стеклянные меню: выпадающие меню и панель реакций становятся "
                     + "матовым стеклом. Выключи, если тормозит."));
-
-            items.add(UItem.asHeader("Стиль вкладок папок"));
-            items.add(UItem.asSlideView(
-                    new String[]{"Текст", "Значок + текст", "Значок"},
-                    DevGramConfig.getFolderTabsStyle(),
-                    index -> DevGramConfig.setFolderTabsStyle(index)).setId(ID_FOLDER_TABS_STYLE));
-            items.add(UItem.asShadow(null));
-
-            items.add(UItem.asHeader("Размер стикеров"));
-            items.add(UItem.asIntSlideView(1, 2, (int) DevGramConfig.getStickerSize(), 14,
-                    val -> String.valueOf(val),
-                    val -> DevGramConfig.setStickerSize(val)).setId(ID_STICKER_SIZE));
-            items.add(UItem.asShadow(null));
         } else if (category == CATEGORY_CHATS) {
             items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
                     .setChecked(DevGramConfig.disableMarkdown));
@@ -283,6 +305,9 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setUseSystemEmoji(!DevGramConfig.isUseSystemEmoji());
         } else if (item.id == ID_FORCE_SNOW) {
             DevGramConfig.setForceSnow(!DevGramConfig.forceSnow);
+        } else if (item.id == ID_CENTER_TITLE) {
+            DevGramConfig.setCenterTitle(!DevGramConfig.centerTitle);
+            if (chatListPreview != null) chatListPreview.invalidate();
         } else if (item.id == ID_DISABLE_MARKDOWN) {
             DevGramConfig.setDisableMarkdown(!DevGramConfig.disableMarkdown);
         } else if (item.id == ID_HIDE_KEYBOARD_ON_SCROLL) {
