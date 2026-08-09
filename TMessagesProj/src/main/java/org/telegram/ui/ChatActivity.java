@@ -1879,6 +1879,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int hideTitle = 34;
     private final static int goToFirstMessage = 35;
     private final static int devgram_deleted_history = 9091; // DevGram: история удалёнок
+    private final static int devgram_chat_theme = 9092; // DevGram: локальная тема чата
     private final static int deleteAllYourMessages = 36;
     private final static int deleteAllUnpinnedMessages = 37;
     private final static int deleteAllYourMessagesInAllTopics = 38;
@@ -4351,6 +4352,8 @@ public class ChatActivity extends BaseFragment implements
                     jumpToDate(1375350800);
                 } else if (id == devgram_deleted_history) {
                     presentFragment(new DevGramDeletedHistoryActivity(dialog_id, getTopicId()));
+                } else if (id == devgram_chat_theme) {
+                    showDevgramChatThemePicker();
                 } else if (id == deleteAllYourMessages) {
                     org.telegram.messenger.forkgram.ForkDialogs.CreateDeleteAllYourMessagesAlert(
                         currentAccount,
@@ -4785,6 +4788,10 @@ public class ChatActivity extends BaseFragment implements
             if (DevGramConfig.saveDeletedMessages && chatMode == MODE_DEFAULT
                     && !DevGramMessagesController.skipDialog(currentAccount, getDialogId())) {
                 headerItem.addSubItem(devgram_deleted_history, R.drawable.msg_delete, "История удалёнок", themeDelegate);
+            }
+            // DevGram: локальная тема этого чата («Различные темы в чатах»)
+            if (MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", false) && chatMode == MODE_DEFAULT) {
+                headerItem.addSubItem(devgram_chat_theme, R.drawable.msg_theme, "Тема этого чата", themeDelegate);
             }
 
             if (currentUser != null && chatMode != MODE_SAVED) {
@@ -44070,6 +44077,44 @@ public class ChatActivity extends BaseFragment implements
         });
     }
 
+    // DevGram: выбор ЛОКАЛЬНОЙ темы приложения для этого чата («Различные темы в чатах»)
+    private void showDevgramChatThemePicker() {
+        if (getParentActivity() == null || themeDelegate == null) {
+            return;
+        }
+        java.util.ArrayList<Theme.ThemeInfo> themes = Theme.themes;
+        java.util.ArrayList<CharSequence> labels = new java.util.ArrayList<>();
+        java.util.ArrayList<String> names = new java.util.ArrayList<>();
+        String current = MessagesController.getGlobalMainSettings().getString("dg_chattheme_" + dialog_id, null);
+        labels.add((current == null ? "• " : "    ") + "По умолчанию");
+        names.add(null);
+        if (themes != null) {
+            for (Theme.ThemeInfo t : themes) {
+                if (t == null || TextUtils.isEmpty(t.getName())) {
+                    continue;
+                }
+                boolean sel = t.getName().equals(current);
+                labels.add((sel ? "• " : "    ") + t.getName());
+                names.add(t.getName());
+            }
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity(), themeDelegate);
+        b.setTitle("Тема этого чата");
+        b.setItems(labels.toArray(new CharSequence[0]), (d, which) -> {
+            String chosen = names.get(which);
+            android.content.SharedPreferences.Editor e = MessagesController.getGlobalMainSettings().edit();
+            if (chosen == null) {
+                e.remove("dg_chattheme_" + dialog_id);
+            } else {
+                e.putString("dg_chattheme_" + dialog_id, chosen);
+            }
+            e.apply();
+            themeDelegate.devgramApplyLocalTheme(chosen);
+        });
+        b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(b.create());
+    }
+
     private void setChatThemeEmoticon(final TLRPC.ChatTheme theme) {
         if (themeDelegate == null || parentThemeDelegate != null) {
             return;
@@ -44168,6 +44213,14 @@ public class ChatActivity extends BaseFragment implements
                 Theme.refreshThemeColors(true, true);
             } else {
                 AndroidUtilities.runOnUIThread(() -> NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewTheme, false, true, true));
+            }
+            // DevGram: применить локальную тему этого чата, если выбрана
+            if (parentThemeDelegate == null
+                    && MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", false)) {
+                String localTheme = MessagesController.getGlobalMainSettings().getString("dg_chattheme_" + dialog_id, null);
+                if (!TextUtils.isEmpty(localTheme)) {
+                    devgramApplyLocalTheme(localTheme);
+                }
             }
         }
 
@@ -44518,6 +44571,54 @@ public class ChatActivity extends BaseFragment implements
                     initServiceMessageColors(backgroundDrawable);
                     updateServiceMessageColor(1f);
                 }
+            }
+        }
+
+        // DevGram: «Различные темы в чатах» — применить ЛОКАЛЬНУЮ тему приложения только к этому чату.
+        // Заливаем цвета темы в currentColors (getColor читает их) и переиспользуем refresh-путь.
+        public void devgramApplyLocalTheme(String themeName) {
+            if (parentThemeDelegate != null) {
+                return;
+            }
+            try {
+                if (TextUtils.isEmpty(themeName)) {
+                    setupChatTheme(chatTheme, wallpaper, true, true);
+                } else {
+                    Theme.ThemeInfo info = Theme.getTheme(themeName);
+                    if (info == null) {
+                        return;
+                    }
+                    SparseIntArray colors = Theme.getThemeFileValues(
+                            info.pathToFile != null ? new java.io.File(info.pathToFile) : null, info.assetName, null);
+                    if (colors == null || colors.size() == 0) {
+                        return;
+                    }
+                    isDark = info.isDark();
+                    currentColors = colors;
+                    currentPaints.clear();
+                    currentDrawables.clear();
+                    if (ApplicationLoader.applicationContext != null) {
+                        Theme.createChatResources(ApplicationLoader.applicationContext, false);
+                    }
+                    backgroundDrawable = Theme.getCachedWallpaperNonBlocking();
+                    int[] cc = AndroidUtilities.calcDrawableColor(backgroundDrawable);
+                    currentColor = cc[0];
+                    initDrawables();
+                    initPaints();
+                    initServiceMessageColors(backgroundDrawable);
+                    updateServiceMessageColor(1f);
+                }
+                AndroidUtilities.runOnUIThread(() -> {
+                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewTheme, false, true, true);
+                    if (fragmentView != null) {
+                        fragmentView.invalidate();
+                    }
+                    if (chatListView != null) {
+                        chatListView.invalidateViews();
+                    }
+                });
+            } catch (Throwable e) {
+                FileLog.e(e);
             }
         }
 
