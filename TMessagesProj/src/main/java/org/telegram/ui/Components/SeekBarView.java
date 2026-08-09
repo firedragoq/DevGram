@@ -520,17 +520,32 @@ public class SeekBarView extends FrameLayout {
             final float oldCircleProgress = 1f - Easings.easeInQuad.getInterpolation(Math.min(1f, transitionProgress * 3f));
             final float newCircleProgress = Easings.easeOutQuad.getInterpolation(transitionProgress);
             if (oldCircleProgress > 0f) {
-                canvas.drawCircle(transitionThumbX + selectorWidth / 2, y + thumbSize / 2, currentRadius * oldCircleProgress, outerPaint1);
+                drawThumbShape(canvas, transitionThumbX + selectorWidth / 2, y + thumbSize / 2, currentRadius * oldCircleProgress, outerPaint1);
             }
-            canvas.drawCircle(thumbX + selectorWidth / 2, y + thumbSize / 2, currentRadius * newCircleProgress, outerPaint1);
+            drawThumbShape(canvas, thumbX + selectorWidth / 2, y + thumbSize / 2, currentRadius * newCircleProgress, outerPaint1);
         } else {
-            canvas.drawCircle(thumbX + selectorWidth / 2, y + thumbSize / 2, currentRadius, outerPaint1);
+            drawThumbShape(canvas, thumbX + selectorWidth / 2, y + thumbSize / 2, currentRadius, outerPaint1);
         }
 
         drawTimestampLabel(canvas);
 
         if (needInvalidate) {
             postInvalidateOnAnimation();
+        }
+    }
+
+    // DevGram (MD3): тумблер слайдера — вертикальная пилюля вместо круга
+    private void drawThumbShape(Canvas canvas, float cx, float cy, float radius, Paint paint) {
+        if (radius <= 0) {
+            return;
+        }
+        if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", true)) {
+            float w = AndroidUtilities.dp(4);
+            float h = radius * 2.4f;
+            rect.set(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
+            canvas.drawRoundRect(rect, w / 2f, w / 2f, paint);
+        } else {
+            canvas.drawCircle(cx, cy, radius, paint);
         }
     }
 

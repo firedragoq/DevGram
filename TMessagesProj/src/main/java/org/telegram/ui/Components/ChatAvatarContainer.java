@@ -278,7 +278,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         titleTextView = new SimpleTextConnectedView(context, titleTextLargerCopyView);
         titleTextView.setEllipsizeByGradient(true);
         titleTextView.setTextColor(getThemedColor(Theme.key_actionBarDefaultTitle));
-        titleTextView.setTextSize(18);
+        // DevGram (MD3): заголовок чата крупнее
+        titleTextView.setTextSize(org.telegram.messenger.MessagesController.getGlobalMainSettings()
+                .getBoolean("dg_md3_title", true) ? 20 : 18);
         titleTextView.setGravity(Gravity.LEFT);
         titleTextView.setTypeface(AndroidUtilities.bold());
         titleTextView.setLeftDrawableTopPadding(-dp(1.3f));

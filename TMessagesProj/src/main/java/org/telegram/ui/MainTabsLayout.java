@@ -311,8 +311,10 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     protected void dispatchDraw(@NonNull Canvas canvas) {
         if (drawCustomSelector) {
             final float x = animatedLongSelectedViewCenterX + animatedLongSelectedViewOffsetX;
+            // DevGram (MD3): более заметный индикатор активной вкладки (во всю высоту)
+            boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_bottomnav", false);
             final float sWidth = getInterpolatedWidthByX(x, this);
-            final float sHeight = getHeight() - getPaddingTop() - getPaddingBottom();
+            final float sHeight = md3 ? getHeight() : getHeight() - getPaddingTop() - getPaddingBottom();
 
             canvas.drawRoundRect(
                     x - sWidth / 2f, (getHeight() - sHeight) / 2f,
