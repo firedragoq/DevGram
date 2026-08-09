@@ -44562,8 +44562,9 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
             try {
+                // 1) заполнить currentColors (getColor читает их) — работает и до attach (при открытии чата)
                 if (TextUtils.isEmpty(themeName)) {
-                    setupChatTheme(chatTheme, wallpaper, true, true);
+                    setupChatTheme(chatTheme, wallpaper, false, true);
                 } else {
                     Theme.ThemeInfo info = Theme.getTheme(themeName);
                     if (info == null) {
@@ -44589,15 +44590,25 @@ public class ChatActivity extends BaseFragment implements
                     initServiceMessageColors(backgroundDrawable);
                     updateServiceMessageColor(1f);
                 }
-                AndroidUtilities.runOnUIThread(() -> {
-                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewTheme, false, true, true);
-                    if (fragmentView != null) {
-                        fragmentView.invalidate();
+                // 2) обновить все ячейки через ThemeDescription-анимацию (как setCurrentTheme),
+                //    иначе кэшированные цвета в ячейках не перечитываются
+                if (parentLayout != null) {
+                    Theme.ThemeInfo baseTheme = isDark ? Theme.getCurrentNightTheme() : Theme.getCurrentTheme();
+                    ActionBarLayout.ThemeAnimationSettings s = new ActionBarLayout.ThemeAnimationSettings(
+                            baseTheme, baseTheme.currentAccentId, baseTheme.isDark(), true);
+                    s.applyTheme = false;
+                    if (dialog_id < 0) {
+                        s.applyTrulyTheme = false;
                     }
-                    if (chatListView != null) {
-                        chatListView.invalidateViews();
+                    s.onlyTopFragment = true;
+                    s.resourcesProvider = this;
+                    s.duration = 250;
+                    if (contentView != null) {
+                        updateBackground();
+                        contentView.invalidateBackground();
                     }
-                });
+                    parentLayout.animateThemedValues(s, null);
+                }
             } catch (Throwable e) {
                 FileLog.e(e);
             }
