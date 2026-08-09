@@ -3145,6 +3145,35 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         return !isDialogFolder() && !insideCommunityListNoDialog && chat != null && (chat.forum || ChatObject.isMonoForum(chat) && ChatObject.canManageMonoForum(currentAccount, chat)) && !isTopic;
     }
 
+    // DevGram: «Липкая» анимация аватарок — вертикальный желейный стретч по скорости скролла + пружина
+    private float devgramPrevY = Float.NaN;
+    private float devgramStretch = 0f;
+    private boolean devgramGooeyActive;
+    private void devgramGooeyPre(Canvas canvas, float cx, float cy) {
+        if (!MessagesController.getGlobalMainSettings().getBoolean("dg_gooey", false)) {
+            return;
+        }
+        float y = getY();
+        if (!Float.isNaN(devgramPrevY)) {
+            float delta = y - devgramPrevY;
+            devgramStretch = devgramStretch * 0.65f + delta * 0.018f;
+            devgramStretch = Math.max(-0.32f, Math.min(0.32f, devgramStretch));
+        }
+        devgramPrevY = y;
+        if (Math.abs(devgramStretch) > 0.002f) {
+            canvas.save();
+            canvas.scale(1f, 1f + Math.abs(devgramStretch), cx, cy);
+            devgramGooeyActive = true;
+            invalidate();
+        }
+    }
+    private void devgramGooeyPost(Canvas canvas) {
+        if (devgramGooeyActive) {
+            canvas.restore();
+            devgramGooeyActive = false;
+        }
+    }
+
     private void drawCheckStatus(Canvas canvas, boolean drawClock, boolean drawCheck1, boolean drawCheck2, boolean moveCheck,  float alpha) {
         if (alpha == 0 && !moveCheck) {
             return;
@@ -4854,6 +4883,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         }
 
         if (drawAvatar && (!(isTopic && forumTopic != null && forumTopic.id == 1) || archivedChatsDrawable == null || !archivedChatsDrawable.isDraw())) {
+            devgramGooeyPre(canvas, storyParams.originalAvatarRect.centerX(), storyParams.originalAvatarRect.centerY());
             if (drawMonoforumAvatar) {
                 if (bubbleClip == null) {
                     bubbleClip = new PhotoBubbleClip();
@@ -4900,6 +4930,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
                 communityArrowDrawable.draw(canvas);
             }
+            devgramGooeyPost(canvas);
         }
 
         if (animatingArchiveAvatar) {
