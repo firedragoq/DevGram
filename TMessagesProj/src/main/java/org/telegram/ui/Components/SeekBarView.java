@@ -539,7 +539,7 @@ public class SeekBarView extends FrameLayout {
         if (radius <= 0) {
             return;
         }
-        if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", true)) {
+        if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", false)) {
             // Material 3: тумблер — узкая высокая вертикальная планка
             float w = AndroidUtilities.dp(4);
             float h = Math.max(radius * 3f, AndroidUtilities.dp(20));

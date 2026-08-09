@@ -325,20 +325,7 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(gPref("dg_systemFonts", false)));
             items.add(UItem.asCheck(ID_SYSTEM_EMOJI, "Системные эмодзи")
                     .setChecked(DevGramConfig.isUseSystemEmoji()));
-            items.add(UItem.asCheck(ID_MD3, "Material Design 3  " + md3Count() + "/5")
-                    .setChecked(gPref("dg_md3", true)));
-            if (gPref("dg_md3", true)) {
-                items.add(UItem.asRoundCheckbox(ID_MD3_PROGRESS, "Индикаторы загрузки")
-                        .setChecked(gPref("dg_md3_progress", true)));
-                items.add(UItem.asRoundCheckbox(ID_MD3_SLIDER, "Стиль слайдера")
-                        .setChecked(gPref("dg_md3_slider", true)));
-                items.add(UItem.asRoundCheckbox(ID_MD3_SWITCH, "Стиль переключателей")
-                        .setChecked(gPref("dg_md3_switch", true)));
-                items.add(UItem.asRoundCheckbox(ID_MD3_TITLE, "Заголовок чата")
-                        .setChecked(gPref("dg_md3_title", true)));
-                items.add(UItem.asRoundCheckbox(ID_MD3_BOTTOMNAV, "Нижняя панель навигации")
-                        .setChecked(gPref("dg_md3_bottomnav", false)));
-            }
+            // Material Design 3 временно скрыт из меню (эффекты выключены по умолчанию, код сохранён)
             items.add(UItem.asCheck(ID_GOOEY, "«Липкая» анимация аватарок")
                     .setChecked(gPref("dg_gooey", false)));
             items.add(UItem.asCheck(ID_CUSTOM_THEMES, "Различные темы в чатах")

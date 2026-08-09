@@ -15,7 +15,7 @@ import org.telegram.messenger.MessagesController;
 public class DevGramMaterial3 {
 
     public static boolean loadingEnabled() {
-        return MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", true);
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", false);
     }
 
     // Материаловым виджетам нужна тема Material3 в контексте, иначе не заинфлейтятся/упадут.

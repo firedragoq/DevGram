@@ -378,7 +378,7 @@ public class Switch extends View {
         }
 
         // DevGram (MD3): более высокий трек-пилюля + мелкий тумблер в выкл / крупный во вкл
-        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_switch", true);
+        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_switch", false);
         float trackH = md3 ? AndroidUtilities.dpf2(20) : AndroidUtilities.dpf2(14);
         float trackR = md3 ? AndroidUtilities.dpf2(10) : AndroidUtilities.dpf2(7);
 
