@@ -8971,8 +8971,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void updateFloatingButtonOffset() {
-        final float top = 0;
-        final float baseTranslationY = top;
+        // поднимаем кнопку над нижними вкладками (Чаты/Настройки/Профиль) и системной навигацией
+        final float baseTranslationY = -(navigationBarHeight + additionFloatingButtonOffset + additionalFloatingTranslation);
 
         if (floatingButton3 != null) {
             floatingButton3.setTranslationY(baseTranslationY);
