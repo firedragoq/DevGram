@@ -60,6 +60,20 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_FOLDER_TABS_STYLE = 32;
     private static final int ID_STICKER_SIZE = 33;
     private static final int ID_CENTER_TITLE = 34;
+    // перенос рабочих настроек из скрытого Fork в наше меню
+    private static final int ID_HIDE_ALL_CHATS = 35;
+    private static final int ID_MINI_AVATARS = 36;
+    private static final int ID_HIDE_CONTACTS_DIALOGS = 37;
+    private static final int ID_LAST_SEEN_DOTS = 38;
+
+    private static boolean gPref(String key, boolean def) {
+        return org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean(key, def);
+    }
+
+    private static void gToggle(String key, boolean def) {
+        org.telegram.messenger.MessagesController.getGlobalMainSettings()
+                .edit().putBoolean(key, !gPref(key, def)).apply();
+    }
 
     private org.telegram.ui.Components.DevGramAvatarPreviewCell avatarPreview;
     private org.telegram.ui.Components.DevGramChatListPreviewCell chatListPreview;
@@ -166,7 +180,15 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asCustom(getChatListPreview()));
             items.add(UItem.asCheck(ID_CENTER_TITLE, "Заголовок по центру")
                     .setChecked(DevGramConfig.centerTitle));
-            items.add(UItem.asShadow("Открой экран заново, чтобы применить заголовок."));
+            items.add(UItem.asCheck(ID_HIDE_ALL_CHATS, "Скрыть вкладку «Все чаты»")
+                    .setChecked(gPref("hideAllChatsTab", false)));
+            items.add(UItem.asCheck(ID_MINI_AVATARS, "Мини-аватарки в списке")
+                    .setChecked(!gPref("disableThumbsInDialogList", false)));
+            items.add(UItem.asCheck(ID_HIDE_CONTACTS_DIALOGS, "Скрыть контакты в списке чатов")
+                    .setChecked(gPref("hideContactsInDialogs", false)));
+            items.add(UItem.asCheck(ID_LAST_SEEN_DOTS, "Точки «в сети» в списке")
+                    .setChecked(gPref("enableLastSeenDots", false)));
+            items.add(UItem.asShadow("Часть настроек применяется после перезапуска приложения."));
 
             // — Аватар —
             items.add(UItem.asHeader("Форма аватара"));
@@ -308,6 +330,14 @@ public class DevGramCategoryActivity extends BaseFragment {
         } else if (item.id == ID_CENTER_TITLE) {
             DevGramConfig.setCenterTitle(!DevGramConfig.centerTitle);
             if (chatListPreview != null) chatListPreview.invalidate();
+        } else if (item.id == ID_HIDE_ALL_CHATS) {
+            gToggle("hideAllChatsTab", false);
+        } else if (item.id == ID_MINI_AVATARS) {
+            gToggle("disableThumbsInDialogList", false);
+        } else if (item.id == ID_HIDE_CONTACTS_DIALOGS) {
+            gToggle("hideContactsInDialogs", false);
+        } else if (item.id == ID_LAST_SEEN_DOTS) {
+            gToggle("enableLastSeenDots", false);
         } else if (item.id == ID_DISABLE_MARKDOWN) {
             DevGramConfig.setDisableMarkdown(!DevGramConfig.disableMarkdown);
         } else if (item.id == ID_HIDE_KEYBOARD_ON_SCROLL) {
