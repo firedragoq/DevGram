@@ -101,8 +101,6 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_GOOEY = 47;
     private static final int ID_CUSTOM_THEMES = 48;
     private static final int ID_SEPARATE_HEADERS = 49;
-    private static final int ID_HIDE_DIVIDERS = 57;
-    private static final int ID_FULL_DIVIDERS = 58;
     private static final int ID_ACTIONBAR_TITLE = 59;
     private static final int ID_DIVIDER_STYLE = 60;
     private static final int ID_GLASS_OUTLINE = 61;
@@ -129,7 +127,6 @@ public class DevGramCategoryActivity extends BaseFragment {
         b.setNegativeButton("Отмена", null);
         showDialog(b.create());
     }
-    private static final int ID_GLARE = 50;
     private static final int ID_MD3 = 51;
     private static final int ID_MD3_PROGRESS = 52;
     private static final int ID_MD3_SLIDER = 53;
@@ -382,8 +379,6 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.addCommaAfterMention));
             items.add(UItem.asCheck(ID_TIME_WITH_SECONDS, "Время с секундами")
                     .setChecked(DevGramConfig.isFormatWithSeconds()));
-            items.add(UItem.asCheck(ID_GLASS_MENU, "Стеклянные меню")
-                    .setChecked(DevGramConfig.glassMenu));
             items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
                     .setChecked(DevGramConfig.hideEmojiCategories));
             items.add(UItem.asCheck(ID_NUMBER_ROUNDING, "Отключить округление чисел")
@@ -509,8 +504,6 @@ public class DevGramCategoryActivity extends BaseFragment {
             return;
         } else if (item.id == ID_SEPARATE_HEADERS) {
             gToggle("dg_separateHeaders", false);
-        } else if (item.id == ID_GLARE) {
-            gToggle("dg_glare", true);
         } else if (item.id == ID_MD3) {
             gToggle("dg_md3", true);
         } else if (item.id == ID_MD3_PROGRESS) {
