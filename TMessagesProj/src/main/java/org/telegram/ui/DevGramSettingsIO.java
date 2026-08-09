@@ -36,6 +36,7 @@ public class DevGramSettingsIO {
             {"squareFab", "Квадратная кнопка (FAB)"},
             {"glassMenu", "Стеклянные меню"},
             {"hideEmojiCategories", "Скрыть категории в поиске эмодзи"},
+            {"forceSnow", "Снег в шапке"},
             {"disableMarkdown", "Отключить Markdown"},
             {"hideKeyboardOnScroll", "Скрывать клавиатуру при прокрутке"},
             {"disableGreetingSticker", "Скрыть приветственный стикер"},
@@ -178,6 +179,7 @@ public class DevGramSettingsIO {
             case "squareFab": return DevGramConfig.squareFab;
             case "glassMenu": return DevGramConfig.glassMenu;
             case "hideEmojiCategories": return DevGramConfig.hideEmojiCategories;
+            case "forceSnow": return DevGramConfig.forceSnow;
             case "disableMarkdown": return DevGramConfig.disableMarkdown;
             case "hideKeyboardOnScroll": return DevGramConfig.hideKeyboardOnScroll;
             case "disableGreetingSticker": return DevGramConfig.disableGreetingSticker;

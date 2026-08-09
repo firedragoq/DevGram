@@ -55,6 +55,19 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_SQUARE_FAB = 25;   // квадратная кнопка (FAB)
     private static final int ID_GLASS_MENU = 26;   // стеклянное меню сообщения
     private static final int ID_HIDE_EMOJI_CATEGORIES = 27; // скрыть строку категорий в поиске эмодзи
+    private static final int ID_SYSTEM_EMOJI = 30;
+    private static final int ID_FORCE_SNOW = 31;
+    private static final int ID_FOLDER_TABS_STYLE = 32;
+    private static final int ID_STICKER_SIZE = 33;
+
+    private org.telegram.ui.Components.DevGramAvatarPreviewCell avatarPreview;
+
+    private View getAvatarPreview() {
+        if (avatarPreview == null) {
+            avatarPreview = new org.telegram.ui.Components.DevGramAvatarPreviewCell(getContext());
+        }
+        return avatarPreview;
+    }
     // Чаты
     private static final int ID_DISABLE_MARKDOWN = 22;
     private static final int ID_HIDE_KEYBOARD_ON_SCROLL = 23;
@@ -140,12 +153,14 @@ public class DevGramCategoryActivity extends BaseFragment {
             // Форма аватара (перенесено из скрытого экрана Fork). Пишем pref avatarCorners,
             // который читает AndroidUtilities.avatarCornersType() по всему приложению.
             items.add(UItem.asHeader("Форма аватара"));
+            items.add(UItem.asCustom(getAvatarPreview()));
             items.add(UItem.asSlideView(
                     new String[]{"Круг", "Скруглённый", "Квадрат"},
                     org.telegram.messenger.AndroidUtilities.avatarCornersType(),
                     index -> {
                         org.telegram.messenger.MessagesController.getGlobalMainSettings()
                                 .edit().putInt("avatarCorners", index).apply();
+                        if (avatarPreview != null) avatarPreview.invalidate();
                     }).setId(ID_AVATAR_SHAPE));
             items.add(UItem.asShadow(null));
 
@@ -157,8 +172,25 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.glassMenu));
             items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
                     .setChecked(DevGramConfig.hideEmojiCategories));
+            items.add(UItem.asCheck(ID_SYSTEM_EMOJI, "Системные эмодзи")
+                    .setChecked(DevGramConfig.isUseSystemEmoji()));
+            items.add(UItem.asCheck(ID_FORCE_SNOW, "Снег в шапке")
+                    .setChecked(DevGramConfig.forceSnow));
             items.add(UItem.asShadow("Стеклянные меню: выпадающие меню и панель реакций становятся "
                     + "матовым стеклом. Выключи, если тормозит."));
+
+            items.add(UItem.asHeader("Стиль вкладок папок"));
+            items.add(UItem.asSlideView(
+                    new String[]{"Текст", "Значок + текст", "Значок"},
+                    DevGramConfig.getFolderTabsStyle(),
+                    index -> DevGramConfig.setFolderTabsStyle(index)).setId(ID_FOLDER_TABS_STYLE));
+            items.add(UItem.asShadow(null));
+
+            items.add(UItem.asHeader("Размер стикеров"));
+            items.add(UItem.asIntSlideView(1, 2, (int) DevGramConfig.getStickerSize(), 14,
+                    val -> String.valueOf(val),
+                    val -> DevGramConfig.setStickerSize(val)).setId(ID_STICKER_SIZE));
+            items.add(UItem.asShadow(null));
         } else if (category == CATEGORY_CHATS) {
             items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
                     .setChecked(DevGramConfig.disableMarkdown));
@@ -247,6 +279,10 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setGlassMenu(!DevGramConfig.glassMenu);
         } else if (item.id == ID_HIDE_EMOJI_CATEGORIES) {
             DevGramConfig.setHideEmojiCategories(!DevGramConfig.hideEmojiCategories);
+        } else if (item.id == ID_SYSTEM_EMOJI) {
+            DevGramConfig.setUseSystemEmoji(!DevGramConfig.isUseSystemEmoji());
+        } else if (item.id == ID_FORCE_SNOW) {
+            DevGramConfig.setForceSnow(!DevGramConfig.forceSnow);
         } else if (item.id == ID_DISABLE_MARKDOWN) {
             DevGramConfig.setDisableMarkdown(!DevGramConfig.disableMarkdown);
         } else if (item.id == ID_HIDE_KEYBOARD_ON_SCROLL) {

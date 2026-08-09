@@ -66,6 +66,8 @@ public class DevGramConfig {
     public static boolean glassMenu = true;
     // Скрыть строку категорий в поиске эмодзи/стикеров — в exteraGram ВКЛ по умолчанию (hideCategories).
     public static boolean hideEmojiCategories = true;
+    // Снег поверх шапки всегда (exteraGram ForceSnow).
+    public static boolean forceSnow = false;
 
     // --- раздел «Чаты» (порт из exteraGram) ---
     public static boolean disableMarkdown = false;       // не преобразовывать **/`code` в форматирование
@@ -109,6 +111,7 @@ public class DevGramConfig {
             squareFab = preferences.getBoolean("squareFab", true);
             glassMenu = preferences.getBoolean("glassMenu", true);
             hideEmojiCategories = preferences.getBoolean("hideEmojiCategories", true);
+            forceSnow = preferences.getBoolean("forceSnow", false);
             disableMarkdown = preferences.getBoolean("disableMarkdown", false);
             hideKeyboardOnScroll = preferences.getBoolean("hideKeyboardOnScroll", true);
             disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
@@ -160,6 +163,41 @@ public class DevGramConfig {
         if (preferences != null) {
             preferences.edit().putBoolean("hideEmojiCategories", v).apply();
         }
+    }
+
+    public static void setForceSnow(boolean v) {
+        forceSnow = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("forceSnow", v).apply();
+        }
+    }
+
+    // Системные эмодзи (флаг живёт в SharedConfig — обёртка для нашего меню).
+    public static boolean isUseSystemEmoji() {
+        return org.telegram.messenger.SharedConfig.useSystemEmoji;
+    }
+
+    public static void setUseSystemEmoji(boolean v) {
+        org.telegram.messenger.SharedConfig.useSystemEmoji = v;
+        MessagesController.getGlobalMainSettings().edit().putBoolean("useSystemEmoji", v).apply();
+    }
+
+    // Размер стикеров (0..N) — pref в глобальных настройках, читается ChatMessageCell/LocaleController.
+    public static float getStickerSize() {
+        return MessagesController.getGlobalMainSettings().getFloat("stickerSize", 14f);
+    }
+
+    public static void setStickerSize(float v) {
+        MessagesController.getGlobalMainSettings().edit().putFloat("stickerSize", v).apply();
+    }
+
+    // Стиль вкладок папок (0..2) — pref в глобальных настройках, читается FolderIcons.
+    public static int getFolderTabsStyle() {
+        return MessagesController.getGlobalMainSettings().getInt("folderTabsStyle", 0);
+    }
+
+    public static void setFolderTabsStyle(int v) {
+        MessagesController.getGlobalMainSettings().edit().putInt("folderTabsStyle", v).apply();
     }
 
     public static void setDisableMarkdown(boolean v) {
@@ -231,6 +269,7 @@ public class DevGramConfig {
             squareFab = true;
             glassMenu = true;
             hideEmojiCategories = true;
+            forceSnow = false;
             disableMarkdown = false;
             hideKeyboardOnScroll = true;
             disableGreetingSticker = false;
@@ -264,6 +303,7 @@ public class DevGramConfig {
             o.put("squareFab", squareFab);
             o.put("glassMenu", glassMenu);
             o.put("hideEmojiCategories", hideEmojiCategories);
+            o.put("forceSnow", forceSnow);
             o.put("disableMarkdown", disableMarkdown);
             o.put("hideKeyboardOnScroll", hideKeyboardOnScroll);
             o.put("disableGreetingSticker", disableGreetingSticker);
@@ -298,6 +338,7 @@ public class DevGramConfig {
             setSquareFab(o.optBoolean("squareFab", squareFab));
             setGlassMenu(o.optBoolean("glassMenu", glassMenu));
             setHideEmojiCategories(o.optBoolean("hideEmojiCategories", hideEmojiCategories));
+            setForceSnow(o.optBoolean("forceSnow", forceSnow));
             setDisableMarkdown(o.optBoolean("disableMarkdown", disableMarkdown));
             setHideKeyboardOnScroll(o.optBoolean("hideKeyboardOnScroll", hideKeyboardOnScroll));
             setDisableGreetingSticker(o.optBoolean("disableGreetingSticker", disableGreetingSticker));

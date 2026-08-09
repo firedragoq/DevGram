@@ -124,6 +124,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
 
     private boolean supportsHolidayImage;
     private SnowflakesEffect snowflakesEffect;
+    private SnowflakesEffect devgramForceSnow; // DevGram: снег всегда (forceSnow), независимо от праздников
     private FireworksEffect fireworksEffect;
     private Paint.FontMetricsInt fontMetricsInt;
     private boolean manualStart;
@@ -2239,6 +2240,14 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
 
         super.dispatchDraw(canvas);
+
+        // DevGram (как exteraGram, ForceSnow): снег поверх шапки всегда, если включено
+        if (org.telegram.messenger.DevGramConfig.forceSnow) {
+            if (devgramForceSnow == null) {
+                devgramForceSnow = new SnowflakesEffect(0);
+            }
+            devgramForceSnow.onDraw(this, canvas);
+        }
     }
 
     public void setForceSkipTouches(boolean forceSkipTouches) {
