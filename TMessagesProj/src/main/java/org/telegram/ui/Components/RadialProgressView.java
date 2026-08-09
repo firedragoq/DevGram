@@ -68,9 +68,8 @@ public class RadialProgressView extends View {
         progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         progressPaint.setStyle(Paint.Style.STROKE);
         progressPaint.setStrokeCap(Paint.Cap.ROUND);
-        // DevGram (MD3): более толстый индикатор загрузки
-        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", true);
-        progressPaint.setStrokeWidth(AndroidUtilities.dp(md3 ? 4 : 3));
+        devgramBaseStroke = AndroidUtilities.dp(3);
+        progressPaint.setStrokeWidth(devgramBaseStroke);
         progressPaint.setColor(progressColor);
     }
 
@@ -210,7 +209,8 @@ public class RadialProgressView extends View {
     }
 
     public void setStrokeWidth(float value) {
-        progressPaint.setStrokeWidth(AndroidUtilities.dp(value));
+        devgramBaseStroke = AndroidUtilities.dp(value);
+        progressPaint.setStrokeWidth(devgramBaseStroke);
     }
 
     public void setProgressColor(int color) {
@@ -230,14 +230,23 @@ public class RadialProgressView extends View {
         int x = (getMeasuredWidth() - size) / 2;
         int y = (getMeasuredHeight() - size) / 2;
         cicleRect.set(x, y, x + size, y + size);
+        applyDevgramStroke();
         canvas.drawArc(cicleRect, radOffset, drawingCircleLenght = currentCircleLength, false, progressPaint);
         updateAnimation();
     }
 
     public void draw(Canvas canvas, float cx, float cy) {
         cicleRect.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy +  size / 2f);
+        applyDevgramStroke();
         canvas.drawArc(cicleRect, radOffset, drawingCircleLenght = currentCircleLength, false, progressPaint);
         updateAnimation();
+    }
+
+    // DevGram (MD3): более толстый индикатор — применяем на каждом кадре (не перебивается)
+    private float devgramBaseStroke;
+    private void applyDevgramStroke() {
+        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", true);
+        progressPaint.setStrokeWidth(md3 ? devgramBaseStroke * 1.7f : devgramBaseStroke);
     }
 
     public boolean isCircle() {
