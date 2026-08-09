@@ -76,11 +76,26 @@ public class DevGramChatListPreviewCell extends View {
                 : (rtl ? w - sidePad - blockW : sidePad);
         canvas.drawText(title, bx, cy + AndroidUtilities.dp(6), titlePaint);
         if (showStatus) {
-            // эмодзи-статус (премиум) — цветная скруглённая плашка рядом с именем
+            // премиум-статус — звёздочка рядом с именем
+            float ex = bx + tw + emojiGap + emojiSize / 2f;
             paint.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
-            float ex = bx + tw + emojiGap;
-            rect.set(ex, cy - emojiSize / 2f, ex + emojiSize, cy + emojiSize / 2f);
-            canvas.drawRoundRect(rect, AndroidUtilities.dp(4), AndroidUtilities.dp(4), paint);
+            drawStar(canvas, ex, cy, emojiSize / 2f, paint);
         }
+    }
+
+    private final android.graphics.Path starPath = new android.graphics.Path();
+
+    private void drawStar(Canvas canvas, float cx, float cy, float radius, Paint p) {
+        starPath.reset();
+        float inner = radius * 0.42f;
+        for (int i = 0; i < 10; i++) {
+            float rr = (i % 2 == 0) ? radius : inner;
+            double a = Math.PI / 5 * i - Math.PI / 2;
+            float px = cx + (float) (rr * Math.cos(a));
+            float py = cy + (float) (rr * Math.sin(a));
+            if (i == 0) starPath.moveTo(px, py); else starPath.lineTo(px, py);
+        }
+        starPath.close();
+        canvas.drawPath(starPath, p);
     }
 }

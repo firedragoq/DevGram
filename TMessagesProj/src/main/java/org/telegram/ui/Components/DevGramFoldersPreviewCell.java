@@ -79,8 +79,7 @@ public class DevGramFoldersPreviewCell extends View {
             float cx = left + padH;
             if (iconW > 0) {
                 icon.setColor(fg);
-                rect.set(cx, cy - iconW / 2f, cx + iconW, cy + iconW / 2f);
-                canvas.drawRoundRect(rect, AndroidUtilities.dp(4), AndroidUtilities.dp(4), icon);
+                drawFolderIcon(canvas, cx, cy, iconW);
                 cx += iconW + iconGap;
             }
             if (textW > 0) {
@@ -99,5 +98,24 @@ public class DevGramFoldersPreviewCell extends View {
             }
             x = rtl ? left - AndroidUtilities.dp(8) : left + pillW + AndroidUtilities.dp(8);
         }
+    }
+
+    private final android.graphics.Path folderPath = new android.graphics.Path();
+
+    // силуэт папки (тело + вкладка) в квадрате iconW, вертикально по центру cy
+    private void drawFolderIcon(Canvas canvas, float left, float cy, float s) {
+        float top = cy - s * 0.34f;
+        float bot = cy + s * 0.36f;
+        float r = left + s;
+        float tabW = s * 0.42f;
+        float tabTop = cy - s * 0.44f;
+        folderPath.reset();
+        // вкладка
+        rect.set(left, tabTop, left + tabW, top + AndroidUtilities.dp(3));
+        folderPath.addRoundRect(rect, AndroidUtilities.dp(2), AndroidUtilities.dp(2), android.graphics.Path.Direction.CW);
+        // тело
+        rect.set(left, top, r, bot);
+        folderPath.addRoundRect(rect, AndroidUtilities.dp(3), AndroidUtilities.dp(3), android.graphics.Path.Direction.CW);
+        canvas.drawPath(folderPath, icon);
     }
 }

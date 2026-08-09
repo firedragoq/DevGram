@@ -8959,7 +8959,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void updateFloatingButtonVisibility(boolean animated) {
-        final boolean isVisible = !(onlySelect && initialDialogsType != 10 || folderId != 0 || communityId != 0 || inPreviewMode || (searching && !onlySelect) || floatingButtonHidden);
+        final boolean hideFab = MessagesController.getGlobalMainSettings().getBoolean("dg_hideFab", false);
+        final boolean isVisible = !hideFab && !(onlySelect && initialDialogsType != 10 || folderId != 0 || communityId != 0 || inPreviewMode || (searching && !onlySelect) || floatingButtonHidden);
 
         if (floatingButton3 != null) {
             floatingButton3.setButtonVisible(isVisible, animated);
@@ -12885,9 +12886,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (StoryRecorder.isVisible() || (getLastStoryViewer() != null && getLastStoryViewer().isFullyVisible())) {
             animated = false;
         }
+        final boolean dgHideStories = MessagesController.getGlobalMainSettings().getBoolean("dg_hideStories", false);
         boolean onlySelfStories = !isArchive() && getStoriesController().hasOnlySelfStories();
         boolean newVisibility;
-        if (communityId != 0) {
+        if (communityId != 0 || dgHideStories) {
             newVisibility = false;
         } else if (isArchive()) {
             boolean hideStoriesInArchive = MessagesController.getGlobalMainSettings().getBoolean("hideStoriesInArchive", false);
@@ -12895,6 +12897,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         } else {
             newVisibility = !onlySelfStories && getStoriesController().hasStories();
             onlySelfStories = getStoriesController().hasOnlySelfStories();
+        }
+        if (dgHideStories) {
+            onlySelfStories = false;
         }
 
         hasOnlySlefStories = onlySelfStories;
