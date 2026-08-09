@@ -11297,7 +11297,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     boolean floatingButtonHidden;
 
     private void hideFloatingButton(boolean hide) {
-        hide = true;
         if (rightSlidingDialogContainer.hasFragment()) {
             hide = true;
         }
