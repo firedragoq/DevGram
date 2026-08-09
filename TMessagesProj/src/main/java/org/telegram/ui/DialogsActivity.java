@@ -8971,7 +8971,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void updateFloatingButtonOffset() {
-        final float top = Integer.MAX_VALUE;
+        final float top = 0;
         final float baseTranslationY = top;
 
         if (floatingButton3 != null) {
