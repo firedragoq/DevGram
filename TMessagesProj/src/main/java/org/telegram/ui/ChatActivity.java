@@ -44082,26 +44082,8 @@ public class ChatActivity extends BaseFragment implements
         if (getParentActivity() == null || themeDelegate == null) {
             return;
         }
-        java.util.ArrayList<Theme.ThemeInfo> themes = Theme.themes;
-        java.util.ArrayList<CharSequence> labels = new java.util.ArrayList<>();
-        java.util.ArrayList<String> names = new java.util.ArrayList<>();
         String current = MessagesController.getGlobalMainSettings().getString("dg_chattheme_" + dialog_id, null);
-        labels.add((current == null ? "• " : "    ") + "По умолчанию");
-        names.add(null);
-        if (themes != null) {
-            for (Theme.ThemeInfo t : themes) {
-                if (t == null || TextUtils.isEmpty(t.getName())) {
-                    continue;
-                }
-                boolean sel = t.getName().equals(current);
-                labels.add((sel ? "• " : "    ") + t.getName());
-                names.add(t.getName());
-            }
-        }
-        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity(), themeDelegate);
-        b.setTitle("Тема этого чата");
-        b.setItems(labels.toArray(new CharSequence[0]), (d, which) -> {
-            String chosen = names.get(which);
+        DevGramChatThemeSheet sheet = new DevGramChatThemeSheet(getParentActivity(), dialog_id, current, themeDelegate, chosen -> {
             android.content.SharedPreferences.Editor e = MessagesController.getGlobalMainSettings().edit();
             if (chosen == null) {
                 e.remove("dg_chattheme_" + dialog_id);
@@ -44111,8 +44093,7 @@ public class ChatActivity extends BaseFragment implements
             e.apply();
             themeDelegate.devgramApplyLocalTheme(chosen);
         });
-        b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-        showDialog(b.create());
+        showDialog(sheet);
     }
 
     private void setChatThemeEmoticon(final TLRPC.ChatTheme theme) {
