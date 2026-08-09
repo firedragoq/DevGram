@@ -56,7 +56,8 @@ public class DevGramChatThemeSheet extends BottomSheet {
         androidx.recyclerview.widget.LinearLayoutManager lm =
                 new androidx.recyclerview.widget.LinearLayoutManager(context, androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL, false);
         listView.setLayoutManager(lm);
-        listView.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(6), AndroidUtilities.dp(12), AndroidUtilities.dp(16));
+        listView.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(6), AndroidUtilities.dp(12),
+                AndroidUtilities.dp(12) + AndroidUtilities.navigationBarHeight);
         listView.setClipToPadding(false);
 
         final ArrayList<Item> items = buildItems(context);
@@ -94,7 +95,7 @@ public class DevGramChatThemeSheet extends BottomSheet {
             }
             AndroidUtilities.runOnUIThread(this::dismiss, 180);
         });
-        root.addView(listView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 130));
+        root.addView(listView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         setCustomView(root);
     }
