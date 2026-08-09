@@ -64,6 +64,17 @@ public class CircularProgressDrawable extends Drawable {
             start = SystemClock.elapsedRealtime();
         }
         updateSegment();
+        // DevGram (MD3): более толстый индикатор + фоновый трек-кольцо
+        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", true);
+        if (md3) {
+            paint.setStrokeWidth(thickness * 1.8f);
+            int col = paint.getColor();
+            paint.setColor((col & 0x00FFFFFF) | 0x33000000);
+            canvas.drawArc(bounds, 0, 360, false, paint);
+            paint.setColor(col);
+        } else {
+            paint.setStrokeWidth(thickness);
+        }
         canvas.drawArc(
             bounds,
             angleOffset + segment[0],

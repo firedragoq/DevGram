@@ -229,24 +229,36 @@ public class RadialProgressView extends View {
     protected void onDraw(Canvas canvas) {
         int x = (getMeasuredWidth() - size) / 2;
         int y = (getMeasuredHeight() - size) / 2;
+        if (drawDevgramMaterial(canvas, getMeasuredWidth() / 2f, getMeasuredHeight() / 2f)) {
+            return;
+        }
         cicleRect.set(x, y, x + size, y + size);
-        applyDevgramStroke();
+        progressPaint.setStrokeWidth(devgramBaseStroke);
         canvas.drawArc(cicleRect, radOffset, drawingCircleLenght = currentCircleLength, false, progressPaint);
         updateAnimation();
     }
 
     public void draw(Canvas canvas, float cx, float cy) {
+        if (drawDevgramMaterial(canvas, cx, cy)) {
+            return;
+        }
         cicleRect.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy +  size / 2f);
-        applyDevgramStroke();
+        progressPaint.setStrokeWidth(devgramBaseStroke);
         canvas.drawArc(cicleRect, radOffset, drawingCircleLenght = currentCircleLength, false, progressPaint);
         updateAnimation();
     }
 
-    // DevGram (MD3): более толстый индикатор — применяем на каждом кадре (не перебивается)
+    // DevGram (MD3): настоящий Material-индикатор поверх (getNewLoadingStyle у exteraGram)
     private float devgramBaseStroke;
-    private void applyDevgramStroke() {
-        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", true);
-        progressPaint.setStrokeWidth(md3 ? devgramBaseStroke * 1.7f : devgramBaseStroke);
+    private DevGramMaterial3.CircularHost devgramMaterial;
+    private boolean drawDevgramMaterial(Canvas canvas, float cx, float cy) {
+        if (!noProgress || !DevGramMaterial3.loadingEnabled() || size <= 0) {
+            return false; // определённый прогресс (с процентами) рисуем по-старому
+        }
+        if (devgramMaterial == null) {
+            devgramMaterial = new DevGramMaterial3.CircularHost(this);
+        }
+        return devgramMaterial.draw(canvas, cx, cy, size, (int) (devgramBaseStroke * 1.4f), progressColor, progressPaint.getAlpha());
     }
 
     public boolean isCircle() {
