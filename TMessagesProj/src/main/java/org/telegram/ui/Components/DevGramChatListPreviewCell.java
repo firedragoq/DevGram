@@ -4,7 +4,11 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.text.TextPaint;
 import android.view.View;
 
@@ -12,10 +16,14 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DevGramConfig;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.UserObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 
 // DevGram: превью «Список чатов» (как ChatListPreviewCell в exteraGram) — макет верхней панели
-// диалогов: заголовок + эмодзи-статус + меню ⋮. Отражает «Заголовок по центру» и «Скрыть статус».
+// диалогов: заголовок + реальный эмодзи-статус пользователя + меню ⋮. Отражает «Заголовок по центру».
 public class DevGramChatListPreviewCell extends View {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -23,16 +31,50 @@ public class DevGramChatListPreviewCell extends View {
     private final TextPaint titlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
 
+    private final int currentAccount = UserConfig.selectedAccount;
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable statusDrawable;
+    private final boolean hasStatus;
+
     public DevGramChatListPreviewCell(Context context) {
         super(context);
         setWillNotDraw(false);
         setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         titlePaint.setTypeface(AndroidUtilities.bold());
         titlePaint.setTextSize(AndroidUtilities.dp(17));
+
+        TLRPC.User user = UserConfig.getInstance(currentAccount).getCurrentUser();
+        Long emojiStatusId = user != null ? UserObject.getEmojiStatusDocumentId(user) : null;
+        boolean premium = user != null && MessagesController.getInstance(currentAccount).isPremiumUser(user);
+        hasStatus = emojiStatusId != null || premium;
+
+        if (hasStatus) {
+            statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, AndroidUtilities.dp(20));
+            if (emojiStatusId != null) {
+                statusDrawable.set(emojiStatusId, false);
+                statusDrawable.setParticles(user.emoji_status instanceof TLRPC.TL_emojiStatusCollectible, false);
+            } else {
+                Drawable star = getResources().getDrawable(R.drawable.msg_premium_liststar).mutate();
+                star.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_profile_verifiedBackground), PorterDuff.Mode.MULTIPLY));
+                statusDrawable.set(star, false);
+            }
+            statusDrawable.setColor(Theme.getColor(Theme.key_profile_verifiedBackground));
+        }
     }
 
-    private static boolean hideStatus() {
-        return MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false);
+    public boolean userHasStatus() {
+        return hasStatus;
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (statusDrawable != null) statusDrawable.attach();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (statusDrawable != null) statusDrawable.detach();
     }
 
     @Override
@@ -55,7 +97,6 @@ public class DevGramChatListPreviewCell extends View {
         canvas.drawRoundRect(rect, AndroidUtilities.dp(12), AndroidUtilities.dp(12), paint);
 
         float sidePad = AndroidUtilities.dp(30);
-        boolean showStatus = !hideStatus();
 
         // меню ⋮ у правого края
         dots.setColor(Theme.getColor(Theme.key_actionBarDefaultIcon));
@@ -64,38 +105,22 @@ public class DevGramChatListPreviewCell extends View {
             canvas.drawCircle(dotX, cy + i * AndroidUtilities.dp(6), AndroidUtilities.dp(2), dots);
         }
 
-        // заголовок + эмодзи-статус
+        // заголовок + реальный эмодзи-статус
         titlePaint.setColor(Theme.getColor(Theme.key_actionBarDefaultTitle));
         String title = "DevGram";
         float tw = titlePaint.measureText(title);
-        float emojiSize = showStatus ? AndroidUtilities.dp(18) : 0;
-        float emojiGap = showStatus ? AndroidUtilities.dp(6) : 0;
-        float blockW = tw + emojiGap + emojiSize;
+        float statusSize = statusDrawable != null ? AndroidUtilities.dp(20) : 0;
+        float statusGap = statusDrawable != null ? AndroidUtilities.dp(6) : 0;
+        float blockW = tw + statusGap + statusSize;
 
         float bx = DevGramConfig.centerTitle ? (w - blockW) / 2f
                 : (rtl ? w - sidePad - blockW : sidePad);
         canvas.drawText(title, bx, cy + AndroidUtilities.dp(6), titlePaint);
-        if (showStatus) {
-            // премиум-статус — звёздочка рядом с именем
-            float ex = bx + tw + emojiGap + emojiSize / 2f;
-            paint.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
-            drawStar(canvas, ex, cy, emojiSize / 2f, paint);
+        if (statusDrawable != null) {
+            float ex = bx + tw + statusGap;
+            statusDrawable.setBounds((int) ex, (int) (cy - statusSize / 2f),
+                    (int) (ex + statusSize), (int) (cy + statusSize / 2f));
+            statusDrawable.draw(canvas);
         }
-    }
-
-    private final android.graphics.Path starPath = new android.graphics.Path();
-
-    private void drawStar(Canvas canvas, float cx, float cy, float radius, Paint p) {
-        starPath.reset();
-        float inner = radius * 0.42f;
-        for (int i = 0; i < 10; i++) {
-            float rr = (i % 2 == 0) ? radius : inner;
-            double a = Math.PI / 5 * i - Math.PI / 2;
-            float px = cx + (float) (rr * Math.cos(a));
-            float py = cy + (float) (rr * Math.sin(a));
-            if (i == 0) starPath.moveTo(px, py); else starPath.lineTo(px, py);
-        }
-        starPath.close();
-        canvas.drawPath(starPath, p);
     }
 }

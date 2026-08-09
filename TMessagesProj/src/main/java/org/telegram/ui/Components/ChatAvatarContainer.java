@@ -1054,9 +1054,6 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
 
 
     public void setSubtitle(CharSequence value) {
-        if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_hideStatus", false)) {
-            value = "";
-        }
         if (lastSubtitle == null) {
             if (subtitleTextView != null) {
                 subtitleTextView.setText(value);

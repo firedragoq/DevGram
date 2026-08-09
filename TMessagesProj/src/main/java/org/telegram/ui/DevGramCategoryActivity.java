@@ -258,8 +258,11 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asCustom(getChatListPreview()));
             items.add(UItem.asCheck(ID_FORCE_SNOW, "Принудительный снег")
                     .setChecked(DevGramConfig.forceSnow));
-            items.add(UItem.asCheck(ID_HIDE_STATUS, "Скрыть статус")
-                    .setChecked(gPref("dg_hideStatus", false)));
+            // «Скрыть статус» — только если у пользователя есть эмодзи-статус/премиум
+            if (chatListPreview != null && chatListPreview.userHasStatus()) {
+                items.add(UItem.asCheck(ID_HIDE_STATUS, "Скрыть статус")
+                        .setChecked(gPref("dg_hideStatus", false)));
+            }
             items.add(UItem.asCheck(ID_CENTER_TITLE, "Заголовок по центру")
                     .setChecked(DevGramConfig.centerTitle));
             items.add(UItem.asCheck(ID_HIDE_STORIES, "Скрыть истории")
