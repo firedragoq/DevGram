@@ -166,12 +166,36 @@ public class DevGramCategoryActivity extends BaseFragment {
     private org.telegram.ui.Components.DevGramFoldersPreviewCell foldersPreview;
     private org.telegram.ui.Components.DevGramFabPreviewCell fabPreview;
     private org.telegram.ui.Components.DevGramMessagesPreviewCell messagesPreview;
+    private org.telegram.ui.Components.DevGramStickerSizePreviewCell stickerSizePreview;
+    private org.telegram.ui.Components.DevGramDoubleTapPreviewCell doubleTapPreview;
 
     private View getMessagesPreview() {
         if (messagesPreview == null) {
             messagesPreview = new org.telegram.ui.Components.DevGramMessagesPreviewCell(getContext());
         }
         return messagesPreview;
+    }
+
+    private View getStickerSizePreview() {
+        if (stickerSizePreview == null) {
+            stickerSizePreview = new org.telegram.ui.Components.DevGramStickerSizePreviewCell(getContext());
+        }
+        return stickerSizePreview;
+    }
+
+    private View getDoubleTapPreview() {
+        if (doubleTapPreview == null) {
+            doubleTapPreview = new org.telegram.ui.Components.DevGramDoubleTapPreviewCell(getContext());
+        }
+        return doubleTapPreview;
+    }
+
+    private org.telegram.ui.Components.DevGramStickerShapeCell stickerShapeCell;
+    private View getStickerShapePreview() {
+        if (stickerShapeCell == null) {
+            stickerShapeCell = new org.telegram.ui.Components.DevGramStickerShapeCell(getContext());
+        }
+        return stickerShapeCell;
     }
 
     private View getAvatarPreview() {
@@ -433,9 +457,13 @@ public class DevGramCategoryActivity extends BaseFragment {
             // Порядок основан на ChatsPreferencesActivity из ExteraGram. Уже имевшиеся
             // функции DevGram не потеряны: они разнесены по подходящим секциям.
             items.add(UItem.asHeader("Стикеры"));
+            items.add(UItem.asCustom(getStickerSizePreview()));
             items.add(UItem.asIntSlideView(1, 2, (int) DevGramConfig.getStickerSize(), 14,
                     val -> String.valueOf(val),
-                    val -> DevGramConfig.setStickerSize(val)).setId(ID_STICKER_SIZE));
+                    val -> {
+                        DevGramConfig.setStickerSize(val);
+                        if (stickerSizePreview != null) stickerSizePreview.invalidate();
+                    }).setId(ID_STICKER_SIZE));
             items.add(UItem.asCheck(ID_FULL_RECENT_STICKERS, "Не ограничивать недавние стикеры")
                     .setChecked(gPref("fullRecentStickers", true)));
             items.add(UItem.asCheck(ID_SHOW_ARCHIVED_STICKERS, "Показывать архивные стикеры")
@@ -444,10 +472,15 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.hideEmojiCategories));
             items.add(UItem.asShadow(null));
 
+            items.add(UItem.asHeader("Форма стикеров"));
+            items.add(UItem.asCustom(getStickerShapePreview()));
+            items.add(UItem.asShadow(null));
+
             items.add(UItem.asHeader("Двойное нажатие"));
+            items.add(UItem.asCustom(getDoubleTapPreview()));
             items.add(UItem.asButton(ID_DOUBLE_TAP_REACTION, "Реакция по двойному нажатию",
                     org.telegram.messenger.MediaDataController.getInstance(currentAccount).getDoubleTapReaction()));
-            items.add(UItem.asShadow("Откроется экран выбора реакции с интерактивным превью."));
+            items.add(UItem.asShadow("Дважды нажми на превью — проиграется выбранная реакция."));
 
             items.add(UItem.asHeader("Поведение чата"));
             items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
