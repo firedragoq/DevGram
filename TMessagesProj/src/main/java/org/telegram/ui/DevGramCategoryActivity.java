@@ -432,6 +432,23 @@ public class DevGramCategoryActivity extends BaseFragment {
         } else if (category == CATEGORY_CHATS) {
             // Порядок основан на ChatsPreferencesActivity из ExteraGram. Уже имевшиеся
             // функции DevGram не потеряны: они разнесены по подходящим секциям.
+            items.add(UItem.asHeader("Стикеры"));
+            items.add(UItem.asIntSlideView(1, 2, (int) DevGramConfig.getStickerSize(), 14,
+                    val -> String.valueOf(val),
+                    val -> DevGramConfig.setStickerSize(val)).setId(ID_STICKER_SIZE));
+            items.add(UItem.asCheck(ID_FULL_RECENT_STICKERS, "Не ограничивать недавние стикеры")
+                    .setChecked(gPref("fullRecentStickers", true)));
+            items.add(UItem.asCheck(ID_SHOW_ARCHIVED_STICKERS, "Показывать архивные стикеры")
+                    .setChecked(gPref("showArchivedStickers", false)));
+            items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
+                    .setChecked(DevGramConfig.hideEmojiCategories));
+            items.add(UItem.asShadow(null));
+
+            items.add(UItem.asHeader("Двойное нажатие"));
+            items.add(UItem.asButton(ID_DOUBLE_TAP_REACTION, "Реакция по двойному нажатию",
+                    org.telegram.messenger.MediaDataController.getInstance(currentAccount).getDoubleTapReaction()));
+            items.add(UItem.asShadow("Откроется экран выбора реакции с интерактивным превью."));
+
             items.add(UItem.asHeader("Поведение чата"));
             items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
                     .setChecked(DevGramConfig.disableMarkdown));
@@ -455,27 +472,6 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.isFormatWithSeconds()));
             items.add(UItem.asShadow("Настройки применяются к полю ввода и навигации внутри чатов."));
 
-            items.add(UItem.asHeader("Реакции"));
-            items.add(UItem.asCheck(ID_DISABLE_QUICK_REACTION, "Отключить быструю реакцию")
-                    .setChecked(gPref("disableQuickReaction", false)));
-            items.add(UItem.asCheck(ID_HIDE_MESSAGE_REACTIONS, "Скрыть реакции под сообщениями")
-                    .setChecked(gPref("hideMessageReactions", false)));
-            items.add(UItem.asCheck(ID_HIDE_SAVED_TAGS, "Скрыть теги в Избранном")
-                    .setChecked(gPref("hideSavedMessagesTags", false)));
-            items.add(UItem.asShadow(null));
-
-            items.add(UItem.asHeader("Стикеры"));
-            items.add(UItem.asIntSlideView(1, 2, (int) DevGramConfig.getStickerSize(), 14,
-                    val -> String.valueOf(val),
-                    val -> DevGramConfig.setStickerSize(val)).setId(ID_STICKER_SIZE));
-            items.add(UItem.asCheck(ID_FULL_RECENT_STICKERS, "Не ограничивать недавние стикеры")
-                    .setChecked(gPref("fullRecentStickers", true)));
-            items.add(UItem.asCheck(ID_SHOW_ARCHIVED_STICKERS, "Показывать архивные стикеры")
-                    .setChecked(gPref("showArchivedStickers", false)));
-            items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
-                    .setChecked(DevGramConfig.hideEmojiCategories));
-            items.add(UItem.asShadow(null));
-
             items.add(UItem.asHeader("Сообщения"));
             items.add(UItem.asCustom(getMessagesPreview()));
             items.add(UItem.asCheck(ID_REMOVE_MESSAGE_TAIL, "Убрать хвост сообщения")
@@ -486,10 +482,14 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.hideShareButton));
             items.add(UItem.asShadow("Изменения сразу отображаются на превью выше."));
 
-            items.add(UItem.asHeader("Двойное нажатие"));
-            items.add(UItem.asButton(ID_DOUBLE_TAP_REACTION, "Реакция по двойному нажатию",
-                    org.telegram.messenger.MediaDataController.getInstance(currentAccount).getDoubleTapReaction()));
-            items.add(UItem.asShadow("Откроется экран выбора реакции с интерактивным превью."));
+            items.add(UItem.asHeader("Реакции"));
+            items.add(UItem.asCheck(ID_DISABLE_QUICK_REACTION, "Отключить быструю реакцию")
+                    .setChecked(gPref("disableQuickReaction", false)));
+            items.add(UItem.asCheck(ID_HIDE_MESSAGE_REACTIONS, "Скрыть реакции под сообщениями")
+                    .setChecked(gPref("hideMessageReactions", false)));
+            items.add(UItem.asCheck(ID_HIDE_SAVED_TAGS, "Скрыть теги в Избранном")
+                    .setChecked(gPref("hideSavedMessagesTags", false)));
+            items.add(UItem.asShadow(null));
 
             items.add(UItem.asHeader("Функции ИИ"));
             items.add(UItem.asButton(ID_AI_CHAT, "ИИ-чат",
