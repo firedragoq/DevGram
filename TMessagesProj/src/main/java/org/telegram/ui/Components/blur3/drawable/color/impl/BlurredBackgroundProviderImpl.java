@@ -142,7 +142,13 @@ public class BlurredBackgroundProviderImpl {
                             Theme.key_actionBarDefault : Theme.key_chat_topPanelBackground, r), 255);
                     }
 
-                    final float alpha = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f;
+                    final boolean md3Header = org.telegram.ui.Components.DevGramMaterial3.enabled()
+                            && org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false);
+                    final float alpha = md3Header
+                            ? (LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)
+                                ? org.telegram.ui.Components.DevGramMaterial3.GLASS_ALPHA_DARK
+                                : org.telegram.ui.Components.DevGramMaterial3.GLASS_ALPHA_LIGHT)
+                            : (LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f);
                     final int colorBg = Theme.getColor(Theme.key_chat_topPanelBackground, r);
                     return Theme.multAlpha(colorBg, alpha);
                 })

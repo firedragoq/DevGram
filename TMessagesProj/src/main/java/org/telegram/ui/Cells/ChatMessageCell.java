@@ -7069,7 +7069,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     drawSideButton = 2;
                 }
             }
-            drawSummarizeButton = TranslateController.isSummarizable(messageObject);
+            drawSummarizeButton = TranslateController.isSummarizable(messageObject)
+                    && !MessagesController.getGlobalMainSettings().getBoolean("dg_hideAiSummaries", false);
             hasReplyQuote = false;
             isReplyQuote = false;
             isReplyTaskOrPollOption = false;
@@ -18537,7 +18538,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         } else if (edited) {
             timeString = AppGlobalConfig.getInstance(currentAccount).messagePrimaryEditedDate.get() ?
                 LocaleController.formatPmEditedDate(currentMessagesGroup != null ? currentMessagesGroup.getMaxEditDate() : messageObject.messageOwner.edit_date) :
-                (getString(R.string.EditedMessage) + " " + LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000));
+                ((org.telegram.messenger.DevGramConfig.replaceEditedWithIcon ? "✎" : getString(R.string.EditedMessage))
+                    + " " + LocaleController.getInstance().getFormatterDay().format((long) (messageObject.messageOwner.date) * 1000));
         } else if (currentMessageObject.isSaved && currentMessageObject.messageOwner.fwd_from != null && (currentMessageObject.messageOwner.fwd_from.date != 0 || currentMessageObject.messageOwner.fwd_from.saved_date != 0)) {
             int date = currentMessageObject.messageOwner.fwd_from.saved_date;
             if (date == 0) {
@@ -18721,6 +18723,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     protected boolean checkNeedDrawShareButton(MessageObject messageObject) {
+        if (org.telegram.messenger.DevGramConfig.hideShareButton) return false;
         if (isReportChat) return false;
         if (currentMessageObject.deleted && !currentMessageObject.deletedByThanos) return false;
         if (currentMessageObject.isSponsored()) return false;

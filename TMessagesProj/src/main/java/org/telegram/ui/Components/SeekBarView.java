@@ -35,7 +35,10 @@ import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.core.graphics.ColorUtils;
+
+import com.google.android.material.slider.Slider;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.Emoji;
@@ -75,6 +78,8 @@ public class SeekBarView extends FrameLayout {
     private int transitionThumbX;
     private int separatorsCount;
     private int lineWidthDp = 3;
+    private Slider materialSlider;
+    private boolean ignoreMaterialSliderChanges;
 
     private boolean twoSided;
     private final Theme.ResourcesProvider resourcesProvider;
@@ -136,6 +141,7 @@ public class SeekBarView extends FrameLayout {
         };
         textViewSwitcher.setIsCenter();
         addView(textViewSwitcher, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        updateMaterialSliderState();
 
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
         setAccessibilityDelegate(seekBarAccessibilityDelegate = new FloatSeekBarAccessibilityDelegate(inPercents) {
@@ -171,6 +177,7 @@ public class SeekBarView extends FrameLayout {
 
     public void setSeparatorsCount(int separatorsCount) {
         this.separatorsCount = separatorsCount;
+        updateMaterialSliderState();
     }
 
     public void setColors(int inner, int outer) {
@@ -179,10 +186,12 @@ public class SeekBarView extends FrameLayout {
         if (hoverDrawable != null) {
             Theme.setSelectorDrawableColor(hoverDrawable, ColorUtils.setAlphaComponent(outer, 40), true);
         }
+        updateMaterialSliderColors();
     }
 
     public void setTwoSided(boolean value) {
         twoSided = value;
+        updateMaterialSliderState();
     }
 
     public boolean isTwoSided() {
@@ -202,11 +211,13 @@ public class SeekBarView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
+        if (isUsingMaterialSlider()) return false;
         return onTouch(ev);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (isUsingMaterialSlider()) return false;
         return onTouch(event);
     }
 
@@ -220,10 +231,12 @@ public class SeekBarView extends FrameLayout {
             setProgress(minProgress, false);
         }
         invalidate();
+        updateMaterialSliderState();
     }
 
     public void setDelegate(SeekBarViewDelegate seekBarViewDelegate) {
         delegate = seekBarViewDelegate;
+        updateMaterialSliderState();
     }
 
     boolean captured;
@@ -340,6 +353,7 @@ public class SeekBarView extends FrameLayout {
 
     public void setLineWidth(int dp) {
         lineWidthDp = dp;
+        updateMaterialSliderState();
     }
 
     int lastValue;
@@ -357,6 +371,9 @@ public class SeekBarView extends FrameLayout {
     }
 
     public float getProgress() {
+        if (isUsingMaterialSlider()) {
+            return progressFromMaterialValue(materialSlider.getValue());
+        }
         if (getMeasuredWidth() == 0) {
             return progressToSet;
         }
@@ -368,6 +385,9 @@ public class SeekBarView extends FrameLayout {
     }
 
     public void setProgress(float progress, boolean animated) {
+        if (isUsingMaterialSlider()) {
+            setMaterialSliderValue(progressToMaterialValue(progress));
+        }
         if (getMeasuredWidth() == 0) {
             progressToSet = progress;
             return;
@@ -403,6 +423,7 @@ public class SeekBarView extends FrameLayout {
     public void setBufferedProgress(float progress) {
         bufferedProgress = progress;
         invalidate();
+        updateMaterialSliderState();
     }
 
     @Override
@@ -414,6 +435,7 @@ public class SeekBarView extends FrameLayout {
             setProgress(progressToSet);
             progressToSet = -100;
         }
+        updateMaterialSliderState();
     }
 
     @Override
@@ -436,6 +458,7 @@ public class SeekBarView extends FrameLayout {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        if (isUsingMaterialSlider()) return;
         int thumbX = this.thumbX;
         if (!twoSided && separatorsCount > 1) {
             float step = (getMeasuredWidth() - selectorWidth) / ((float) separatorsCount - 1f);
@@ -539,7 +562,7 @@ public class SeekBarView extends FrameLayout {
         if (radius <= 0) {
             return;
         }
-        if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", false)) {
+        if (DevGramMaterial3.enabled() && org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", true)) {
             // Material 3: тумблер — узкая высокая вертикальная планка
             float w = AndroidUtilities.dp(4);
             float h = Math.max(radius * 3f, AndroidUtilities.dp(20));
@@ -548,6 +571,142 @@ public class SeekBarView extends FrameLayout {
         } else {
             canvas.drawCircle(cx, cy, radius, paint);
         }
+    }
+
+    // ExteraGram 12.9.0 uses a real Material 3 Slider for compatible seek bars.
+    private boolean materialSliderEnabled() {
+        return DevGramMaterial3.enabled()
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_slider", true);
+    }
+
+    private boolean canUseMaterialSlider() {
+        return materialSliderEnabled() && !twoSided && minProgress <= 0f
+                && bufferedProgress <= 0f && lineWidthDp == 3
+                && (timestamps == null || timestamps.isEmpty());
+    }
+
+    private boolean isUsingMaterialSlider() {
+        return materialSlider != null && materialSlider.getVisibility() == VISIBLE;
+    }
+
+    private void initMaterialSlider() {
+        Context themed = new ContextThemeWrapper(getContext(), com.google.android.material.R.style.Theme_Material3_DayNight);
+        materialSlider = new Slider(themed);
+        materialSlider.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        materialSlider.setFocusable(false);
+        materialSlider.setFocusableInTouchMode(false);
+        materialSlider.setValueFrom(0f);
+        materialSlider.setValueTo(1f);
+        materialSlider.setTrackHeight(dp(8));
+        materialSlider.setThumbHeight(dp(24));
+        materialSlider.setThumbWidth(dp(3));
+        materialSlider.setTrackStopIndicatorSize(0);
+        materialSlider.setHaloRadius(0);
+        materialSlider.setLabelBehavior(2);
+        materialSlider.setTickVisible(false);
+        materialSlider.addOnChangeListener((slider, value, fromUser) -> {
+            if (ignoreMaterialSliderChanges || !fromUser) return;
+            float progress = progressFromMaterialValue(value);
+            setProgressFromMaterialSlider(progress);
+            if (reportChanges) setSeekBarDrag(false, progress);
+        });
+        materialSlider.addOnSliderTouchListener(new Slider.OnSliderTouchListener() {
+            @Override
+            public void onStartTrackingTouch(Slider slider) {
+                pressedDelayed = pressed = true;
+                if (delegate != null) delegate.onSeekBarPressed(true);
+            }
+
+            @Override
+            public void onStopTrackingTouch(Slider slider) {
+                float progress = progressFromMaterialValue(slider.getValue());
+                setProgressFromMaterialSlider(progress);
+                setSeekBarDrag(true, progress);
+                if (delegate != null) delegate.onSeekBarPressed(false);
+                pressed = false;
+                AndroidUtilities.runOnUIThread(() -> pressedDelayed = false, 50);
+            }
+        });
+        materialSlider.setVisibility(GONE);
+        materialSlider.setEnabled(isEnabled());
+        addView(materialSlider, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.CENTER));
+    }
+
+    private void updateMaterialSliderState() {
+        boolean use = canUseMaterialSlider();
+        if (use && materialSlider == null) initMaterialSlider();
+        if (materialSlider == null) return;
+        materialSlider.setVisibility(use ? VISIBLE : GONE);
+        textViewSwitcher.setVisibility(use ? GONE : VISIBLE);
+        if (!use) return;
+        int steps = delegate == null ? 0 : delegate.getStepsCount();
+        if (steps <= 0 && separatorsCount > 1) steps = separatorsCount - 1;
+        float valueTo = steps > 0 ? steps : 1f;
+        // Material validates the current value against the new step on draw. Temporarily
+        // make the slider continuous while changing its range, then install an already
+        // quantized value before enabling discrete steps.
+        materialSlider.setStepSize(0f);
+        if (materialSlider.getValue() > valueTo) setMaterialSliderValue(valueTo);
+        materialSlider.setValueTo(valueTo);
+        float p = getMeasuredWidth() == 0 ? Math.max(0, progressToSet) : thumbX / (float) Math.max(1, getMeasuredWidth() - selectorWidth);
+        float value = progressToMaterialValue(p);
+        if (steps > 0) value = Math.round(value);
+        setMaterialSliderValue(value);
+        materialSlider.setStepSize(steps > 0 ? 1f : 0f);
+        if (steps > 0) {
+            materialSlider.setTickVisible(true);
+            materialSlider.setTickActiveRadius(dp(2));
+            materialSlider.setTickInactiveRadius(dp(2));
+        } else {
+            materialSlider.setTickVisible(false);
+        }
+        updateMaterialSliderColors();
+    }
+
+    private void updateMaterialSliderColors() {
+        if (materialSlider == null) return;
+        int active = outerPaint1.getColor();
+        int inactive = innerPaint1.getColor() != 0 ? innerPaint1.getColor() : getThemedColor(Theme.key_player_progressBackground);
+        materialSlider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(active));
+        materialSlider.setThumbTintList(android.content.res.ColorStateList.valueOf(active));
+        materialSlider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(inactive));
+        materialSlider.setTickActiveTintList(android.content.res.ColorStateList.valueOf(inactive));
+        materialSlider.setTickInactiveTintList(android.content.res.ColorStateList.valueOf(inactive));
+    }
+
+    private float progressToMaterialValue(float progress) {
+        float max = materialSlider == null ? 1f : materialSlider.getValueTo();
+        return Math.max(0f, Math.min(max, progress * max));
+    }
+
+    private float progressFromMaterialValue(float value) {
+        return materialSlider == null ? value : value / Math.max(1f, materialSlider.getValueTo());
+    }
+
+    private void setMaterialSliderValue(float value) {
+        if (materialSlider == null) return;
+        value = Math.max(materialSlider.getValueFrom(), Math.min(materialSlider.getValueTo(), value));
+        float step = materialSlider.getStepSize();
+        if (step > 0f) {
+            value = materialSlider.getValueFrom()
+                    + Math.round((value - materialSlider.getValueFrom()) / step) * step;
+        }
+        if (Math.abs(materialSlider.getValue() - value) < 0.0001f) return;
+        ignoreMaterialSliderChanges = true;
+        materialSlider.setValue(value);
+        ignoreMaterialSliderChanges = false;
+    }
+
+    private void setProgressFromMaterialSlider(float progress) {
+        int width = getMeasuredWidth() - selectorWidth;
+        if (width > 0) thumbX = Math.max(minThumbX(), Math.min(width, (int) Math.ceil(width * progress)));
+        invalidate();
+    }
+
+    @Override
+    public void setEnabled(boolean enabled) {
+        super.setEnabled(enabled);
+        if (materialSlider != null) materialSlider.setEnabled(enabled);
     }
 
     private ArrayList<Pair<Float, CharSequence>> timestamps;
@@ -579,6 +738,7 @@ public class SeekBarView extends FrameLayout {
         }
         lastCaption = null;
         lastDuration = -1;
+        updateMaterialSliderState();
     }
 
     public void updateTimestamps(MessageObject messageObject, Long duration) {

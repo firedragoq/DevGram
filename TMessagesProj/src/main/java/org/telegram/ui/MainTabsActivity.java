@@ -200,7 +200,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         Bulletin.Delegate delegate = new Bulletin.Delegate() {
             @Override
             public int getBottomOffset(int tag) {
-                return navigationBarHeight + dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN);
+                return navigationBarHeight + dp(org.telegram.ui.Components.DevGramMaterial3.navigationEnabled() ? 64 : DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN);
             }
         };
 
@@ -295,8 +295,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         tabsView = new MainTabsLayout(context, resourceProvider);
         tabsView.setClipChildren(false);
-        tabsView.setPadding(dp(DialogsActivity.MAIN_TABS_MARGIN + 4), dp(DialogsActivity.MAIN_TABS_MARGIN + 4), dp(DialogsActivity.MAIN_TABS_MARGIN + 4), dp(DialogsActivity.MAIN_TABS_MARGIN + 4));
-        tabsView.setMaxWidth(dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
+        boolean md3Navigation = org.telegram.ui.Components.DevGramMaterial3.navigationEnabled();
+        int tabsPadding = md3Navigation ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN + 4);
+        tabsView.setPadding(tabsPadding, tabsPadding, tabsPadding, tabsPadding);
+        tabsView.setMaxWidth(md3Navigation ? 0 : dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
 
         tabs = new GlassTabView[5];
         tabs[INDEX_CHATS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
@@ -353,8 +355,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         iBlur3FactoryGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
 
         tabsViewBackground = iBlur3FactoryGlass.create(tabsView, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
-        tabsViewBackground.setRadius(dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
-        tabsViewBackground.setPadding(dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
+        // A full-width rectangular M3 bar looks especially heavy over gesture navigation.
+        // Keep the M3 item geometry, but present the bar as a rounded 28dp container.
+        tabsViewBackground.setRadius(md3Navigation ? dp(org.telegram.ui.Components.DevGramMaterial3.RADIUS_LARGE_DP) : dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
+        tabsViewBackground.setPadding(md3Navigation ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
         tabsView.setBackground(tabsViewBackground);
 
         BlurredBackgroundDrawableViewFactory iBlur3FactoryFade = new BlurredBackgroundDrawableViewFactory(iBlur3SourceColor);
@@ -369,7 +373,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         tabsViewWrapper = new FrameLayout(context);
         tabsViewWrapper.setOnClickListener(v -> {});
-        tabsViewWrapper.addView(tabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        tabsViewWrapper.addView(tabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
+                org.telegram.ui.Components.DevGramMaterial3.mainTabsHeightDp(),
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
+                md3Navigation ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0,
+                md3Navigation ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0));
         tabsViewWrapper.setClipToPadding(false);
         contentView.addView(tabsViewWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
 
@@ -841,7 +849,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         ViewGroup.MarginLayoutParams lp;
         {
-            final int height = navigationBarHeight + updateLayoutHeight + dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS);
+            final int height = navigationBarHeight + updateLayoutHeight + dp(org.telegram.ui.Components.DevGramMaterial3.mainTabsHeightDp());
             lp = (ViewGroup.MarginLayoutParams) fadeView.getLayoutParams();
             if (lp.height != height) {
                 lp.height = height;
@@ -851,7 +859,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         {
             int bottomMargin = isUpdateLayoutVisible ? (navigationBarHeight + updateLayoutHeight) : 0;
             if (tabletLayout) {
-                bottomMargin = Math.max(bottomMargin, navigationBarHeight + dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS));
+                bottomMargin = Math.max(bottomMargin, navigationBarHeight + dp(org.telegram.ui.Components.DevGramMaterial3.mainTabsHeightDp()));
             }
             lp = (ViewGroup.MarginLayoutParams) viewPager.getLayoutParams();
             if (lp.bottomMargin != bottomMargin) {
@@ -1129,7 +1137,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 accountSwitchHint.setCloseButton(true);
                 accountSwitchHint.setText(getString(R.string.SwitchAccountHint));
                 accountSwitchHint.setJoint(1, -translate + 7.33f);
-                contentView.addView(accountSwitchHint, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 0, 0, 0, DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS));
+                contentView.addView(accountSwitchHint, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 0, 0, 0, org.telegram.ui.Components.DevGramMaterial3.mainTabsHeightDp()));
                 accountSwitchHint.setOnHiddenListener(() -> AndroidUtilities.removeFromParent(accountSwitchHint));
                 accountSwitchHint.setDuration(8000);
                 accountSwitchHint.show();

@@ -65,7 +65,7 @@ public class CircularProgressDrawable extends Drawable {
         }
         updateSegment();
         // DevGram (MD3): более толстый индикатор + фоновый трек-кольцо
-        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", false);
+        boolean md3 = DevGramMaterial3.loadingEnabled();
         if (md3) {
             paint.setStrokeWidth(thickness * 1.8f);
             int col = paint.getColor();

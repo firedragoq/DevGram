@@ -16,10 +16,12 @@ import android.util.Log;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.Components.voip.CellFlickerDrawable;
 
-public class LineProgressView extends View {
+public class LineProgressView extends LinearProgressIndicator {
 
     private long lastUpdateTime;
     private float currentProgress;
@@ -47,6 +49,12 @@ public class LineProgressView extends View {
             progressPaint.setStrokeCap(Paint.Cap.ROUND);
             progressPaint.setStrokeWidth(AndroidUtilities.dp(2));
         }
+        setMax(1000);
+        setTrackThickness(AndroidUtilities.dp(2));
+        setTrackCornerRadius(AndroidUtilities.dp(1));
+        setTrackStopIndicatorSize(AndroidUtilities.dp(2));
+        setIndicatorTrackGapSize(AndroidUtilities.dp(2));
+        setIndeterminate(false);
     }
 
     private void updateAnimation() {
@@ -79,10 +87,12 @@ public class LineProgressView extends View {
 
     public void setProgressColor(int color) {
         progressColor = color;
+        if (DevGramMaterial3.loadingEnabled()) setIndicatorColor(color);
     }
 
     public void setBackColor(int color) {
         backColor = color;
+        if (DevGramMaterial3.loadingEnabled()) setTrackColor(color);
     }
 
     public void setProgress(float value, boolean animated) {
@@ -99,7 +109,11 @@ public class LineProgressView extends View {
         currentProgressTime = 0;
 
         lastUpdateTime = System.currentTimeMillis();
-        invalidate();
+        if (DevGramMaterial3.loadingEnabled()) {
+            setProgressCompat((int) (value * getMax()), animated);
+        } else {
+            invalidate();
+        }
     }
 
     public float getCurrentProgress() {
@@ -107,6 +121,10 @@ public class LineProgressView extends View {
     }
 
     public void onDraw(Canvas canvas) {
+        if (DevGramMaterial3.loadingEnabled()) {
+            super.onDraw(canvas);
+            return;
+        }
         if (backColor != 0 && animatedProgressValue != 1) {
             progressPaint.setColor(backColor);
             progressPaint.setAlpha((int) (255 * animatedAlphaValue));

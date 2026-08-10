@@ -24,6 +24,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
@@ -428,17 +429,21 @@ public class UniversalRecyclerView extends RecyclerListView {
     }
 
     public void setSections() {
-        setSections(dp(12), dp(16), false);
+        setSections(dp(12), dp(MessagesController.getGlobalMainSettings().getInt("dg_sectionRadius", 20)), false);
     }
     public void setSections(boolean topPadding) {
-        setSections(dp(12), dp(16), topPadding);
+        setSections(dp(12), dp(MessagesController.getGlobalMainSettings().getInt("dg_sectionRadius", 20)), topPadding);
     }
     public void setSections(int padding, float roundRadius, boolean topPadding) {
         super.setSections(
             view -> {
                 if (view.getParent() != this) return false;
                 final ViewHolder viewHolder = getChildViewHolder(view);
-                return !UniversalAdapter.isShadow(viewHolder.getItemViewType());
+                int type = viewHolder.getItemViewType();
+                return !UniversalAdapter.isShadow(type)
+                        && !(MessagesController.getGlobalMainSettings().getBoolean("dg_separateHeaders", true)
+                        && (type == UniversalAdapter.VIEW_TYPE_HEADER
+                        || type == UniversalAdapter.VIEW_TYPE_BLACK_HEADER));
             },
             UniversalAdapter::isShadow,
             padding, roundRadius,

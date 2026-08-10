@@ -3150,7 +3150,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private float devgramStretch = 0f;
     private boolean devgramGooeyActive;
     private void devgramGooeyPre(Canvas canvas, float cx, float cy) {
-        if (!MessagesController.getGlobalMainSettings().getBoolean("dg_gooey", false)) {
+        if (!MessagesController.getGlobalMainSettings().getBoolean("dg_gooey", true)) {
             return;
         }
         float y = getY();
@@ -4966,10 +4966,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             canvas.restore();
         }
 
-        int dgDividerStyle = MessagesController.getGlobalMainSettings().getInt("dg_dividerStyle", 0); // 0 линия, 1 сегменты, 2 скрыть
-        if (useSeparator && dgDividerStyle != 2) {
+        int dgDividerStyle = MessagesController.getGlobalMainSettings().getInt("dg_dividerStyle", 1); // Extera: 0 скрыть, 1 линия, 2 сегменты
+        if (useSeparator && dgDividerStyle != 0) {
             int left;
-            if (dgDividerStyle == 1
+            if (dgDividerStyle == 2
                     || fullSeparator || currentDialogFolderId != 0 && archiveHidden && !fullSeparator2 || fullSeparator2 && !archiveHidden) {
                 left = 0;
             } else {

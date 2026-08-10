@@ -25,8 +25,8 @@ import org.telegram.messenger.Utilities;
 // на экране (через getLocationOnScreen). Сверху — полупрозрачная подложка цвета меню.
 public class DevGramGlassMenu {
 
-    private static final int DOWNSCALE = 8;   // во сколько раз ужимаем снимок перед блюром
-    private static final int BLUR_RADIUS = 8; // радиус stackBlur в пикселях уменьшенного снимка
+    private static final int DOWNSCALE = 8;
+    private static final int BLUR_RADIUS = 15;
 
     // Снять и размыть контент. Вернёт null, если вью ещё не измерена.
     public static Bitmap snapshot(View root) {
@@ -48,24 +48,28 @@ public class DevGramGlassMenu {
     }
 
     // Фон-drawable «стекло»: рисует размытый снимок, выровненный под попапом, + подложку-тинт.
-    // DevGram: «Обводка стекла» — 0 Скрыта, 1 Сплошная, 2 Блики (яркая сверху)
+    // Порядок как в ExteraGram GlassOutlineStyle: 0 Блики, 1 Сплошная, 2 Скрыта.
     private static void drawGlassOutline(Canvas canvas, RectF rect, float radius, Paint p) {
-        int style = org.telegram.messenger.MessagesController.getGlobalMainSettings().getInt("dg_glassOutline", 1);
-        if (style == 0) {
+        int style = org.telegram.messenger.MessagesController.getGlobalMainSettings().getInt("dg_glassOutline", 0);
+        if (style == 2) {
             return;
         }
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(org.telegram.messenger.AndroidUtilities.dp(1));
-        if (style == 2) {
-            // Блики: вертикальный градиент от яркого к прозрачному
-            android.graphics.Shader sh = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom,
-                    new int[]{Color.argb(150, 255, 255, 255), Color.argb(20, 255, 255, 255)},
-                    null, android.graphics.Shader.TileMode.CLAMP);
-            p.setShader(sh);
-            p.setColor(Color.WHITE);
+        if (style == 0) {
+            p.setShader(null);
+            p.setStrokeWidth(AndroidUtilities.dpf2(1f));
+            p.setColor(Color.argb(41, 255, 255, 255));
+            org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable.drawStroke(
+                    canvas, rect, radius, AndroidUtilities.dpf2(1f), true, p);
+            p.setStrokeWidth(AndroidUtilities.dpf2(2f / 3f));
+            p.setColor(Color.argb(21, 255, 255, 255));
+            org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable.drawStroke(
+                    canvas, rect, radius, AndroidUtilities.dpf2(2f / 3f), false, p);
+            return;
         } else {
             p.setShader(null);
-            p.setColor(Color.argb(60, 255, 255, 255));
+            p.setStrokeWidth(AndroidUtilities.dpf2(1f));
+            p.setColor(Color.argb(42, 255, 255, 255));
         }
         float inset = org.telegram.messenger.AndroidUtilities.dp(0.5f);
         canvas.drawRoundRect(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset, radius, radius, p);
@@ -93,8 +97,11 @@ public class DevGramGlassMenu {
             this.padding = padding;
             shader = new BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
             blurPaint.setShader(shader);
-            // подложка: цвет меню с пониженной непрозрачностью, чтобы блюр просвечивал
-            tintPaint.setColor(Color.argb(150, Color.red(tintColor), Color.green(tintColor), Color.blue(tintColor)));
+            boolean dark = AndroidUtilities.computePerceivedBrightness(tintColor) < .721f;
+            float tintAlpha = DevGramMaterial3.enabled()
+                    ? (dark ? DevGramMaterial3.GLASS_ALPHA_DARK : DevGramMaterial3.GLASS_ALPHA_LIGHT)
+                    : (dark ? .85f : .76f);
+            tintPaint.setColor(Color.argb(Math.round(255 * tintAlpha), Color.red(tintColor), Color.green(tintColor), Color.blue(tintColor)));
         }
 
         @Override
@@ -144,7 +151,7 @@ public class DevGramGlassMenu {
     }
 
     public static float defaultRadius() {
-        return AndroidUtilities.dp(10);
+        return AndroidUtilities.dp(DevGramMaterial3.RADIUS_SMALL_DP);
     }
 
     // Переиспользуемый «стеклянный» рисовальщик для вью, которые рисуют фон сами (напр. панель
@@ -161,7 +168,11 @@ public class DevGramGlassMenu {
 
         public GlassPainter(int tintColor) {
             this.tintColor = tintColor;
-            tintPaint.setColor(Color.argb(150, Color.red(tintColor), Color.green(tintColor), Color.blue(tintColor)));
+            boolean dark = AndroidUtilities.computePerceivedBrightness(tintColor) < .721f;
+            float tintAlpha = DevGramMaterial3.enabled()
+                    ? (dark ? DevGramMaterial3.GLASS_ALPHA_DARK : DevGramMaterial3.GLASS_ALPHA_LIGHT)
+                    : (dark ? .85f : .76f);
+            tintPaint.setColor(Color.argb(Math.round(255 * tintAlpha), Color.red(tintColor), Color.green(tintColor), Color.blue(tintColor)));
         }
 
         public boolean ready() {
@@ -191,7 +202,7 @@ public class DevGramGlassMenu {
             matrix.postTranslate(cc[0] - h[0], cc[1] - h[1]);
             shader.setLocalMatrix(matrix);
             blurPaint.setAlpha(alpha);
-            tintPaint.setAlpha(alpha * 150 / 255);
+            tintPaint.setAlpha(alpha);
             canvas.drawRoundRect(rect, radius, radius, blurPaint);
             canvas.drawRoundRect(rect, radius, radius, tintPaint);
             drawGlassOutline(canvas, rect, radius, outlinePaint);

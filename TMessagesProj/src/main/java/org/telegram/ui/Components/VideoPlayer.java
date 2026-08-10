@@ -436,6 +436,11 @@ public class VideoPlayer implements Player.Listener, VideoListener, AnalyticsLis
 
     public static Quality getSavedQuality(ArrayList<Quality> qualities, MessageObject messageObject) {
         if (messageObject == null) return null;
+        if (MessagesController.getGlobalMainSettings().getBoolean("dg_preferOriginalQuality", false)) {
+            for (Quality quality : qualities) {
+                if (quality.original) return quality;
+            }
+        }
         return getSavedQuality(qualities, messageObject.getDialogId(), messageObject.getId());
     }
 

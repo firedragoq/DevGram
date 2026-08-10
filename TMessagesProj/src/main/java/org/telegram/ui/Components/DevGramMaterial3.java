@@ -10,12 +10,34 @@ import com.google.android.material.progressindicator.IndeterminateDrawable;
 
 import org.telegram.messenger.MessagesController;
 
-// DevGram: настоящие Material 3 виджеты (как exteraGram getNew*Style). Пока — индикатор загрузки:
-// хостим Material IndeterminateDrawable внутри существующих вью, без подмены самих вью по всему коду.
+// Material 3 widgets and feature gates ported from exteraGram's getNew*Style implementation.
 public class DevGramMaterial3 {
 
+    // DevGram design tokens. Keeping these here prevents navigation, glass, FABs and
+    // chat chrome from slowly drifting into unrelated radius/spacing systems.
+    public static final int RADIUS_LARGE_DP = 28;
+    public static final int RADIUS_MEDIUM_DP = 16;
+    public static final int RADIUS_SMALL_DP = 12;
+    public static final int HORIZONTAL_INSET_DP = 8;
+    public static final int CHAT_HEADER_FADE_DP = 78;
+    public static final int CHAT_HEADER_FADE_ZONE_DP = 42;
+    public static final float GLASS_ALPHA_LIGHT = .90f;
+    public static final float GLASS_ALPHA_DARK = .93f;
+
+    public static boolean enabled() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_md3", true);
+    }
+
     public static boolean loadingEnabled() {
-        return MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", false);
+        return enabled() && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_progress", true);
+    }
+
+    public static boolean navigationEnabled() {
+        return enabled() && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_bottomnav", false);
+    }
+
+    public static int mainTabsHeightDp() {
+        return navigationEnabled() ? 64 : 72;
     }
 
     // Материаловым виджетам нужна тема Material3 в контексте, иначе не заинфлейтятся/упадут.

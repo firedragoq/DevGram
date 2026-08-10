@@ -50,6 +50,12 @@ public class BlurredBackgroundWithFadeDrawable extends Drawable {
 
     private int fadeHeight;
     private boolean opacity;
+    private boolean overrideFadeEnabled;
+    private int overrideFadeColor;
+    private int lastOverrideFadeColor;
+    private int lastOverrideFadeHeight;
+    private Shader overrideFadeShader;
+    private final Paint overrideFadePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     public BlurredBackgroundWithFadeDrawable(BlurredBackgroundDrawable drawable) {
         this.drawable = drawable;
@@ -90,10 +96,39 @@ public class BlurredBackgroundWithFadeDrawable extends Drawable {
         this.ignoreFastWay = ignoreFastWay;
     }
 
+    public void setOverrideFadeColor(int color) {
+        if (overrideFadeColor != color) {
+            overrideFadeColor = color;
+            overrideFadeShader = null;
+        }
+        overrideFadeEnabled = true;
+        invalidateSelf();
+    }
+
     @Override
     public void draw(@NonNull Canvas canvas) {
         final Rect bounds = getBounds();
         if (bounds.isEmpty() || alpha == 0) {
+            return;
+        }
+
+        if (overrideFadeEnabled) {
+            final int height = Math.max(1, bounds.height());
+            if (overrideFadeShader == null || lastOverrideFadeColor != overrideFadeColor || lastOverrideFadeHeight != height) {
+                lastOverrideFadeColor = overrideFadeColor;
+                lastOverrideFadeHeight = height;
+                final boolean dark = org.telegram.ui.ActionBar.Theme.isCurrentThemeDark();
+                final float[] a = {dark ? .95f : 1f, dark ? .90f : .93f, dark ? .78f : .83f, .62f, .40f, .18f, .05f, 0f};
+                final int[] colors = new int[a.length];
+                for (int i = 0; i < colors.length; i++) {
+                    colors[i] = ColorUtils.setAlphaComponent(overrideFadeColor, Math.round(a[i] * 255));
+                }
+                overrideFadeShader = new LinearGradient(0, bounds.top, 0, bounds.bottom, colors,
+                        new float[]{0f, .5f, .65f, .75f, .84f, .92f, .97f, 1f}, Shader.TileMode.CLAMP);
+                overrideFadePaint.setShader(overrideFadeShader);
+            }
+            overrideFadePaint.setAlpha(alpha);
+            canvas.drawRect(bounds, overrideFadePaint);
             return;
         }
 

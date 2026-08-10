@@ -68,6 +68,7 @@ import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.GenericProvider;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -77,6 +78,7 @@ import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Cells.CollapseTextCell;
 import org.telegram.ui.Cells.GraySectionCell;
+import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
@@ -3303,14 +3305,16 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
     }
 
     public void setSections() {
-        setSections(dp(12), dp(16), false);
+        setSections(dp(12), dp(MessagesController.getGlobalMainSettings().getInt("dg_sectionRadius", 20)), false);
     }
     public void setSections(boolean topPadding) {
-        setSections(dp(12), dp(16), topPadding);
+        setSections(dp(12), dp(MessagesController.getGlobalMainSettings().getInt("dg_sectionRadius", 20)), topPadding);
     }
     public void setSections(int padding, float roundRadius, boolean topPadding) {
         setSections(
-            view -> !(view instanceof TextInfoPrivacyCell || view instanceof ShadowSectionCell || view instanceof FiltersSetupActivity.HintInnerCell || view instanceof GraySectionCell || view instanceof CollapseTextCell) && !Objects.equals(view.getTag(), TAG_NOT_SECTION),
+            view -> !(view instanceof TextInfoPrivacyCell || view instanceof ShadowSectionCell || view instanceof FiltersSetupActivity.HintInnerCell || view instanceof GraySectionCell || view instanceof CollapseTextCell)
+                    && !(MessagesController.getGlobalMainSettings().getBoolean("dg_separateHeaders", true) && view instanceof HeaderCell)
+                    && !Objects.equals(view.getTag(), TAG_NOT_SECTION),
             padding,
             roundRadius,
             this::drawBackgroundRect,

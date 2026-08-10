@@ -31,6 +31,9 @@ import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import androidx.annotation.Keep;
+import androidx.dynamicanimation.animation.FloatPropertyCompat;
+import androidx.dynamicanimation.animation.SpringAnimation;
+import androidx.dynamicanimation.animation.SpringForce;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.Theme;
@@ -39,12 +42,17 @@ import org.telegram.ui.Cells.BaseCell;
 import me.vkryl.android.animator.BoolAnimator;
 
 public class Switch extends View {
+    private static final FloatPropertyCompat<Switch> PROGRESS_PROPERTY = new FloatPropertyCompat<Switch>("progress") {
+        @Override public float getValue(Switch view) { return view.getProgress(); }
+        @Override public void setValue(Switch view, float value) { view.setProgress(value); }
+    };
     private final BoolAnimator animatorIconVisibility = new BoolAnimator(this, CubicBezierInterpolator.EASE_OUT_QUINT, 380L, true);
 
     private RectF rectF;
 
     private float progress;
     private ObjectAnimator checkAnimator;
+    private SpringAnimation checkSpringAnimator;
     private ObjectAnimator iconAnimator;
 
     private boolean attachedToWindow;
@@ -141,6 +149,10 @@ public class Switch extends View {
             checkAnimator.cancel();
             checkAnimator = null;
         }
+        if (checkSpringAnimator != null) {
+            checkSpringAnimator.cancel();
+            checkSpringAnimator = null;
+        }
     }
 
     private void cancelIconAnimator() {
@@ -234,6 +246,17 @@ public class Switch extends View {
     }
 
     private void animateToCheckedState(boolean newCheckedState) {
+        cancelCheckAnimator();
+        if (DevGramMaterial3.enabled()
+                && org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_switch", true)) {
+            checkSpringAnimator = new SpringAnimation(this, PROGRESS_PROPERTY)
+                    .setSpring(new SpringForce(newCheckedState ? 1f : 0f)
+                            .setDampingRatio(0.9f).setStiffness(1400f))
+                    .setMinimumVisibleChange(0.001f)
+                    .setStartValue(progress);
+            checkSpringAnimator.start();
+            return;
+        }
         checkAnimator = ObjectAnimator.ofFloat(this, "progress", newCheckedState ? 1 : 0);
         checkAnimator.setDuration(200);
         checkAnimator.addListener(new AnimatorListenerAdapter() {
@@ -378,9 +401,10 @@ public class Switch extends View {
         }
 
         // DevGram (MD3): более высокий трек-пилюля + мелкий тумблер в выкл / крупный во вкл
-        boolean md3 = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_switch", false);
-        float trackH = md3 ? AndroidUtilities.dpf2(20) : AndroidUtilities.dpf2(14);
-        float trackR = md3 ? AndroidUtilities.dpf2(10) : AndroidUtilities.dpf2(7);
+        boolean md3 = DevGramMaterial3.enabled()
+                && org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_switch", true);
+        float trackH = md3 ? AndroidUtilities.dpf2(26) : AndroidUtilities.dpf2(14);
+        float trackR = md3 ? AndroidUtilities.dpf2(14) : AndroidUtilities.dpf2(7);
 
         int width = AndroidUtilities.dp(31);
         int thumb = AndroidUtilities.dp(20);
@@ -450,9 +474,10 @@ public class Switch extends View {
             paint.setColor(color);
             paint2.setColor(color);
 
-            rectF.set(x, y, x + width, y + trackH);
+            rectF.set(md3 ? -AndroidUtilities.dp(2) : x, y,
+                    md3 ? getMeasuredWidth() + AndroidUtilities.dp(3) : x + width, y + trackH);
             canvasToDraw.drawRoundRect(rectF, trackR, trackR, paint);
-            canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dpf2(10), paint);
+            if (!md3) canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dpf2(10), paint);
 
             if (a == 0 && rippleDrawable != null) {
                 rippleDrawable.setBounds(tx - AndroidUtilities.dp(18), ty - AndroidUtilities.dp(18), tx + AndroidUtilities.dp(18), ty + AndroidUtilities.dp(18));
@@ -499,8 +524,14 @@ public class Switch extends View {
             alpha = (int) (a1 + (a2 - a1) * colorProgress);
             paint.setColor(((alpha & 0xff) << 24) | ((red & 0xff) << 16) | ((green & 0xff) << 8) | (blue & 0xff));
 
-            float thumbR = md3 ? AndroidUtilities.dpf2(8) + AndroidUtilities.dpf2(2) * progress : AndroidUtilities.dp(8);
-            canvasToDraw.drawCircle(tx, ty, thumbR, paint);
+            float thumbR = md3 ? AndroidUtilities.dpf2(7) + AndroidUtilities.dpf2(2) * progress : AndroidUtilities.dp(8);
+            if (md3) {
+                float bulge = AndroidUtilities.dpf2(3) * (1f - Math.abs(progress * 2f - 1f));
+                rectF.set(tx - thumbR - bulge, ty - thumbR, tx + thumbR + bulge, ty + thumbR);
+                canvasToDraw.drawRoundRect(rectF, thumbR, thumbR, paint);
+            } else {
+                canvasToDraw.drawCircle(tx, ty, thumbR, paint);
+            }
 
             if (a == 0) {
                 if (iconDrawable != null) {

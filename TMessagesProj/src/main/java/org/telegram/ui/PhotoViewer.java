@@ -1060,6 +1060,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private boolean usedSurfaceView;
     private FirstFrameView firstFrameView;
     private VideoPlayer videoPlayer;
+    private boolean devgramPausedOnMinimize;
     private PipSource pipSource;
     private boolean manuallyPaused;
     private Runnable videoPlayRunnable;
@@ -19140,6 +19141,10 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         if (photoPaintView != null) {
             photoPaintView.onResume();
         }
+        if (devgramPausedOnMinimize && videoPlayer != null && !videoPlayer.isPlaying()) {
+            devgramPausedOnMinimize = false;
+            videoPlayer.play();
+        }
     }
 
     public void onConfigurationChanged(Configuration newConfig) {}
@@ -19154,6 +19159,11 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         }
         if (videoPlayer != null && playerLooping) {
             videoPlayer.setLooping(allowLoopingOnPause());
+        }
+        if (MessagesController.getGlobalMainSettings().getBoolean("dg_pauseVideoOnMinimize", false)
+                && videoPlayer != null && videoPlayer.isPlaying()) {
+            devgramPausedOnMinimize = true;
+            videoPlayer.pause();
         }
     }
 
@@ -21280,7 +21290,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         boolean forward = x >= width / 3 * 2;
         long current = getCurrentVideoPosition();
         long total = getVideoDuration();
-        return current != C.TIME_UNSET && total > 15 * 1000 && (!forward || total - current > 10000);
+        long seek = new long[]{5000, 10000, 15000, 30000}[
+                Math.max(0, Math.min(3, MessagesController.getGlobalMainSettings().getInt("dg_doubleTapSeek", 1)))];
+        return current != C.TIME_UNSET && total > seek + 5000 && (!forward || total - current > seek);
     }
 
     long totalRewinding;
@@ -21294,18 +21306,20 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             int width = getContainerViewWidth();
             boolean forward = x >= width / 3 * 2;
             if (canDoubleTapSeekVideo(e)) {
+                long seek = new long[]{5000, 10000, 15000, 30000}[
+                        Math.max(0, Math.min(3, MessagesController.getGlobalMainSettings().getInt("dg_doubleTapSeek", 1)))];
                 long old = current;
                 if (x >= width / 3 * 2) {
-                    current += 10000;
+                    current += seek;
                 } else if (x < width / 3) {
-                    current -= 10000;
+                    current -= seek;
                 }
                 if (old != current) {
                     boolean apply = true;
                     if (current > total) {
                         current = total;
                     } else if (current < 0) {
-                        if (current < -9000) {
+                        if (current < -(seek - 1000)) {
                             apply = false;
                         }
                         current = 0;
@@ -21313,7 +21327,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                     if (apply) {
                         videoForwardDrawable.setOneShootAnimation(true);
                         videoForwardDrawable.setLeftSide(x < width / 3);
-                        videoForwardDrawable.addTime(10000);
+                        videoForwardDrawable.addTime(seek);
                         seekVideoOrWebTo(current);
                         containerView.invalidate();
                         videoPlayerSeekbar.setProgress(current / (float) total, true);
@@ -21356,7 +21370,12 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     }
 
     private boolean enableSwipeToPiP() {
-        return false;
+        return (pipItem.getVisibility() == View.VISIBLE
+                || (menuItem.getVisibility() == View.VISIBLE && menuItem.isSubItemVisible(6)))
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_swipeToPip", true)
+                && pipAvailable && textureUploaded && videoPlayer != null
+                && videoPlayer.getRepeatCount() == 0 && checkInlinePermissions()
+                && !changingTextureView && !switchingInlineMode && !isInline;
     }
 
     @Override

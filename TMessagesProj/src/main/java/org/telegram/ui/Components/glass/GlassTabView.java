@@ -41,6 +41,7 @@ import org.telegram.ui.Components.AnimatedTextView;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.CubicBezierInterpolator;
+import org.telegram.ui.Components.DevGramMaterial3;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.Premium.PremiumGradient;
 import org.telegram.ui.Components.RLottieDrawable;
@@ -53,6 +54,10 @@ import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
 
 public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, FactorAnimator.Target {
+    private static boolean material3Navigation() {
+        return DevGramMaterial3.enabled() && MessagesController.getGlobalMainSettings()
+                .getBoolean("dg_md3_bottomnav", false);
+    }
     private final TextView textView;
     private final RLottieImageView imageView;
     private BackupImageView backupImageView;
@@ -154,12 +159,21 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         if (selectedFactor > 0 && !skipDrawSelector) {
             final float alpha = AnimatorUtils.DECELERATE_INTERPOLATOR.getInterpolation(selectedFactor);
 
-            paintCounterBackground.setColor(Theme.multAlpha(colorSelected, 0.09f * alpha));
-            tmpRectF.set(0, 0, viewWidth, getHeight());
+            boolean md3 = material3Navigation();
+            paintCounterBackground.setColor(Theme.multAlpha(colorSelected, (md3 ? 0.125f : 0.09f) * alpha));
+            if (md3) {
+                float width = Math.min(dp(56), Math.max(0, viewWidth - dp(8)));
+                float height = Math.min(dp(32), getHeight());
+                float left = (viewWidth - width) / 2f;
+                tmpRectF.set(left, dp(6), left + width, dp(6) + height);
+            } else {
+                tmpRectF.set(0, 0, viewWidth, getHeight());
+            }
             final float r = Math.min(tmpRectF.width(), tmpRectF.height()) / 2f;
-            final float s = lerp(0.6f, 1, selectedFactor) * MathUtils.clamp(attachScale, 0, 1);
+            final float sx = lerp(md3 ? 0.4f : 0.6f, 1, selectedFactor) * MathUtils.clamp(attachScale, 0, 1);
+            final float sy = (md3 ? 1f : sx);
             canvas.save();
-            canvas.scale(s, s, tmpRectF.centerX(), tmpRectF.centerY());
+            canvas.scale(sx, sy, tmpRectF.centerX(), tmpRectF.centerY());
             canvas.drawRoundRect(tmpRectF, r, r, paintCounterBackground);
             canvas.restore();
         }
@@ -177,7 +191,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
 
             final float gap = dpf2(1.33f);
             final float cx = viewWidth / 2f + dpf2(11);
-            final float cy = dpf2(10);
+            final float cy = dpf2(material3Navigation() ? 16 : 10);
             final float height = dpf2(16);
             final float width = Math.max(height, counter.getCurrentWidth() + dp(8));
             final float rOuter = dpf2(9.333f);
@@ -231,6 +245,10 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     }
 
     public void setSelected(boolean selected, boolean animated) {
+        if (material3Navigation()) {
+            isSelectedAnimator.setDuration(500L);
+            isSelectedAnimator.setInterpolator(CubicBezierInterpolator.Emphasized);
+        }
         isSelectedAnimator.setValue(selected, animated);
         checkPlayAnimation(animated);
 
@@ -404,6 +422,12 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         tab.textView.setText(LocaleController.getString(stringRes));
         tab.checkPlayAnimation(false);
         tab.imageView.setLayoutParams(LayoutHelper.createFrame(24, 24, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 4, 0, 0));
+        if (material3Navigation()) {
+            tab.imageView.setLayoutParams(LayoutHelper.createFrame(24, 24, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 10, 0, 0));
+            tab.textView.setIncludeFontPadding(false);
+            tab.textView.setLetterSpacing(0.04166667f);
+            tab.textView.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 16, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 42, 0, 0));
+        }
         tab.colorDefault = Theme.getColor(Theme.key_glass_tabUnselected, resourcesProvider);
         tab.colorSelected = Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider);
         tab.colorSelectedText = Theme.getColor(Theme.key_glass_tabSelectedText, resourcesProvider);
@@ -425,6 +449,12 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         tab.backupImageView = backupImageView;
 
         tab.addView(backupImageView, LayoutHelper.createFrame(22, 22, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 5, 0, 0));
+        if (material3Navigation()) {
+            backupImageView.setLayoutParams(LayoutHelper.createFrame(22, 22, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 11, 0, 0));
+            tab.textView.setIncludeFontPadding(false);
+            tab.textView.setLetterSpacing(0.04166667f);
+            tab.textView.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 16, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 42, 0, 0));
+        }
         tab.colorDefault = Theme.getColor(Theme.key_glass_tabUnselected, resourcesProvider);
         tab.colorSelected = Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider);
         tab.colorSelectedText = Theme.getColor(Theme.key_glass_tabSelectedText, resourcesProvider);

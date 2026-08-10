@@ -2427,7 +2427,7 @@ public class AndroidUtilities {
     private static boolean devgramSystemFonts() {
         if (devgramSystemFonts == null) {
             try {
-                devgramSystemFonts = MessagesController.getGlobalMainSettings().getBoolean("dg_systemFonts", false);
+                devgramSystemFonts = MessagesController.getGlobalMainSettings().getBoolean("dg_systemFonts", true);
             } catch (Throwable e) {
                 devgramSystemFonts = false;
             }

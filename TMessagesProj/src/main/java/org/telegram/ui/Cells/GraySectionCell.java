@@ -51,7 +51,7 @@ public class GraySectionCell extends FrameLayout implements Theme.Colorable {
         super(context);
         this.resourcesProvider = resourcesProvider;
 
-        setBackgroundColor(org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_separateHeaders", false)
+        setBackgroundColor(org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_separateHeaders", true)
                 ? 0 : getThemedColor(Theme.key_graySection));
 
         textView = new AnimatedEmojiSpan.TextViewEmojis(getContext());
@@ -85,7 +85,7 @@ public class GraySectionCell extends FrameLayout implements Theme.Colorable {
 
     public void updateColors() {
         // DevGram: «Отделить заголовки» — прозрачный фон, заголовки «плавают» над списком
-        boolean separate = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_separateHeaders", false);
+        boolean separate = org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_separateHeaders", true);
         setBackgroundColor(noBackground || separate ? 0 : getThemedColor(Theme.key_graySection));
         textView.setTextColor(getThemedColor(Theme.key_graySectionText));
         rightTextView.setTextColor(getThemedColor(Theme.key_graySectionText));

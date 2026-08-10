@@ -80,7 +80,8 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
 
     public boolean allowDrawStories;
     private Integer storiesForceState;
-    private int avatarSizeInDp = 42;
+    private int avatarSizeInDp = DevGramMaterial3.enabled()
+            && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false) ? 46 : 42;
     public BackupImageView avatarImageView;
     private boolean avatarImageIsHidden;
     private SimpleTextView titleTextView;
@@ -278,9 +279,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         titleTextView = new SimpleTextConnectedView(context, titleTextLargerCopyView);
         titleTextView.setEllipsizeByGradient(true);
         titleTextView.setTextColor(getThemedColor(Theme.key_actionBarDefaultTitle));
-        // DevGram (MD3): заголовок чата крупнее
-        titleTextView.setTextSize(org.telegram.messenger.MessagesController.getGlobalMainSettings()
-                .getBoolean("dg_md3_title", false) ? 20 : 18);
+        titleTextView.setTextSize(18);
         titleTextView.setGravity(Gravity.LEFT);
         titleTextView.setTypeface(AndroidUtilities.bold());
         titleTextView.setLeftDrawableTopPadding(-dp(1.3f));
@@ -666,8 +665,12 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         final int width = MeasureSpec.getSize(widthMeasureSpec);
-        final int availableWidth = width - dp((avatarImageView.getVisibility() == VISIBLE ? 54 : 0) + 16);
-        avatarImageView.measure(MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - 2, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - 2, MeasureSpec.EXACTLY));
+        boolean md3Header = DevGramMaterial3.enabled()
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false);
+        avatarSizeInDp = md3Header ? 46 : 42;
+        final int availableWidth = width - dp((avatarImageView.getVisibility() == VISIBLE ? (md3Header ? 59 : 54) : 0) + 16);
+        int avatarInset = md3Header ? 0 : 2;
+        avatarImageView.measure(MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - avatarInset, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - avatarInset, MeasureSpec.EXACTLY));
         titleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(24 + 8), MeasureSpec.AT_MOST));
         if (subtitleTextView != null) {
             subtitleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(20), MeasureSpec.AT_MOST));
@@ -769,11 +772,19 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         final int actionBarHeight = ActionBar.getCurrentActionBarHeight();
-        final int viewTop = (actionBarHeight - avatarImageView.getMeasuredHeight() - 2) / 2 + (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0);
-        final int subtitleTop = viewTop + dp(glassMode ? 23.66f : 24);
+        boolean md3Header = DevGramMaterial3.enabled()
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false);
+        final int avatarInset = md3Header ? 0 : 1;
+        final int viewTop = (actionBarHeight - avatarImageView.getMeasuredHeight() - avatarInset * 2) / 2
+                + (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0);
+        final int subtitleTop = viewTop + dp(md3Header ? (glassMode ? 26.66f : 27f) : (glassMode ? 23.66f : 24f));
 
-        avatarImageView.layout(1 + leftPadding, 1 + viewTop, 1 + leftPadding + avatarImageView.getMeasuredWidth(), 1 + viewTop + avatarImageView.getMeasuredHeight());
-        int l = leftPadding + (avatarImageView.getVisibility() == VISIBLE ? dp(glassMode ? 49.66f : 55) : dp(glassMode ? 13 : 1)) + rightAvatarPadding;
+        avatarImageView.layout(avatarInset + leftPadding, avatarInset + viewTop,
+                avatarInset + leftPadding + avatarImageView.getMeasuredWidth(),
+                avatarInset + viewTop + avatarImageView.getMeasuredHeight());
+        int l = leftPadding + (avatarImageView.getVisibility() == VISIBLE
+                ? dp(md3Header ? avatarSizeInDp + (glassMode ? 10.66f : 12f) : (glassMode ? 49.66f : 55f))
+                : dp((glassMode ? 12 : 0) + avatarInset)) + rightAvatarPadding;
         SimpleTextView titleTextLargerCopyView = this.titleTextLargerCopyView.get();
         if (getSubtitleTextView().getVisibility() != GONE) {
             titleTextView.layout(l, viewTop + dp(1.66f) - titleTextView.getPaddingTop(), l + titleTextView.getMeasuredWidth(), viewTop + titleTextView.getTextHeight() + dp(1.66f) - titleTextView.getPaddingTop() + titleTextView.getPaddingBottom());
@@ -787,25 +798,27 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             }
         }
         if (communityItem != null) {
+            float sizeOffset = avatarSizeInDp - 42f;
             communityItem.layout(
-                leftPadding + dp(29f),
-                viewTop + dp(27.33f),
-                leftPadding + dp(29f) + communityItem.getMeasuredWidth(),
-                viewTop + dp(27.33f) + communityItem.getMeasuredHeight());
+                leftPadding + dp(29f + sizeOffset),
+                viewTop + dp(27.33f + sizeOffset),
+                leftPadding + dp(29f + sizeOffset) + communityItem.getMeasuredWidth(),
+                viewTop + dp(27.33f + sizeOffset) + communityItem.getMeasuredHeight());
         }
         if (timeItem != null) {
+            float sizeOffset = avatarSizeInDp - 42f;
             timeItem.layout(
-                leftPadding + dp(19.333f),
+                leftPadding + dp(19.333f + sizeOffset),
                 viewTop - dp(8),
-                leftPadding + dp(19.333f) + timeItem.getMeasuredWidth(),
+                leftPadding + dp(19.333f + sizeOffset) + timeItem.getMeasuredWidth(),
                 viewTop - dp(8) + timeItem.getMeasuredHeight()
             );
         }
         if (starBgItem != null) {
-            starBgItem.layout(leftPadding + dp(28), viewTop + dp(24), leftPadding + dp(28) + starBgItem.getMeasuredWidth(), viewTop + dp(24) + starBgItem.getMeasuredHeight());
+            starBgItem.layout(leftPadding + dp(avatarSizeInDp - 14), viewTop + dp(avatarSizeInDp - 18), leftPadding + dp(avatarSizeInDp - 14) + starBgItem.getMeasuredWidth(), viewTop + dp(avatarSizeInDp - 18) + starBgItem.getMeasuredHeight());
         }
         if (starFgItem != null) {
-            starFgItem.layout(leftPadding + dp(28), viewTop + dp(24), leftPadding + dp(28) + starFgItem.getMeasuredWidth(), viewTop + dp(24) + starFgItem.getMeasuredHeight());
+            starFgItem.layout(leftPadding + dp(avatarSizeInDp - 14), viewTop + dp(avatarSizeInDp - 18), leftPadding + dp(avatarSizeInDp - 14) + starFgItem.getMeasuredWidth(), viewTop + dp(avatarSizeInDp - 18) + starFgItem.getMeasuredHeight());
         }
         if (subtitleTextView != null) {
             subtitleTextView.layout(l, subtitleTop, l + subtitleTextView.getMeasuredWidth(), subtitleTop + subtitleTextView.getTextHeight());

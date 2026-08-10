@@ -95,7 +95,7 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
             iBlur3Background = iBlur3SourceColor.createDrawable();
             iBlur3Background.setColorProvider(iBlur3ColorProviderTabs);
             iBlur3Background.setStrokeWidth(dpf2(0.4f), dpf2(0.4f));
-            iBlur3Background.setRadius(dp(18));
+            iBlur3Background.setRadius(dp(DevGramMaterial3.enabled() ? DevGramMaterial3.RADIUS_MEDIUM_DP : 18));
             iBlur3Background.setPadding(dp(5.66f));
         }
 
@@ -157,7 +157,7 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
             iBlur3Background.updateColors();
             invalidate();
 
-            int rad = dp(18);
+            int rad = dp(DevGramMaterial3.enabled() ? DevGramMaterial3.RADIUS_MEDIUM_DP : 18);
             int pressedColor = Theme.getColor(Theme.key_listSelector, resourcesProvider);
             setBackground(Theme.createInsetRoundRectDrawable(pressedColor, rad, dp(6)));
         } else {
@@ -165,7 +165,7 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
             progressView.setProgressColor(Theme.getColor(Theme.key_chats_actionIcon, resourcesProvider));
             // DevGram (как exteraGram): квадратная кнопка (squircle) вместо круглой
             if (org.telegram.messenger.DevGramConfig.squareFab) {
-                final int rad = dp(16);
+                final int rad = dp(DevGramMaterial3.RADIUS_MEDIUM_DP);
                 setBackground(Theme.createSimpleSelectorRoundRectDrawable(rad,
                     Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider),
                     Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourcesProvider)

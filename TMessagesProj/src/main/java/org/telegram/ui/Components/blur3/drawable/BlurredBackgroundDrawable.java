@@ -184,7 +184,7 @@ public abstract class BlurredBackgroundDrawable extends Drawable {
     /* Colors */
 
     protected BlurredBackgroundColorProvider colorProvider;
-    protected int shadowColor, backgroundColor, strokeColorTop, strokeColorBottom;
+    protected int shadowColor, backgroundColor, strokeColorTop, strokeColorBottom, strokeColorFull;
 
     public BlurredBackgroundDrawable setColorProvider(BlurredBackgroundColorProvider colorProvider) {
         this.colorProvider = colorProvider;
@@ -202,10 +202,12 @@ public abstract class BlurredBackgroundDrawable extends Drawable {
     public void updateColors() {
         if (colorProvider == null) return;
 
+        final int outline = org.telegram.messenger.MessagesController.getGlobalMainSettings().getInt("dg_glassOutline", 0);
         backgroundColor = colorProvider.getBackgroundColor();
-        shadowColor = colorProvider.getShadowColor();
-        strokeColorTop = colorProvider.getStrokeColorTop();
-        strokeColorBottom = colorProvider.getStrokeColorBottom();
+        shadowColor = outline == 0 ? colorProvider.getShadowColor() : 0;
+        strokeColorTop = outline == 0 ? colorProvider.getStrokeColorTop() : 0;
+        strokeColorBottom = outline == 0 ? colorProvider.getStrokeColorBottom() : 0;
+        strokeColorFull = outline == 1 ? colorProvider.getStrokeColorFull() : 0;
     }
 
 
@@ -704,10 +706,17 @@ public abstract class BlurredBackgroundDrawable extends Drawable {
     }
 
     private void drawStrokeInternalIfNeeded(Canvas canvas) {
+        final int strokeColorFull = Theme.multAlpha(this.strokeColorFull, alpha / 255f);
         final int strokeColorTop = Theme.multAlpha(this.strokeColorTop, alpha / 255f);
         final int strokeColorBottom = Theme.multAlpha(this.strokeColorBottom, alpha / 255f);
 
-        if (Color.alpha(strokeColorTop) > 0) {
+        if (Color.alpha(strokeColorFull) > 0) {
+            paintStrokeFill.setStyle(Paint.Style.STROKE);
+            paintStrokeFill.setStrokeWidth(dpf2(1f));
+            paintStrokeFill.setColor(strokeColorFull);
+            boundProps.draw(canvas, paintStrokeFill);
+            paintStrokeFill.setStyle(Paint.Style.FILL);
+        } else if (Color.alpha(strokeColorTop) > 0) {
             paintStrokeFill.setColor(strokeColorTop);
             canvas.drawPath(boundProps.strokePathTop, paintStrokeFill);
         }

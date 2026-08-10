@@ -4353,7 +4353,7 @@ public class ChatActivity extends BaseFragment implements
                 } else if (id == devgram_deleted_history) {
                     presentFragment(new DevGramDeletedHistoryActivity(dialog_id, getTopicId()));
                 } else if (id == devgram_chat_theme) {
-                    showDevgramChatThemePicker();
+                    showChatThemeBottomSheet();
                 } else if (id == deleteAllYourMessages) {
                     org.telegram.messenger.forkgram.ForkDialogs.CreateDeleteAllYourMessagesAlert(
                         currentAccount,
@@ -4790,7 +4790,7 @@ public class ChatActivity extends BaseFragment implements
                 headerItem.addSubItem(devgram_deleted_history, R.drawable.msg_delete, "История удалёнок", themeDelegate);
             }
             // DevGram: локальная тема этого чата («Различные темы в чатах»)
-            if (MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", false) && chatMode == MODE_DEFAULT) {
+            if (MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", true) && chatMode == MODE_DEFAULT) {
                 headerItem.addSubItem(devgram_chat_theme, R.drawable.msg_theme, "Тема этого чата", themeDelegate);
             }
 
@@ -4891,6 +4891,10 @@ public class ChatActivity extends BaseFragment implements
             glassBackgroundDrawableFactory,
             BlurredBackgroundProviderImpl.topPanelChatActivity(themeDelegate),
             ChatObject.isForum(currentChat));
+        boolean md3ChatHeader = org.telegram.ui.Components.DevGramMaterial3.enabled()
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false);
+        actionBar.setDrawGlassMiddlePill(!md3ChatHeader);
+        actionBar.setGlassShadowAlpha(md3ChatHeader ? 0f : 1f);
         actionBar.setGlassAvatarSquare(AndroidUtilities.avatarCornersType() == AndroidUtilities.AVATAR_CORNERS_SQUARE);
         //actionBar.setChatAvatarContainer(avatarContainer);
         //avatarContainer.setActionBar(actionBar);
@@ -7285,7 +7289,12 @@ public class ChatActivity extends BaseFragment implements
 
         chatActivityFadeView = new ChatActivityFadeView(context);
         chatActivityFadeView.setup(navbarContentDrawableFactory);
-        chatActivityFadeView.setFadeHeightTop(dp(48));
+        md3ChatHeader = org.telegram.ui.Components.DevGramMaterial3.enabled()
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false);
+        chatActivityFadeView.setFadeHeightTop(dp(md3ChatHeader ? org.telegram.ui.Components.DevGramMaterial3.CHAT_HEADER_FADE_DP : 48));
+        if (md3ChatHeader) {
+            chatActivityFadeView.setTopFadeColor(getThemedColor(Theme.key_windowBackgroundGray));
+        }
         chatActivityFadeView.setFadeHeightBottom(dp(48));
         contentView.addView(chatActivityFadeView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
@@ -44195,14 +44204,6 @@ public class ChatActivity extends BaseFragment implements
             } else {
                 AndroidUtilities.runOnUIThread(() -> NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewTheme, false, true, true));
             }
-            // DevGram: применить локальную тему этого чата, если выбрана
-            if (parentThemeDelegate == null
-                    && MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", false)) {
-                String localTheme = MessagesController.getGlobalMainSettings().getString("dg_chattheme_" + dialog_id, null);
-                if (!TextUtils.isEmpty(localTheme)) {
-                    devgramApplyLocalTheme(localTheme);
-                }
-            }
         }
 
         @Override
@@ -44302,6 +44303,11 @@ public class ChatActivity extends BaseFragment implements
         }
 
         public boolean isThemeChangeAvailable(boolean canEdit) {
+            // DevGram: «Различные темы в чатах» — разблокировать локальные темы для всех чатов
+            if (currentEncryptedChat == null
+                    && MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", true)) {
+                return true;
+            }
             return currentEncryptedChat == null && (
                 (!canEdit /*|| currentChat != null && ChatObject.isChannelAndNotMegaGroup(currentChat) && ChatObject.canChangeChatInfo(currentChat)*/) ||
                 currentChat == null && currentUser != null && !currentUser.bot
@@ -45090,6 +45096,11 @@ public class ChatActivity extends BaseFragment implements
         }
         if (actionBar == null) {
             return !Theme.isCurrentThemeDark();
+        }
+        if (org.telegram.ui.Components.DevGramMaterial3.enabled()
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false)
+                && !actionBar.isActionModeShowed()) {
+            return AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundGray)) > .721f;
         }
         return !shouldHaveLightStatusBarIcons;
     }
@@ -47253,7 +47264,10 @@ public class ChatActivity extends BaseFragment implements
         }
         fadeHeight += dp(36 + 7) * getHashtagTabsShownT();
 
-        chatActivityFadeView.setFadeZoneTop((int) fadeHeight);
+        boolean md3ChatHeader = org.telegram.ui.Components.DevGramMaterial3.enabled()
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false);
+        chatActivityFadeView.setFadeTopAlpha(actionBar.getVisibility() == View.VISIBLE ? 255 : 0);
+        chatActivityFadeView.setFadeZoneTop((int) fadeHeight + (md3ChatHeader ? dp(org.telegram.ui.Components.DevGramMaterial3.CHAT_HEADER_FADE_ZONE_DP) : 0));
     }
 
     private void checkUi_messagesSearchListPadding() {

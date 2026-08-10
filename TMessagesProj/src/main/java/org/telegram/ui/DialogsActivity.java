@@ -3553,16 +3553,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 SpannableStringBuilder ssb = new SpannableStringBuilder(getString(R.string.AppName));
                 ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 actionBar.setTitle(ssb, statusDrawable);
-                // DevGram: «Текст в заголовке» — Название приложения / Имя / Имя пользователя
-                int dgTitleMode = MessagesController.getGlobalMainSettings().getInt("dg_actionBarTitle", 0);
-                CharSequence dgTitle = MessagesController.getGlobalMainSettings().getString("forkCustomTitle", "DevGram");
-                TLRPC.User dgSelf = UserConfig.getInstance(currentAccount).getCurrentUser();
-                if (dgTitleMode == 1 && dgSelf != null) {
-                    dgTitle = UserObject.getUserName(dgSelf);
-                } else if (dgTitleMode == 2 && dgSelf != null && !TextUtils.isEmpty(UserObject.getPublicUsername(dgSelf))) {
-                    dgTitle = "@" + UserObject.getPublicUsername(dgSelf);
-                }
-                actionBar.setTitle(dgTitle);
+                actionBar.setTitle(devgramActionBarTitle());
                 actionBar.setTitleLongClickListener(v -> {
                     boolean mainTabsHidden = !UserConfig.getInstance(currentAccount).getMainTabsHiddenFork();
                     UserConfig.getInstance(currentAccount).setMainTabsHiddenFork(mainTabsHidden);
@@ -5785,13 +5776,35 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return false;
     }
 
-    // DevGram: эффективная высота строки поиска — 0, когда она скрыта (dg_hideSearchBar).
-    // Схлопывает зарезервированное место в layout/скролле, чтобы не оставался пустой зазор.
+    // DevGram: эффективная высота строки поиска. При скрытии (dg_hideSearchBar) высота 0,
+    // но раскрывается до 48dp во время активного поиска (по прогрессу animatorSearchVisible),
+    // чтобы поле поиска не ломалось при вводе.
     private int searchFieldHeightPx() {
         if (MessagesController.getGlobalMainSettings().getBoolean("dg_hideSearchBar", false)) {
-            return 0;
+            return (int) (dp(SEARCH_FIELD_HEIGHT) * animatorSearchVisible.getFloatValue());
         }
         return dp(SEARCH_FIELD_HEIGHT);
+    }
+
+    // DevGram: «Текст в заголовке» — 0 название приложения, 1 @юзернейм, 2 имя аккаунта, 3 «Чаты»
+    private CharSequence devgramActionBarTitle() {
+        int mode = MessagesController.getGlobalMainSettings().getInt("dg_actionBarTitle", 0);
+        TLRPC.User self = UserConfig.getInstance(currentAccount).getCurrentUser();
+        switch (mode) {
+            case 1:
+                if (self != null && !TextUtils.isEmpty(UserObject.getPublicUsername(self))) {
+                    return "@" + UserObject.getPublicUsername(self);
+                }
+                break;
+            case 2:
+                if (self != null) {
+                    return UserObject.getUserName(self);
+                }
+                break;
+            case 3:
+                return LocaleController.getString(R.string.FilterChats);
+        }
+        return MessagesController.getGlobalMainSettings().getString("forkCustomTitle", "DevGram");
     }
 
     private int getMaxScrollYOffsetWithoutSearch() {
@@ -7152,15 +7165,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
         if (actionBar != null && folderId == 0 && communityId == 0 && !onlySelect) {
-            int dgTitleMode = MessagesController.getGlobalMainSettings().getInt("dg_actionBarTitle", 0);
-            TLRPC.User dgSelf = UserConfig.getInstance(currentAccount).getCurrentUser();
-            if (dgTitleMode == 1 && dgSelf != null) {
-                actionBar.setTitle(UserObject.getUserName(dgSelf));
-            } else if (dgTitleMode == 2 && dgSelf != null && !TextUtils.isEmpty(UserObject.getPublicUsername(dgSelf))) {
-                actionBar.setTitle("@" + UserObject.getPublicUsername(dgSelf));
-            } else {
-                actionBar.setTitle(MessagesController.getGlobalMainSettings().getString("forkCustomTitle", "DevGram"));
-            }
+            actionBar.setTitle(devgramActionBarTitle());
         }
         updateStoriesVisibility(false);
         updateFloatingButtonVisibility(false);

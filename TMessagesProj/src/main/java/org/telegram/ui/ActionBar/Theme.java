@@ -830,6 +830,7 @@ public class Theme {
 
         private void generatePath(Path path, Rect bounds, int padding, int rad, int smallRad, int nearRad, int top, boolean drawFullBottom, boolean drawFullTop, boolean customPaint) {
             path.rewind();
+            final boolean removeTail = org.telegram.messenger.DevGramConfig.removeMessageTail;
             int heightHalf = (bounds.height() - padding) >> 1;
             if (rad > heightHalf) {
                 rad = heightHalf;
@@ -838,7 +839,7 @@ public class Theme {
                 // LEFT-BOTTOM <- RIGHT-BOTTOM
                 if (drawFullBubble || currentType == TYPE_PREVIEW || customPaint || drawFullBottom) {
                     int radToUse = botButtonsBottom ? nearRad : rad;
-                    if (currentType == TYPE_MEDIA) {
+                    if (currentType == TYPE_MEDIA || removeTail) {
                         path.moveTo(bounds.right - dp(8) - radToUse, bounds.bottom - padding);
                     } else {
                         path.moveTo(bounds.right - dp(2.6f), bounds.bottom - padding);
@@ -858,7 +859,7 @@ public class Theme {
 
                     // LEFT-TOP -> RIGHT-TOP
                     int radToUse = isTopNear ? nearRad : rad;
-                    if (currentType == TYPE_MEDIA) {
+                    if (currentType == TYPE_MEDIA || removeTail) {
                         path.lineTo(bounds.right - padding - radToUse, bounds.top + padding);
                         rect.set(bounds.right - padding - radToUse * 2, bounds.top + padding, bounds.right - padding, bounds.top + padding + radToUse * 2);
                     } else {
@@ -878,7 +879,7 @@ public class Theme {
                     }
                 }
                 // RIGHT-TOP -> RIGHT-BOTTOM
-                if (currentType == TYPE_MEDIA) {
+                if (currentType == TYPE_MEDIA || removeTail) {
                     if (customPaint || drawFullBottom) {
                         int radToUse = isBottomNear ? nearRad : rad;
 
@@ -901,7 +902,7 @@ public class Theme {
                 if (drawFullBubble || currentType == TYPE_PREVIEW || customPaint || drawFullBottom) {
                     int radToUse = botButtonsBottom ? nearRad : rad;
 
-                    if (currentType == TYPE_MEDIA) {
+                    if (currentType == TYPE_MEDIA || removeTail) {
                         path.moveTo(bounds.left + dp(8) + radToUse, bounds.bottom - padding);
                     } else {
                         path.moveTo(bounds.left + dp(2.6f), bounds.bottom - padding);
@@ -919,7 +920,7 @@ public class Theme {
                     path.arcTo(rect, 0, -90, false);
 
                     int radToUse = isTopNear ? nearRad : rad;
-                    if (currentType == TYPE_MEDIA) {
+                    if (currentType == TYPE_MEDIA || removeTail) {
                         path.lineTo(bounds.left + padding + radToUse, bounds.top + padding);
                         rect.set(bounds.left + padding, bounds.top + padding, bounds.left + padding + radToUse * 2, bounds.top + padding + radToUse * 2);
                     } else {
@@ -935,7 +936,7 @@ public class Theme {
                         path.lineTo(bounds.left + dp(8), top - topY - dp(2));
                     }
                 }
-                if (currentType == TYPE_MEDIA) {
+                if (currentType == TYPE_MEDIA || removeTail) {
                     if (customPaint || drawFullBottom) {
                         int radToUse = isBottomNear || botButtonsBottom ? nearRad : rad;
 
@@ -1019,11 +1020,14 @@ public class Theme {
             Rect lastRect = new Rect();
             boolean lastDrawFullTop;
             boolean lastDrawFullBottom;
+            boolean lastRemoveTail;
 
             public boolean invalidatePath(Rect bounds, boolean drawFullBottom, boolean drawFullTop) {
-                boolean invalidate = lastRect.isEmpty() || lastRect.top != bounds.top || lastRect.bottom != bounds.bottom || lastRect.right != bounds.right || lastRect.left != bounds.left || lastDrawFullTop != drawFullTop || lastDrawFullBottom != drawFullBottom || !drawFullTop || !drawFullBottom;
+                boolean removeTail = org.telegram.messenger.DevGramConfig.removeMessageTail;
+                boolean invalidate = lastRect.isEmpty() || lastRect.top != bounds.top || lastRect.bottom != bounds.bottom || lastRect.right != bounds.right || lastRect.left != bounds.left || lastDrawFullTop != drawFullTop || lastDrawFullBottom != drawFullBottom || lastRemoveTail != removeTail || !drawFullTop || !drawFullBottom;
                 lastDrawFullTop = drawFullTop;
                 lastDrawFullBottom = drawFullBottom;
+                lastRemoveTail = removeTail;
                 lastRect.set(bounds);
                 return invalidate;
             }

@@ -76,6 +76,9 @@ public class DevGramConfig {
     public static boolean hideKeyboardOnScroll = true;   // скрывать клавиатуру при прокрутке чата (в exteraGram ВКЛ по умолчанию)
     public static boolean disableGreetingSticker = false; // не показывать приветственный стикер в пустом чате
     public static boolean addCommaAfterMention = true;    // запятая после @упоминания в начале строки (в exteraGram ВКЛ)
+    public static boolean removeMessageTail = false;
+    public static boolean replaceEditedWithIcon = false;
+    public static boolean hideShareButton = false;
 
     // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
     private static final Object readSync = new Object();
@@ -119,6 +122,9 @@ public class DevGramConfig {
             hideKeyboardOnScroll = preferences.getBoolean("hideKeyboardOnScroll", true);
             disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
             addCommaAfterMention = preferences.getBoolean("addCommaAfterMention", true);
+            removeMessageTail = preferences.getBoolean("removeMessageTail", false);
+            replaceEditedWithIcon = preferences.getBoolean("replaceEditedWithIcon", false);
+            hideShareButton = preferences.getBoolean("hideShareButton", false);
             loaded = true;
         }
     }
@@ -236,6 +242,21 @@ public class DevGramConfig {
         if (preferences != null) {
             preferences.edit().putBoolean("addCommaAfterMention", v).apply();
         }
+    }
+
+    public static void setRemoveMessageTail(boolean v) {
+        removeMessageTail = v;
+        if (preferences != null) preferences.edit().putBoolean("removeMessageTail", v).apply();
+    }
+
+    public static void setReplaceEditedWithIcon(boolean v) {
+        replaceEditedWithIcon = v;
+        if (preferences != null) preferences.edit().putBoolean("replaceEditedWithIcon", v).apply();
+    }
+
+    public static void setHideShareButton(boolean v) {
+        hideShareButton = v;
+        if (preferences != null) preferences.edit().putBoolean("hideShareButton", v).apply();
     }
 
     // Формат времени сообщений с секундами. Флаг живёт в глобальных настройках (getGlobalMainSettings),
