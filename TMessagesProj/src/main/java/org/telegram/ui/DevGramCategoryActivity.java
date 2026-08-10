@@ -90,6 +90,13 @@ public class DevGramCategoryActivity extends BaseFragment {
         return org.telegram.messenger.MessagesController.getGlobalMainSettings().getInt(key, def);
     }
 
+    // Подпись реакции двойного тапа: кастомный эмодзи (animated_...) → «Своя эмодзи», иначе сам эмодзи
+    private String doubleTapReactionLabel() {
+        String r = org.telegram.messenger.MediaDataController.getInstance(currentAccount).getDoubleTapReaction();
+        if (r == null || r.isEmpty()) return "—";
+        return r.startsWith("animated_") ? "Своя эмодзи" : r;
+    }
+
     // MD3 (master + 5 подпунктов) и остальные настройки внешнего вида — pref-ключи dg_*.
     private static final int ID_SINGLE_CORNER = 40;
     private static final int ID_HIDE_STATUS = 41;
@@ -165,13 +172,14 @@ public class DevGramCategoryActivity extends BaseFragment {
     private org.telegram.ui.Components.DevGramChatListPreviewCell chatListPreview;
     private org.telegram.ui.Components.DevGramFoldersPreviewCell foldersPreview;
     private org.telegram.ui.Components.DevGramFabPreviewCell fabPreview;
-    private org.telegram.ui.Components.DevGramMessagesPreviewCell messagesPreview;
+    private View messagesPreview;
     private org.telegram.ui.Components.DevGramStickerSizePreviewCell stickerSizePreview;
-    private org.telegram.ui.Components.DevGramDoubleTapPreviewCell doubleTapPreview;
+    private View doubleTapPreview;
 
+    // Реальное превью сообщений через ChatMessageCell (как у exteraGram) — базовый ThemePreviewMessagesCell.
     private View getMessagesPreview() {
         if (messagesPreview == null) {
-            messagesPreview = new org.telegram.ui.Components.DevGramMessagesPreviewCell(getContext());
+            messagesPreview = new org.telegram.ui.Cells.ThemePreviewMessagesCell(getContext(), getParentLayout(), 0);
         }
         return messagesPreview;
     }
@@ -183,9 +191,11 @@ public class DevGramCategoryActivity extends BaseFragment {
         return stickerSizePreview;
     }
 
+    // Реальное превью двойного тапа через ChatMessageCell (базовый ThemePreviewMessagesCell)
     private View getDoubleTapPreview() {
         if (doubleTapPreview == null) {
-            doubleTapPreview = new org.telegram.ui.Components.DevGramDoubleTapPreviewCell(getContext());
+            doubleTapPreview = new org.telegram.ui.Cells.ThemePreviewMessagesCell(getContext(), getParentLayout(),
+                    org.telegram.ui.Cells.ThemePreviewMessagesCell.TYPE_REACTIONS_DOUBLE_TAP);
         }
         return doubleTapPreview;
     }
@@ -479,7 +489,7 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asHeader("Двойное нажатие"));
             items.add(UItem.asCustom(getDoubleTapPreview()));
             items.add(UItem.asButton(ID_DOUBLE_TAP_REACTION, "Реакция по двойному нажатию",
-                    org.telegram.messenger.MediaDataController.getInstance(currentAccount).getDoubleTapReaction()));
+                    doubleTapReactionLabel()));
             items.add(UItem.asShadow("Дважды нажми на превью — проиграется выбранная реакция."));
 
             items.add(UItem.asHeader("Поведение чата"));

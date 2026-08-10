@@ -38,9 +38,15 @@ public class DevGramStickerSizePreviewCell extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         int w = getWidth(), h = getHeight();
-        // обои чата
-        paint.setColor(Theme.getColor(Theme.key_chat_wallpaper));
-        canvas.drawRect(0, 0, w, h, paint);
+        // обои чата — реальный Drawable (не цвет!), иначе key_chat_wallpaper даёт мусорный цвет
+        android.graphics.drawable.Drawable wp = Theme.getCachedWallpaperNonBlocking();
+        if (wp != null) {
+            wp.setBounds(0, 0, w, h);
+            wp.draw(canvas);
+        } else {
+            paint.setColor(Theme.getColor(Theme.key_windowBackgroundGray));
+            canvas.drawRect(0, 0, w, h, paint);
+        }
 
         float m = AndroidUtilities.dp(12);
 
