@@ -44404,6 +44404,7 @@ public class ChatActivity extends BaseFragment implements
 
         private SparseIntArray currentColors = new SparseIntArray();
         private SparseIntArray animatingColors;
+        private boolean devgramLocalThemeActive;
         private EmojiThemes chatTheme;
         private TLRPC.WallPaper wallpaper;
         private Drawable backgroundDrawable;
@@ -44448,7 +44449,7 @@ public class ChatActivity extends BaseFragment implements
                     return animatingColors.valueAt(index);
                 }
             }
-            if (chatTheme == null) {
+            if (chatTheme == null && !devgramLocalThemeActive) {
                 return Theme.getColor(key);
             }
             int index = currentColors.indexOfKey(key);
@@ -44804,6 +44805,7 @@ public class ChatActivity extends BaseFragment implements
             try {
                 // 1) заполнить currentColors (getColor читает их) — работает и до attach (при открытии чата)
                 if (TextUtils.isEmpty(themeName)) {
+                    devgramLocalThemeActive = false;
                     setupChatTheme(chatTheme, wallpaper, false, true);
                 } else {
                     Theme.ThemeInfo info = Theme.getTheme(themeName);
@@ -44816,13 +44818,12 @@ public class ChatActivity extends BaseFragment implements
                         return;
                     }
                     isDark = info.isDark();
+                    devgramLocalThemeActive = true;
                     currentColors = colors;
                     currentPaints.clear();
                     currentDrawables.clear();
-                    if (ApplicationLoader.applicationContext != null) {
-                        Theme.createChatResources(ApplicationLoader.applicationContext, false);
-                    }
-                    backgroundDrawable = Theme.getCachedWallpaperNonBlocking();
+                    int wallpaperColor = getColor(Theme.key_chat_wallpaper);
+                    backgroundDrawable = new ColorDrawable(wallpaperColor);
                     int[] cc = AndroidUtilities.calcDrawableColor(backgroundDrawable);
                     currentColor = cc[0];
                     initDrawables();
