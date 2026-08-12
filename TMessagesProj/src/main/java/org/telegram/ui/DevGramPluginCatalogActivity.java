@@ -59,9 +59,12 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private TextView emptyView;
     private org.telegram.ui.ActionBar.ActionBarMenuItem moderationItem;
     private int sortMode;
+    private int loadGeneration;
+    private boolean destroyed;
 
     @Override
     public View createView(Context context) {
+        destroyed = false;
         team = DevGramBadges.isTeam(getUserConfig().getClientUserId());
 
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
@@ -175,7 +178,9 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
 
     // ---------- чипы ----------
     private void rebuildChips() {
-        if (chipRow == null) return;
+        if (destroyed || chipRow == null || !chipRow.isAttachedToWindow() && fragmentView != null) return;
+        Context context = chipRow.getContext();
+        if (context == null) return;
         chipRow.removeAllViews();
         ArrayList<String> names = new ArrayList<>();
         names.add("");
@@ -183,7 +188,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         for (String name : names) {
             final String f = name;
             boolean on = activeFilter.equals(f);
-            TextView chip = new TextView(getContext());
+            TextView chip = new TextView(context);
             int count = countForFilter(f);
             chip.setText((name.isEmpty() ? "Все" : name) + "  " + count);
             chip.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
@@ -203,7 +208,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             chipRow.addView(chip, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 8, 0));
         }
         if (team) {
-            TextView add = new TextView(getContext());
+            TextView add = new TextView(context);
             add.setText("＋  Категория");
             add.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
             add.setTypeface(AndroidUtilities.bold());
@@ -231,13 +236,16 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
 
     // ---------- данные ----------
     private void loadAll() {
+        final int generation = ++loadGeneration;
         loading = true;
         DevGramPlugins.fetchFilters(f -> {
+            if (!isLoadActive(generation)) return;
             filters.clear();
             filters.addAll(f);
             rebuildChips();
         });
         DevGramPlugins.fetchCatalog(entries -> {
+            if (!isLoadActive(generation)) return;
             all.clear();
             all.addAll(entries);
             loading = false;
@@ -248,11 +256,28 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         });
         // показать вход в модерацию только модераторам (по их Telegram-ID)
         DevGramPlugins.fetchModerators(m -> {
-            if (moderationItem != null) {
+            if (isLoadActive(generation) && moderationItem != null) {
                 long myTg = getUserConfig().getClientUserId();
                 moderationItem.setVisibility(DevGramPlugins.canSeeModeration(myTg) ? View.VISIBLE : View.GONE);
             }
         });
+    }
+
+    private boolean isLoadActive(int generation) {
+        return !destroyed && generation == loadGeneration && fragmentView != null && getParentActivity() != null;
+    }
+
+    @Override
+    public void onFragmentDestroy() {
+        destroyed = true;
+        loadGeneration++;
+        chipRow = null;
+        catalogSummary = null;
+        emptyView = null;
+        moderationItem = null;
+        adapter = null;
+        listView = null;
+        super.onFragmentDestroy();
     }
 
     private boolean matches(DevGramPlugins.CatalogEntry e) {

@@ -345,8 +345,12 @@ public class DevGramBadges {
                         return;
                     }
                 }
+                adminIdToken = null;
+                adminUid = null;
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(false, "неверный email или пароль"));
             } catch (Throwable e) {
+                adminIdToken = null;
+                adminUid = null;
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(false, e.getMessage()));
             }
         });
