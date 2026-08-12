@@ -1,0 +1,17 @@
+<!-- DevGram: иконка Tonkeeper — тёмно-синяя скруглённая плашка + светло-голубой бриллиант TON. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#1B2733"
+        android:pathData="M6,0.5 L18,0.5 A5.5,5.5 0 0 1 23.5,6 L23.5,18 A5.5,5.5 0 0 1 18,23.5 L6,23.5 A5.5,5.5 0 0 1 0.5,18 L0.5,6 A5.5,5.5 0 0 1 6,0.5 Z" />
+    <path
+        android:fillColor="#45AEF5"
+        android:pathData="M12,4 L18.5,8.5 L12,19.5 L5.5,8.5 Z" />
+    <path
+        android:strokeColor="#2C86C6"
+        android:strokeWidth="0.9"
+        android:pathData="M5.5,8.5 L18.5,8.5 M12,4 L12,19.5" />
+</vector>

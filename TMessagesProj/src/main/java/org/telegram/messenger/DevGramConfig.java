@@ -1,0 +1,591 @@
+/*
+ * DevGram: конфиг «режима призрака».
+ * Логика портирована из AyuGram for Android (GPL v2+, © @Radolyn),
+ * адаптирована под нашу базу и бренд.
+ */
+
+package org.telegram.messenger;
+
+import android.app.Activity;
+import android.content.SharedPreferences;
+
+public class DevGramConfig {
+    private static final Object sync = new Object();
+    private static boolean loaded;
+
+    public static SharedPreferences preferences;
+
+    // ВАЖНО: значения по умолчанию заданы прямо в полях, чтобы поведение было корректным
+    // даже если loadConfig() ещё не отработал (иначе булины были бы false = ghost включён,
+    // сохранение выключено). loadConfig() лишь перезаписывает их из SharedPreferences.
+    // true  = вести себя как обычный клиент (отправлять пакеты);
+    // false = скрывать активность (режим призрака).
+    public static boolean sendReadPackets = true;   // статусы прочтения
+    public static boolean sendOnlinePackets = true; // статус «в сети»
+    public static boolean sendUploadTyping = true;  // «печатает…» / «загружает…»
+
+    // Скрывать рекламу: спонсорские сообщения в каналах и ботах + реклама в видеоплеере.
+    public static boolean disableAds = false;
+
+    // Локальный премиум: клиент ведёт себя так, будто у аккаунта есть Telegram Premium —
+    // открываются КЛИЕНТСКИЕ фичи (безлимит папок, премиум-эмодзи/стикеры/реакции, статусы
+    // и т.п.). Серверные вещи (гигабайтные загрузки, премиум-реакции у собеседников) подделать
+    // нельзя. Хук стоит в UserConfig.isPremium() и MessagesController.isPremiumUser() — только
+    // для нашего аккаунта, чужим премиум не приписываем.
+    public static boolean localPremium = false;
+
+    // Огоньки-стрик (🔥N рядом с именем). По умолчанию включены.
+    public static boolean streaksEnabled = true;
+
+    // Встроенный WireGuard-VPN. По умолчанию выключен.
+    public static boolean vpnEnabled = false;
+
+    // Профиль в стиле iOS (центрированная шапка, стеклянные кнопки/карточки). По умолчанию ВКЛючён.
+    public static boolean iosProfile = true;
+
+    // --- сохранение истории ---
+    // По умолчанию ВЫКЛЮЧЕНЫ, как и режим призрака: мод не должен ничего менять,
+    // пока пользователь сам не включит нужную функцию.
+    public static boolean saveDeletedMessages = false; // сохранять удалённые сообщения
+    public static boolean saveMessagesHistory = false; // сохранять историю правок
+    public static boolean saveMedia = false;           // сохранять вложения удалённых
+    public static boolean saveInBotChats = false;      // сохранять и в диалогах с ботами
+
+    // --- раздел «Сбор данных» ---
+    // analytics — ВЫКЛ по умолчанию; crashes — ВКЛ по умолчанию, но реальный сбор пока заглушён
+    // мастер-гейтом DevGramTelemetry.COLLECT_CRASHES (см. «не собирай пока что»).
+    public static boolean analyticsEnabled = false;
+    public static boolean crashlyticsEnabled = true;
+
+    // --- раздел «Внешний вид» ---
+    // Отключить округление чисел (1.2K -> 1 234) — как в exteraGram (DisableNumberRounding).
+    public static boolean disableNumberRounding = false;
+    // Квадратная кнопка (FAB) — в exteraGram ВКЛ по умолчанию (squareFab).
+    public static boolean squareFab = true;
+    // Стеклянное меню сообщения (размытый снимок чата под меню) — как exteraGram GlassMessageMenu.
+    public static boolean glassMenu = true;
+    // Скрыть строку категорий в поиске эмодзи/стикеров — в exteraGram ВКЛ по умолчанию (hideCategories).
+    public static boolean hideEmojiCategories = true;
+    // Снег поверх шапки всегда (exteraGram ForceSnow).
+    public static boolean forceSnow = false;
+    // Заголовок по центру шапки (exteraGram centerTitle).
+    public static boolean centerTitle = false;
+
+    // --- раздел «Чаты» (порт из exteraGram) ---
+    public static boolean disableMarkdown = false;       // не преобразовывать **/`code` в форматирование
+    public static boolean hideKeyboardOnScroll = true;   // скрывать клавиатуру при прокрутке чата (в exteraGram ВКЛ по умолчанию)
+    public static boolean disableGreetingSticker = false; // не показывать приветственный стикер в пустом чате
+    public static boolean addCommaAfterMention = true;    // запятая после @упоминания в начале строки (в exteraGram ВКЛ)
+    public static boolean removeMessageTail = false;
+    public static boolean replaceEditedWithIcon = false;
+    public static boolean hideShareButton = false;
+    public static boolean hideStickerTime = false; // скрыть время на стикерах (как exteraGram)
+
+    // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
+    private static final Object readSync = new Object();
+    private static boolean allowReadVal;
+    private static int allowReadResetAfter;
+
+    static {
+        loadConfig();
+    }
+
+    public static void loadConfig() {
+        synchronized (sync) {
+            if (loaded) {
+                return;
+            }
+            if (ApplicationLoader.applicationContext == null) {
+                return; // контекст ещё не готов — попробуем позже, поля пока держат дефолты
+            }
+            preferences = ApplicationLoader.applicationContext.getSharedPreferences("devgram_ghost", Activity.MODE_PRIVATE);
+            sendReadPackets = preferences.getBoolean("sendReadPackets", true);
+            sendOnlinePackets = preferences.getBoolean("sendOnlinePackets", true);
+            sendUploadTyping = preferences.getBoolean("sendUploadTyping", true);
+            disableAds = preferences.getBoolean("disableAds", false);
+            localPremium = preferences.getBoolean("localPremium", false);
+            streaksEnabled = preferences.getBoolean("streaksEnabled", true);
+            vpnEnabled = preferences.getBoolean("vpnEnabled", false);
+            iosProfile = preferences.getBoolean("iosProfile", true);
+            saveDeletedMessages = preferences.getBoolean("saveDeletedMessages", false);
+            saveMessagesHistory = preferences.getBoolean("saveMessagesHistory", false);
+            saveMedia = preferences.getBoolean("saveMedia", false);
+            saveInBotChats = preferences.getBoolean("saveInBotChats", false);
+            analyticsEnabled = preferences.getBoolean("analyticsEnabled", false);
+            crashlyticsEnabled = preferences.getBoolean("crashlyticsEnabled", true);
+            disableNumberRounding = preferences.getBoolean("disableNumberRounding", false);
+            squareFab = preferences.getBoolean("squareFab", true);
+            glassMenu = preferences.getBoolean("glassMenu", true);
+            hideEmojiCategories = preferences.getBoolean("hideEmojiCategories", true);
+            forceSnow = preferences.getBoolean("forceSnow", false);
+            centerTitle = preferences.getBoolean("centerTitle", false);
+            disableMarkdown = preferences.getBoolean("disableMarkdown", false);
+            hideKeyboardOnScroll = preferences.getBoolean("hideKeyboardOnScroll", true);
+            disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
+            addCommaAfterMention = preferences.getBoolean("addCommaAfterMention", true);
+            removeMessageTail = preferences.getBoolean("removeMessageTail", false);
+            replaceEditedWithIcon = preferences.getBoolean("replaceEditedWithIcon", false);
+            hideShareButton = preferences.getBoolean("hideShareButton", false);
+            hideStickerTime = preferences.getBoolean("hideStickerTime", false);
+            loaded = true;
+        }
+    }
+
+    // --- раздел «Google»: тумблеры сбора данных ---
+    public static void setAnalyticsEnabled(boolean v) {
+        analyticsEnabled = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("analyticsEnabled", v).apply();
+        }
+        applyFirebaseCollection();
+    }
+
+    public static void setCrashlyticsEnabled(boolean v) {
+        crashlyticsEnabled = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("crashlyticsEnabled", v).apply();
+        }
+        applyFirebaseCollection();
+    }
+
+    public static void setDisableNumberRounding(boolean v) {
+        disableNumberRounding = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("disableNumberRounding", v).apply();
+        }
+    }
+
+    public static void setSquareFab(boolean v) {
+        squareFab = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("squareFab", v).apply();
+        }
+    }
+
+    public static void setGlassMenu(boolean v) {
+        glassMenu = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("glassMenu", v).apply();
+        }
+    }
+
+    public static void setHideEmojiCategories(boolean v) {
+        hideEmojiCategories = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("hideEmojiCategories", v).apply();
+        }
+    }
+
+    public static void setForceSnow(boolean v) {
+        forceSnow = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("forceSnow", v).apply();
+        }
+    }
+
+    public static void setCenterTitle(boolean v) {
+        centerTitle = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("centerTitle", v).apply();
+        }
+    }
+
+    // Системные эмодзи (флаг живёт в SharedConfig — обёртка для нашего меню).
+    public static boolean isUseSystemEmoji() {
+        return org.telegram.messenger.SharedConfig.useSystemEmoji;
+    }
+
+    public static void setUseSystemEmoji(boolean v) {
+        org.telegram.messenger.SharedConfig.useSystemEmoji = v;
+        MessagesController.getGlobalMainSettings().edit().putBoolean("useSystemEmoji", v).apply();
+    }
+
+    // Размер стикеров (0..N) — pref в глобальных настройках, читается ChatMessageCell/LocaleController.
+    public static float getStickerSize() {
+        return MessagesController.getGlobalMainSettings().getFloat("stickerSize", 14f);
+    }
+
+    public static void setStickerSize(float v) {
+        MessagesController.getGlobalMainSettings().edit().putFloat("stickerSize", v).apply();
+    }
+
+    // Двойное нажатие — раздельные действия для входящих/исходящих (индекс в списке DevGramDoubleTapUtils).
+    // По умолчанию 1 = «Реакции» (совпадает со старым поведением).
+    public static int getDoubleTapActionIn() {
+        return MessagesController.getGlobalMainSettings().getInt("dg_doubletap_in", 1);
+    }
+
+    public static void setDoubleTapActionIn(int v) {
+        MessagesController.getGlobalMainSettings().edit().putInt("dg_doubletap_in", v).apply();
+    }
+
+    public static int getDoubleTapActionOut() {
+        return MessagesController.getGlobalMainSettings().getInt("dg_doubletap_out", 1);
+    }
+
+    public static void setDoubleTapActionOut(int v) {
+        MessagesController.getGlobalMainSettings().edit().putInt("dg_doubletap_out", v).apply();
+    }
+
+    // Стиль вкладок папок (0..2) — pref в глобальных настройках, читается FolderIcons.
+    public static int getFolderTabsStyle() {
+        return MessagesController.getGlobalMainSettings().getInt("folderTabsStyle", 0);
+    }
+
+    public static void setFolderTabsStyle(int v) {
+        MessagesController.getGlobalMainSettings().edit().putInt("folderTabsStyle", v).apply();
+    }
+
+    public static void setDisableMarkdown(boolean v) {
+        disableMarkdown = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("disableMarkdown", v).apply();
+        }
+    }
+
+    public static void setHideKeyboardOnScroll(boolean v) {
+        hideKeyboardOnScroll = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("hideKeyboardOnScroll", v).apply();
+        }
+    }
+
+    public static void setDisableGreetingSticker(boolean v) {
+        disableGreetingSticker = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("disableGreetingSticker", v).apply();
+        }
+    }
+
+    public static void setAddCommaAfterMention(boolean v) {
+        addCommaAfterMention = v;
+        if (preferences != null) {
+            preferences.edit().putBoolean("addCommaAfterMention", v).apply();
+        }
+    }
+
+    public static void setRemoveMessageTail(boolean v) {
+        removeMessageTail = v;
+        if (preferences != null) preferences.edit().putBoolean("removeMessageTail", v).apply();
+    }
+
+    public static void setReplaceEditedWithIcon(boolean v) {
+        replaceEditedWithIcon = v;
+        if (preferences != null) preferences.edit().putBoolean("replaceEditedWithIcon", v).apply();
+    }
+
+    public static void setHideShareButton(boolean v) {
+        hideShareButton = v;
+        if (preferences != null) preferences.edit().putBoolean("hideShareButton", v).apply();
+    }
+
+    public static void setHideStickerTime(boolean v) {
+        hideStickerTime = v;
+        if (preferences != null) preferences.edit().putBoolean("hideStickerTime", v).apply();
+    }
+
+    // Язык офлайн-распознавания голоса (Vosk). "none" = выключено (используется штатная серверная транскрипция).
+    public static String getRecognitionLanguage() {
+        return MessagesController.getGlobalMainSettings().getString("dg_recognitionLanguage", "none");
+    }
+
+    public static void setRecognitionLanguage(String lang) {
+        MessagesController.getGlobalMainSettings().edit().putString("dg_recognitionLanguage", lang == null ? "none" : lang).apply();
+    }
+
+    public static boolean isVoskRecognitionEnabled() {
+        return !"none".equals(getRecognitionLanguage());
+    }
+
+    // ИИ-постобработка распознанного текста (через DevGramAiClient).
+    public static boolean isRecognitionAiPostProcessing() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_recognitionAi", false);
+    }
+
+    public static void setRecognitionAiPostProcessing(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_recognitionAi", v).apply();
+    }
+
+    // Запоминать последнюю использованную камеру для кружков (сохраняет rearVideoMessages при флипе).
+    public static boolean isRememberLastCamera() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_rememberLastCamera", false);
+    }
+
+    public static void setRememberLastCamera(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_rememberLastCamera", v).apply();
+    }
+
+    // Слайдер зума в камере кружков (переиспользуем базовый ZoomControlView).
+    public static boolean isZoomSlider() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_zoomSlider", false);
+    }
+
+    public static void setZoomSlider(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_zoomSlider", v).apply();
+    }
+
+    // Статичный зум — не сбрасывать зум после жеста pinch.
+    public static boolean isStaticZoom() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_staticZoom", false);
+    }
+
+    public static void setStaticZoom(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_staticZoom", v).apply();
+    }
+
+    // Формат времени сообщений с секундами. Флаг живёт в глобальных настройках (getGlobalMainSettings),
+    // оттуда его читает LocaleController — как форма аватара. Держим тут обёртку для нашего меню.
+    public static boolean isFormatWithSeconds() {
+        return MessagesController.getGlobalMainSettings().getBoolean("formatWithSeconds", false);
+    }
+
+    public static void setFormatWithSeconds(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("formatWithSeconds", v).apply();
+    }
+
+    // Сбор данных БЕЗ Google-SDK (они ломали запуск — см. reference_devgram_no_firebase_sdk):
+    // своя телеметрия пишет анонимно в RTDB devgram-d03e4 через REST. Здесь просто дёргаем её,
+    // когда тумблеры «Google» меняются.
+    public static void applyFirebaseCollection() {
+        try {
+            DevGramTelemetry.onSettingsChanged();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    // Сброс всех настроек мода к значениям по умолчанию.
+    public static void resetToDefaults() {
+        synchronized (sync) {
+            sendReadPackets = true;
+            sendOnlinePackets = true;
+            sendUploadTyping = true;
+            disableAds = false;
+            localPremium = false;
+            streaksEnabled = true;
+            vpnEnabled = false;
+            iosProfile = true;
+            saveDeletedMessages = false;
+            saveMessagesHistory = false;
+            saveMedia = false;
+            saveInBotChats = false;
+            analyticsEnabled = false;
+            crashlyticsEnabled = true;
+            disableNumberRounding = false;
+            squareFab = true;
+            glassMenu = true;
+            hideEmojiCategories = true;
+            forceSnow = false;
+            centerTitle = false;
+            disableMarkdown = false;
+            hideKeyboardOnScroll = true;
+            disableGreetingSticker = false;
+            addCommaAfterMention = true;
+            if (preferences != null) {
+                preferences.edit().clear().apply();
+            }
+        }
+        applyFirebaseCollection();
+    }
+
+    // --- экспорт/импорт настроек мода (JSON) ---
+    public static String exportToJson() {
+        org.json.JSONObject o = new org.json.JSONObject();
+        try {
+            o.put("sendReadPackets", sendReadPackets);
+            o.put("sendOnlinePackets", sendOnlinePackets);
+            o.put("sendUploadTyping", sendUploadTyping);
+            o.put("disableAds", disableAds);
+            o.put("localPremium", localPremium);
+            o.put("streaksEnabled", streaksEnabled);
+            o.put("vpnEnabled", vpnEnabled);
+            o.put("iosProfile", iosProfile);
+            o.put("saveDeletedMessages", saveDeletedMessages);
+            o.put("saveMessagesHistory", saveMessagesHistory);
+            o.put("saveMedia", saveMedia);
+            o.put("saveInBotChats", saveInBotChats);
+            o.put("analyticsEnabled", analyticsEnabled);
+            o.put("crashlyticsEnabled", crashlyticsEnabled);
+            o.put("disableNumberRounding", disableNumberRounding);
+            o.put("squareFab", squareFab);
+            o.put("glassMenu", glassMenu);
+            o.put("hideEmojiCategories", hideEmojiCategories);
+            o.put("forceSnow", forceSnow);
+            o.put("centerTitle", centerTitle);
+            o.put("disableMarkdown", disableMarkdown);
+            o.put("hideKeyboardOnScroll", hideKeyboardOnScroll);
+            o.put("disableGreetingSticker", disableGreetingSticker);
+            o.put("addCommaAfterMention", addCommaAfterMention);
+        } catch (Throwable ignore) {
+        }
+        return o.toString();
+    }
+
+    // Применить настройки из JSON. true — успех.
+    public static boolean importFromJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(json.trim());
+            setSendReadPackets(o.optBoolean("sendReadPackets", sendReadPackets));
+            setSendOnlinePackets(o.optBoolean("sendOnlinePackets", sendOnlinePackets));
+            setSendUploadTyping(o.optBoolean("sendUploadTyping", sendUploadTyping));
+            setDisableAds(o.optBoolean("disableAds", disableAds));
+            setLocalPremium(o.optBoolean("localPremium", localPremium));
+            setStreaksEnabled(o.optBoolean("streaksEnabled", streaksEnabled));
+            setVpnEnabled(o.optBoolean("vpnEnabled", vpnEnabled));
+            setIosProfile(o.optBoolean("iosProfile", iosProfile));
+            setSaveDeletedMessages(o.optBoolean("saveDeletedMessages", saveDeletedMessages));
+            setSaveMessagesHistory(o.optBoolean("saveMessagesHistory", saveMessagesHistory));
+            setSaveMedia(o.optBoolean("saveMedia", saveMedia));
+            setSaveInBotChats(o.optBoolean("saveInBotChats", saveInBotChats));
+            setAnalyticsEnabled(o.optBoolean("analyticsEnabled", analyticsEnabled));
+            setCrashlyticsEnabled(o.optBoolean("crashlyticsEnabled", crashlyticsEnabled));
+            setDisableNumberRounding(o.optBoolean("disableNumberRounding", disableNumberRounding));
+            setSquareFab(o.optBoolean("squareFab", squareFab));
+            setGlassMenu(o.optBoolean("glassMenu", glassMenu));
+            setHideEmojiCategories(o.optBoolean("hideEmojiCategories", hideEmojiCategories));
+            setForceSnow(o.optBoolean("forceSnow", forceSnow));
+            setCenterTitle(o.optBoolean("centerTitle", centerTitle));
+            setDisableMarkdown(o.optBoolean("disableMarkdown", disableMarkdown));
+            setHideKeyboardOnScroll(o.optBoolean("hideKeyboardOnScroll", hideKeyboardOnScroll));
+            setDisableGreetingSticker(o.optBoolean("disableGreetingSticker", disableGreetingSticker));
+            setAddCommaAfterMention(o.optBoolean("addCommaAfterMention", addCommaAfterMention));
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    // Режим призрака активен, когда скрыты все три индикатора активности.
+    public static boolean isGhostModeActive() {
+        return !sendReadPackets && !sendOnlinePackets && !sendUploadTyping;
+    }
+
+    public static void setGhostMode(boolean enabled) {
+        sendReadPackets = !enabled;
+        sendOnlinePackets = !enabled;
+        sendUploadTyping = !enabled;
+        preferences.edit()
+                .putBoolean("sendReadPackets", sendReadPackets)
+                .putBoolean("sendOnlinePackets", sendOnlinePackets)
+                .putBoolean("sendUploadTyping", sendUploadTyping)
+                .apply();
+    }
+
+    public static void toggleGhostMode() {
+        setGhostMode(!isGhostModeActive());
+    }
+
+    public static void setSendReadPackets(boolean v) {
+        sendReadPackets = v;
+        preferences.edit().putBoolean("sendReadPackets", v).apply();
+    }
+
+    public static void setSendOnlinePackets(boolean v) {
+        sendOnlinePackets = v;
+        preferences.edit().putBoolean("sendOnlinePackets", v).apply();
+    }
+
+    public static void setSendUploadTyping(boolean v) {
+        sendUploadTyping = v;
+        preferences.edit().putBoolean("sendUploadTyping", v).apply();
+    }
+
+    public static void setDisableAds(boolean v) {
+        disableAds = v;
+        preferences.edit().putBoolean("disableAds", v).apply();
+    }
+
+    public static void setLocalPremium(boolean v) {
+        localPremium = v;
+        preferences.edit().putBoolean("localPremium", v).apply();
+        // применяем сразу ко всем активным аккаунтам: разблокируем папки/лимиты и обновляем UI,
+        // чтобы не требовался перезапуск приложения
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                UserConfig.getInstance(a).notifyPremiumChanged();
+            }
+        }
+    }
+
+    public static void setSaveDeletedMessages(boolean v) {
+        saveDeletedMessages = v;
+        preferences.edit().putBoolean("saveDeletedMessages", v).apply();
+    }
+
+    public static void setVpnEnabled(boolean v) {
+        vpnEnabled = v;
+        preferences.edit().putBoolean("vpnEnabled", v).apply();
+    }
+
+    public static void setIosProfile(boolean v) {
+        iosProfile = v;
+        preferences.edit().putBoolean("iosProfile", v).apply();
+    }
+
+    public static void setStreaksEnabled(boolean v) {
+        streaksEnabled = v;
+        preferences.edit().putBoolean("streaksEnabled", v).apply();
+        // перерисовать имена, чтобы огоньки появились/исчезли сразу
+        AndroidUtilities.runOnUIThread(() -> {
+            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                if (UserConfig.getInstance(a).isClientActivated()) {
+                    NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME);
+                }
+            }
+        });
+    }
+
+    public static void setSaveMessagesHistory(boolean v) {
+        saveMessagesHistory = v;
+        preferences.edit().putBoolean("saveMessagesHistory", v).apply();
+    }
+
+    public static void setSaveMedia(boolean v) {
+        saveMedia = v;
+        preferences.edit().putBoolean("saveMedia", v).apply();
+    }
+
+    public static void setSaveInBotChats(boolean v) {
+        saveInBotChats = v;
+        preferences.edit().putBoolean("saveInBotChats", v).apply();
+    }
+
+    // Пометка удалённого/изменённого сообщения в строке времени.
+    public static String getDeletedMark() {
+        return "🗑";
+    }
+
+    public static String getEditedMark() {
+        return LocaleController.getString("EditedMessage", R.string.EditedMessage);
+    }
+
+    // --- read gate ---
+    public static void setAllowReadPacket(boolean val, int resetAfter) {
+        synchronized (readSync) {
+            allowReadVal = val;
+            allowReadResetAfter = resetAfter;
+        }
+    }
+
+    public static boolean getAllowReadPacket() {
+        if (sendReadPackets) {
+            return true;
+        }
+        synchronized (readSync) {
+            if (allowReadResetAfter == -1) {
+                return allowReadVal;
+            }
+            if (allowReadResetAfter > 0) {
+                allowReadResetAfter -= 1;
+                boolean cur = allowReadVal;
+                if (allowReadResetAfter == 0) {
+                    allowReadVal = false;
+                }
+                return cur;
+            }
+            return allowReadVal;
+        }
+    }
+}

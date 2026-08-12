@@ -1,0 +1,326 @@
+apply plugin: 'com.android.application'
+apply plugin: 'com.google.gms.google-services'
+apply from: '../utils.gradle'
+
+repositories {
+    mavenCentral()
+    google()
+    maven {
+        url 'https://www.jitpack.io'
+        content {
+            includeModule 'com.github.UnifiedPush', 'android-connector'
+        }
+    }
+}
+
+configurations {
+    compile.exclude module: 'support-v4'
+}
+
+configurations.all {
+    exclude group: 'androidx.recyclerview', module: 'recyclerview'
+}
+
+dependencies {
+    implementation project(':TMessagesProj')
+    implementation 'androidx.fragment:fragment:1.8.9'
+    implementation 'androidx.core:core:1.16.0'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+}
+
+def readBuildProp = { String key, Object fallback ->
+    if (project.hasProperty(key)) {
+        def pv = project.property(key)
+        if (pv != null && pv.toString().trim()) {
+            return pv
+        }
+    }
+    def f = rootProject.file('local.properties')
+    if (f.exists()) {
+        def p = new Properties()
+        p.load(new FileInputStream(f))
+        def lv = p[key]
+        if (lv != null && lv.toString().trim()) {
+            return lv
+        }
+    }
+    return fallback
+}
+
+android {
+    compileSdkVersion 35
+    buildToolsVersion '35.0.0'
+
+    defaultConfig.applicationId = "org.devgram.messenger"
+
+    sourceSets.main.jniLibs.srcDirs = ['../TMessagesProj/jni/']
+
+    lintOptions {
+        disable 'MissingTranslation'
+        disable 'ExtraTranslation'
+        disable 'BlockedPrivateApi'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+
+        coreLibraryDesugaringEnabled true
+    }
+
+    def fdroid = Utils['isFdroid']()
+    def appSuffix = fdroid ? "" : ".beta"
+    def flavorsConfig = fdroid ? "release" : "debug"
+    if (fdroid) {
+        defaultConfig.applicationId = "org.forkgram.messenger"
+    }
+
+    signingConfigs {
+        if (fdroid) {
+            debug {
+                storeFile file("")
+                storePassword ""
+                keyAlias ""
+                keyPassword ""
+            }
+
+            release {
+                storeFile file("")
+                storePassword ""
+                keyAlias ""
+                keyPassword ""
+            }
+        } else {
+            def releaseKeystore = readBuildProp('RELEASE_KEYSTORE_FILE', null)
+            def useRealKeystore = releaseKeystore != null
+            def keystorePath = useRealKeystore ? releaseKeystore.toString() : "${rootProject.projectDir}/TMessagesProj/config/test.keystore"
+            def storePw = useRealKeystore ? readBuildProp('RELEASE_STORE_PASSWORD', '') : 'ILRvukMS1XoArnMbCmdMeu3RDigo'
+            def keyPw = useRealKeystore ? readBuildProp('RELEASE_KEY_PASSWORD', '') : 'ILRvukMS1XoArnMbCmdMeu3RDigo'
+            def keyAliasName = useRealKeystore ? readBuildProp('RELEASE_KEY_ALIAS', '') : 'telegramtest'
+
+            debug {
+                storeFile file(keystorePath)
+                storePassword storePw
+                keyAlias keyAliasName
+                keyPassword keyPw
+            }
+
+            release {
+                storeFile file(keystorePath)
+                storePassword storePw
+                keyAlias keyAliasName
+                keyPassword keyPw
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable false
+            jniDebuggable true
+            signingConfig signingConfigs.debug
+            applicationIdSuffix appSuffix
+            minifyEnabled true
+            shrinkResources false
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
+        }
+
+        HA {
+            debuggable false
+            jniDebuggable false
+            signingConfig signingConfigs.debug
+            applicationIdSuffix appSuffix
+            minifyEnabled true
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
+        }
+
+        standalone {
+            debuggable false
+            jniDebuggable false
+            signingConfig signingConfigs.release
+            applicationIdSuffix ".web"
+            minifyEnabled true
+            shrinkResources false
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
+        }
+
+        release {
+            debuggable false
+            jniDebuggable false
+            signingConfig signingConfigs.release
+            applicationIdSuffix appSuffix
+            minifyEnabled true
+            shrinkResources false
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
+        }
+    }
+
+    sourceSets.debug {
+        manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest.xml'
+    }
+
+    sourceSets.HA {
+        manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest.xml'
+    }
+
+    sourceSets.standalone {
+        manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest.xml'
+    }
+
+    sourceSets.release {
+        manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest.xml'
+    }
+
+    flavorDimensions "minApi"
+
+    productFlavors {
+        bundleAfat {
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            }
+            ext {
+                abiVersionCode = 1
+            }
+            buildConfigField "boolean", "BUNDLE", "true"
+        }
+        bundleAfat_SDK23 {
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            }
+            sourceSets.debug {
+                manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.release {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.standalone {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_standalone.xml'
+            }
+            minSdkVersion 24 // DevGram: поднято ради Chaquopy (Python-плагины)
+            ext {
+                abiVersionCode = 2
+            }
+            buildConfigField "boolean", "BUNDLE", "true"
+        }
+        afat {
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            }
+            sourceSets.debug {
+                manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.release {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.standalone {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_standalone.xml'
+            }
+            ext {
+                abiVersionCode = 9
+            }
+            buildConfigField "boolean", "BUNDLE", "false"
+        }
+//
+        afatFd_v7a {
+            ndk {
+                abiFilters "armeabi-v7a"
+            }
+            sourceSets.debug {
+                manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.release {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.standalone {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_standalone.xml'
+            }
+            ext {
+                abiVersionCode = 7
+            }
+        }
+        afatFd_v8a {
+            ndk {
+                abiFilters "arm64-v8a"
+            }
+            sourceSets.debug {
+                manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.release {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.standalone {
+                manifest.srcFile '../TMessagesProj/config/' + flavorsConfig + '/AndroidManifest_standalone.xml'
+            }
+            ext {
+                abiVersionCode = 8
+            }
+        }
+        forkTest {
+            ndk {
+                abiFilters "arm64-v8a"
+            }
+            applicationId "org.devgram.messenger.test"
+            sourceSets.debug {
+                manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
+            }
+            ext {
+                abiVersionCode = 11
+            }
+        }
+//
+    }
+
+    defaultConfig.versionCode = Integer.parseInt(Utils['getVersionCode']())
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if (!fdroid) {
+                outputFileName = "app.apk"
+            }
+            output.versionCodeOverride = defaultConfig.versionCode * 10 + variant.productFlavors.get(0).abiVersionCode
+        }
+    }
+
+    task wrapper(type: Wrapper) {
+        gradleVersion = '7.0.4'
+    }
+
+    task prepareKotlinBuildScriptModel {
+    }
+
+    variantFilter { variant ->
+        def names = variant.flavors*.name
+        if (variant.buildType.name != "release" && !names.contains("afat") && !names.contains("forkTest")) {
+            setIgnore(true)
+        }
+    }
+
+    defaultConfig {
+        minSdkVersion 24 // DevGram: поднято с 21 ради Chaquopy (Python-плагины)
+        targetSdkVersion 35
+        versionName Utils['getVersionName']()
+        ndkVersion "27.2.12479018"
+
+        multiDexEnabled true
+
+        externalNativeBuild {
+            cmake {
+                version '3.10.2'
+                arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-21' // , '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+            }
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+    namespace 'org.telegram.messenger.regular'
+
+    lintOptions {
+        checkReleaseBuilds false
+    }
+}

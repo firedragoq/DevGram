@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Нейтральная подложка нужна только в превью: настоящий Telegram-стикер
+  прозрачный, поэтому без неё разница между квадратной и скруглённой формой
+  визуально теряется на прозрачных углах.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFF7F8FA" />
+        </shape>
+    </item>
+    <item
+        android:left="12dp"
+        android:top="12dp"
+        android:right="12dp"
+        android:bottom="12dp">
+        <bitmap
+            android:src="@drawable/devgram_sticker_cat"
+            android:antialias="true"
+            android:filter="true"
+            android:gravity="fill" />
+    </item>
+</layer-list>

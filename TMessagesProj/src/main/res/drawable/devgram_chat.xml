@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DevGram: чат — речевой пузырь с многоточием (точки вырезаны через evenOdd) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M4.5,3h15C20.88,3 22,4.12 22,5.5v9C22,15.88 20.88,17 19.5,17H9.83l-4.3,3.44C4.87,20.97 3.9,20.5 3.9,19.66V17H4.5C3.12,17 2,15.88 2,14.5v-9C2,4.12 3.12,3 4.5,3zM6.25,9a1.25,1.25 0,1 0,2.5 0a1.25,1.25 0,1 0,-2.5 0zM10.75,9a1.25,1.25 0,1 0,2.5 0a1.25,1.25 0,1 0,-2.5 0zM15.25,9a1.25,1.25 0,1 0,2.5 0a1.25,1.25 0,1 0,-2.5 0z" />
+</vector>
