@@ -140,8 +140,9 @@ public class DevGramSupportSheet {
             @Override
             public void updateDrawState(android.text.TextPaint ds) {
                 super.updateDrawState(ds);
-                ds.setColor(Theme.getColor(Theme.key_dialogTextGray3)); // как обычный текст (серый)
-                ds.setUnderlineText(false);
+                ds.setColor(Theme.getColor(Theme.key_dialogTextBlue2));
+                ds.setUnderlineText(true);
+                ds.setTypeface(AndroidUtilities.bold());
             }
         }, oStart, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         sb.append(".");
@@ -165,8 +166,9 @@ public class DevGramSupportSheet {
             @Override
             public void updateDrawState(android.text.TextPaint ds) {
                 super.updateDrawState(ds);
-                ds.setColor(Theme.getColor(Theme.key_dialogTextGray3)); // как обычный текст (серый)
-                ds.setUnderlineText(false);
+                ds.setColor(Theme.getColor(Theme.key_dialogTextBlue2));
+                ds.setUnderlineText(true);
+                ds.setTypeface(AndroidUtilities.bold());
             }
         }, idx, idx + OWNER.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return sp;

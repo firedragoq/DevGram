@@ -10,6 +10,7 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.DevGramConfig;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -129,9 +130,9 @@ public class DevGramOtherActivity extends BaseFragment {
             @Override
             public void updateDrawState(android.text.TextPaint ds) {
                 super.updateDrawState(ds);
-                // явно красим в серый цвет footer-текста, иначе ячейка красит ссылку в синий
-                ds.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
-                ds.setUnderlineText(false);
+                ds.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+                ds.setUnderlineText(true);
+                ds.setTypeface(AndroidUtilities.bold());
             }
         }, 0, link.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return sp;
