@@ -297,20 +297,83 @@ public class DevGramPluginInstallSheet {
                 return;
             }
             final java.util.ArrayList<String> opts = new java.util.ArrayList<>();
-            opts.add("Без фильтра");
+            opts.add("");
             opts.addAll(filters);
-            AlertDialog.Builder b = new AlertDialog.Builder(ctx);
-            b.setTitle("Куда опубликовать (фильтр)");
-            b.setItems(opts.toArray(new CharSequence[0]), (d, which) -> {
-                ce.filter = which == 0 ? "" : opts.get(which);
-                int r = DevGramPlugins.publishToCatalog(ce);
-                String msg = r == 1 ? "Опубликовано в каталог"
-                        : (r == -1 ? "Плагин заблокирован — публикация запрещена" : "Не удалось опубликовать");
-                org.telegram.ui.Components.BulletinFactory.of(fragment)
-                        .createSimpleBulletin(R.raw.contact_check, msg).show();
-            });
-            b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-            fragment.showDialog(b.create());
+
+            LinearLayout root = new LinearLayout(ctx);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(18), AndroidUtilities.dp(20), AndroidUtilities.dp(14));
+
+            TextView title = new TextView(ctx);
+            title.setText("Категория публикации");
+            title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+            title.setTypeface(AndroidUtilities.bold());
+            title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+            root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+            TextView subtitle = new TextView(ctx);
+            subtitle.setText("Выберите раздел, где пользователям будет проще найти «" + ce.name + "».");
+            subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            subtitle.setTextColor(Theme.getColor(Theme.key_dialogTextGray3));
+            subtitle.setLineSpacing(AndroidUtilities.dp(2), 1f);
+            root.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 5, 0, 14));
+
+            final BottomSheet[] sheetRef = new BottomSheet[1];
+            for (String option : opts) {
+                final String selected = option;
+                LinearLayout row = new LinearLayout(ctx);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(11), AndroidUtilities.dp(14), AndroidUtilities.dp(11));
+                row.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(14),
+                        Theme.getColor(Theme.key_windowBackgroundWhite), Theme.getColor(Theme.key_listSelector)));
+
+                android.widget.ImageView icon = new android.widget.ImageView(ctx);
+                icon.setImageResource(R.drawable.msg_folders);
+                icon.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlueIcon));
+                icon.setPadding(AndroidUtilities.dp(9), AndroidUtilities.dp(9), AndroidUtilities.dp(9), AndroidUtilities.dp(9));
+                icon.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(12),
+                        Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlueIcon), 0.12f)));
+                row.addView(icon, LayoutHelper.createLinear(42, 42));
+
+                LinearLayout texts = new LinearLayout(ctx);
+                texts.setOrientation(LinearLayout.VERTICAL);
+                TextView name = new TextView(ctx);
+                name.setText(selected.isEmpty() ? "Без категории" : selected);
+                name.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+                name.setTypeface(AndroidUtilities.bold());
+                name.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+                texts.addView(name, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+                TextView hint = new TextView(ctx);
+                hint.setText(selected.isEmpty() ? "Показывать только в общем списке" : "Опубликовать в этой категории");
+                hint.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+                hint.setTextColor(Theme.getColor(Theme.key_dialogTextGray3));
+                texts.addView(hint, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
+                row.addView(texts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, Gravity.CENTER_VERTICAL, 12, 0, 8, 0));
+
+                android.widget.ImageView arrow = new android.widget.ImageView(ctx);
+                arrow.setImageResource(R.drawable.msg_arrowright);
+                arrow.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon));
+                row.addView(arrow, LayoutHelper.createLinear(24, 24, Gravity.CENTER_VERTICAL));
+                row.setOnClickListener(v -> {
+                    if (sheetRef[0] != null) sheetRef[0].dismiss();
+                    ce.filter = selected;
+                    int r = DevGramPlugins.publishToCatalog(ce);
+                    String msg = r == 1 ? "Отправлено в каталог"
+                            : (r == -1 ? "Плагин заблокирован — публикация запрещена" : "Не удалось опубликовать");
+                    org.telegram.ui.Components.BulletinFactory.of(fragment)
+                            .createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
+                });
+                root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 8));
+            }
+
+            ScrollView scroll = new ScrollView(ctx);
+            scroll.addView(root);
+            BottomSheet.Builder builder = new BottomSheet.Builder(ctx);
+            builder.setApplyBottomPadding(false);
+            builder.setCustomView(scroll);
+            sheetRef[0] = builder.create();
+            sheetRef[0].show();
         });
     }
 

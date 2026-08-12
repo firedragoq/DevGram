@@ -1642,11 +1642,18 @@ public class DevGramPlugins {
                     br.close();
                     String json = sb.toString().trim();
                     if (!json.isEmpty() && !"null".equals(json)) {
-                        org.json.JSONObject obj = new org.json.JSONObject(json);
-                        for (java.util.Iterator<String> it = obj.keys(); it.hasNext(); ) {
-                            String v = obj.optString(it.next(), "");
-                            if (!v.isEmpty() && !list.contains(v)) {
-                                list.add(v);
+                        if (json.startsWith("[")) {
+                            org.json.JSONArray array = new org.json.JSONArray(json);
+                            for (int i = 0; i < array.length(); i++) {
+                                String v = array.optString(i, "");
+                                if (!v.isEmpty() && !list.contains(v)) list.add(v);
+                            }
+                        } else {
+                            // Совместимость со старым объектом {hash: name}.
+                            org.json.JSONObject obj = new org.json.JSONObject(json);
+                            for (java.util.Iterator<String> it = obj.keys(); it.hasNext(); ) {
+                                String v = obj.optString(it.next(), "");
+                                if (!v.isEmpty() && !list.contains(v)) list.add(v);
                             }
                         }
                     }
@@ -1660,21 +1667,42 @@ public class DevGramPlugins {
         });
     }
 
-    public static boolean addFilter(String name) {
+    public static void addFilter(String name, Utilities.Callback<Boolean> callback) {
         String token = DevGramBadges.getAdminToken();
         if (token == null || name == null || name.trim().isEmpty()) {
-            return false;
+            AndroidUtilities.runOnUIThread(() -> callback.run(false));
+            return;
         }
         final String nm = name.trim();
         final String key = Integer.toHexString(nm.hashCode() & 0x7fffffff);
         try {
             final String body = org.json.JSONObject.quote(nm);
-            Utilities.globalQueue.postRunnable(() ->
-                    httpVerified("PUT", RTDB + "/plugins_filters/" + key + ".json?auth=" + token, body));
-            return true;
+            Utilities.globalQueue.postRunnable(() -> {
+                boolean ok = httpVerified("PUT", RTDB + "/plugins_filters/" + key + ".json?auth=" + token, body);
+                AndroidUtilities.runOnUIThread(() -> callback.run(ok));
+            });
         } catch (Throwable e) {
-            return false;
+            AndroidUtilities.runOnUIThread(() -> callback.run(false));
         }
+    }
+
+    // Сохранить полный упорядоченный список категорий. JSON-массив сохраняет порядок в Firebase.
+    public static void saveFilters(java.util.List<String> filters, Utilities.Callback<Boolean> callback) {
+        String token = DevGramBadges.getAdminToken();
+        if (token == null || filters == null) {
+            AndroidUtilities.runOnUIThread(() -> callback.run(false));
+            return;
+        }
+        org.json.JSONArray array = new org.json.JSONArray();
+        java.util.HashSet<String> unique = new java.util.HashSet<>();
+        for (String filter : filters) {
+            String value = filter == null ? "" : filter.trim();
+            if (!value.isEmpty() && unique.add(value)) array.put(value);
+        }
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean ok = httpVerified("PUT", RTDB + "/plugins_filters.json?auth=" + token, array.toString());
+            AndroidUtilities.runOnUIThread(() -> callback.run(ok));
+        });
     }
 
     public static boolean removeFilter(String name) {
@@ -1697,7 +1725,7 @@ public class DevGramPlugins {
         return new File(pluginsDir(), safe + ".py").exists();
     }
 
-    private static void httpVerified(String method, String urlStr, String body) {
+    private static boolean httpVerified(String method, String urlStr, String body) {
         java.net.HttpURLConnection c = null;
         try {
             c = (java.net.HttpURLConnection) new java.net.URL(urlStr).openConnection();
@@ -1708,9 +1736,11 @@ public class DevGramPlugins {
                 c.setDoOutput(true);
                 c.getOutputStream().write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             }
-            c.getResponseCode();
+            int code = c.getResponseCode();
+            return code >= 200 && code < 300;
         } catch (Throwable e) {
             FileLog.e(e);
+            return false;
         } finally {
             if (c != null) {
                 c.disconnect();
