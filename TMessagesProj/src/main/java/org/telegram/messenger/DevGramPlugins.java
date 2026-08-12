@@ -1363,6 +1363,18 @@ public class DevGramPlugins {
         return true;
     }
 
+    // Удалить публикацию из каталога без блокировки файла: её можно будет отправить повторно.
+    public static boolean catalogDelete(String pluginId) {
+        String token = DevGramBadges.getAdminToken();
+        if (token == null || pluginId == null || pluginId.isEmpty()) {
+            return false;
+        }
+        final String safe = safeKey(pluginId);
+        Utilities.globalQueue.postRunnable(() ->
+                httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null));
+        return true;
+    }
+
     // Удалить плагин из каталога командой + НАВСЕГДА заблокировать его файл (по хешу исходника),
     // чтобы больше нельзя было опубликовать. source — исходник удаляемого плагина.
     public static boolean catalogDeleteAndBlock(String pluginId, String source) {
@@ -1370,7 +1382,7 @@ public class DevGramPlugins {
         if (token == null || pluginId == null || pluginId.isEmpty()) {
             return false;
         }
-        final String safe = pluginId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+        final String safe = safeKey(pluginId);
         final String hash = source == null ? null : sha256(source);
         if (hash != null) {
             java.util.Set<String> set = new java.util.HashSet<>(blockedHashes());

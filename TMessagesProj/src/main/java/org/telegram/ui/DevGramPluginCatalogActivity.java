@@ -373,7 +373,14 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private void confirmDelete(DevGramPlugins.CatalogEntry e) {
         AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
         b.setTitle("Удалить из каталога");
-        b.setMessage("Убрать «" + e.name + "» из каталога и заблокировать файл?\n\nПосле этого именно этот файл опубликовать снова будет нельзя.");
+        b.setMessage("Выберите обычное удаление или удаление с блокировкой файла. При обычном удалении плагин можно будет опубликовать снова.");
+        b.setNeutralButton("Удалить", (d, w) -> ensureAdmin(() -> {
+            if (DevGramPlugins.catalogDelete(e.id)) {
+                all.remove(e);
+                applyFilter();
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Удалено из каталога").show();
+            }
+        }));
         b.setPositiveButton("Удалить и заблокировать", (d, w) -> ensureAdmin(() -> {
             if (DevGramPlugins.catalogDeleteAndBlock(e.id, e.source)) {
                 all.remove(e);
