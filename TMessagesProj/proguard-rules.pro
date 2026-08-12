@@ -135,3 +135,7 @@
 -keep class com.sun.jna.** { *; }
 -keep class * implements com.sun.jna.** { *; }
 -keep class org.vosk.** { *; }
+
+# DevGram: DexMaker (Class Proxy плагинов) — рантайм-генерация подклассов, не обфусцировать/не удалять
+-keep class com.android.dx.** { *; }
+-dontwarn com.android.dx.**

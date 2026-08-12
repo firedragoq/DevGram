@@ -175,6 +175,40 @@ def wants_updates():
     return False
 
 
+def wants_request_hooks():
+    """True, если хоть один включённый плагин переопределил on_send_request/on_receive_response."""
+    from devgram import BasePlugin
+    for p in _plugins:
+        if not getattr(p, "enabled", True):
+            continue
+        if (type(p).on_send_request is not BasePlugin.on_send_request
+                or type(p).on_receive_response is not BasePlugin.on_receive_response):
+            return True
+    return False
+
+
+def dispatch_request(name, request):
+    """Хук исходящего TL-запроса (плагины могут менять поля объекта на месте)."""
+    for p in _plugins:
+        if not getattr(p, "enabled", True):
+            continue
+        try:
+            p.on_send_request(name, request)
+        except Exception:
+            _log("on_send_request error: " + traceback.format_exc())
+
+
+def dispatch_response(name, response, error):
+    """Хук ответа сервера на TL-запрос (только чтение)."""
+    for p in _plugins:
+        if not getattr(p, "enabled", True):
+            continue
+        try:
+            p.on_receive_response(name, response, error)
+        except Exception:
+            _log("on_receive_response error: " + traceback.format_exc())
+
+
 def dispatch_update(update):
     """Хук сырых TL-апдейтов."""
     for p in _plugins:
