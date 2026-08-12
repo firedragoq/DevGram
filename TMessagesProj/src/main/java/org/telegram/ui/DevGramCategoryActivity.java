@@ -1325,19 +1325,32 @@ public class DevGramCategoryActivity extends BaseFragment {
             return;
         }
         launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        int flags = android.app.PendingIntent.FLAG_CANCEL_CURRENT;
+                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT;
         if (android.os.Build.VERSION.SDK_INT >= 23) {
             flags |= android.app.PendingIntent.FLAG_IMMUTABLE;
         }
         android.app.PendingIntent pendingIntent = android.app.PendingIntent.getActivity(context, 9184, launch, flags);
         android.app.AlarmManager alarmManager = (android.app.AlarmManager)
                 context.getSystemService(Context.ALARM_SERVICE);
-        if (alarmManager != null) {
-            alarmManager.set(android.app.AlarmManager.RTC,
-                    System.currentTimeMillis() + 250, pendingIntent);
-            android.os.Process.killProcess(android.os.Process.myPid());
+        if (alarmManager == null) {
+            return;
         }
+        // Register the relaunch before closing the process. A short delay gives Android
+        // time to persist the alarm; immediate killProcess() could lose the old 250 ms alarm.
+        long triggerAt = System.currentTimeMillis() + 700;
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            alarmManager.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent);
+        } else {
+            alarmManager.set(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent);
+        }
+        android.app.Activity activity = getParentActivity();
+        if (activity != null) {
+            activity.finishAffinity();
+        }
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                () -> android.os.Process.killProcess(android.os.Process.myPid()), 150);
     }
 
     @Override
