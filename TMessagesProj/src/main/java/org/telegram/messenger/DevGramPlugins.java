@@ -1791,7 +1791,10 @@ public class DevGramPlugins {
     public static boolean resolveReviewReport(ReviewReport report, boolean deleteReview) {
         String token = DevGramBadges.getAdminToken(); if (token == null || report == null) return false;
         Utilities.globalQueue.postRunnable(() -> {
-            if (deleteReview) httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(report.pluginId) + "/" + report.reviewUserId + ".json?auth=" + token, null);
+            if (deleteReview) {
+                httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(report.pluginId) + "/" + report.reviewUserId + ".json?auth=" + token, null);
+                refreshReviewStats(report.pluginId);
+            }
             httpVerified("DELETE", RTDB + "/plugin_review_reports/" + report.key + ".json?auth=" + token, null);
         });
         return true;
