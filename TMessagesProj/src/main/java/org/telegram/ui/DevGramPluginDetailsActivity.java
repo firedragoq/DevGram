@@ -49,19 +49,16 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
         content.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
 
         LinearLayout hero = section(context, 22);
-        ImageView avatar = new ImageView(context); avatar.setImageResource(R.drawable.devgram_plugins); avatar.setColorFilter(Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider)); avatar.setPadding(AndroidUtilities.dp(16),AndroidUtilities.dp(16),AndroidUtilities.dp(16),AndroidUtilities.dp(16)); avatar.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(22),Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton,resourceProvider),0.14f))); if(entry.icon!=null&&!entry.icon.isEmpty())loadIcon(avatar,entry.icon); hero.addView(avatar,LayoutHelper.createLinear(76,76,Gravity.CENTER_HORIZONTAL,0,0,0,14));
-        TextView heroTitle = text(context, entry.name, 26, true, Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-        hero.addView(heroTitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-        TextView heroRating = text(context, entry.rating > 0 ? String.format(java.util.Locale.US, "★ %.1f   ·   %d отзывов", entry.rating, entry.reviews) : "Новый плагин", 14, true, 0xFFE0A400);
-        hero.addView(heroRating, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 7, 0, 0));
+        LinearLayout heroRow = new LinearLayout(context); heroRow.setGravity(Gravity.TOP);
+        ImageView avatar = new ImageView(context); avatar.setImageResource(R.drawable.devgram_plugins); avatar.setColorFilter(Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider)); avatar.setPadding(AndroidUtilities.dp(17),AndroidUtilities.dp(17),AndroidUtilities.dp(17),AndroidUtilities.dp(17)); avatar.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(20),Theme.getColor(Theme.key_featuredStickers_addButton,resourceProvider))); if(entry.icon!=null&&!entry.icon.isEmpty())loadIcon(avatar,entry.icon); heroRow.addView(avatar,LayoutHelper.createLinear(82,82,Gravity.TOP,0,0,16,0));
+        LinearLayout heroInfo = new LinearLayout(context); heroInfo.setOrientation(LinearLayout.VERTICAL);
+        TextView heroTitle = text(context, entry.name, 24, true, Theme.getColor(Theme.key_windowBackgroundWhiteBlackText)); heroInfo.addView(heroTitle);
+        String meta = (entry.version.isEmpty() ? "" : "v" + entry.version) + (entry.author.isEmpty() ? "" : (entry.version.isEmpty() ? "" : "  •  ") + entry.author);
+        if (!meta.isEmpty()) heroInfo.addView(text(context, meta, 13, false, Theme.getColor(Theme.key_windowBackgroundWhiteGrayText,resourceProvider)),LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,4,0,0));
+        TextView heroRating = text(context, entry.rating > 0 ? String.format(java.util.Locale.US, "★ %.1f  ·  %d отзывов", entry.rating, entry.reviews) : "Новый плагин", 13, true, 0xFFE0A400); heroInfo.addView(heroRating,LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,8,0,0));
+        heroRow.addView(heroInfo,LayoutHelper.createLinear(0,LayoutHelper.WRAP_CONTENT,1f)); hero.addView(heroRow);
         content.addView(hero, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 12));
-        if (!entry.author.isEmpty() && entry.author.contains("@")) {
-            addLink("Автор: " + entry.author + (entry.version.isEmpty() ? "" : "  ·  v" + entry.version), entry.author);
-        } else {
-            addText((entry.author.isEmpty() ? "" : "Автор: " + entry.author) +
-                    (entry.version.isEmpty() ? "" : "  ·  v" + entry.version), 14, false,
-                    Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        }
+        if (!entry.author.isEmpty() && entry.author.contains("@")) addLink("Открыть автора  →", entry.author);
         if (!entry.channel.isEmpty()) addLink("🧩 " + entry.channel, entry.channel);
         if (entry.submittedAt > 0) {
             String dates = "Опубликован: " + android.text.format.DateFormat.format("dd.MM.yyyy", entry.submittedAt);
@@ -78,7 +75,7 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
         });
         content.addView(install, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 54, 0, 16, 0, 18));
 
-        addText("Отзывы", 20, true, Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        addSectionTitle("Отзывы");
         ratingView = addText("Загрузка рейтинга…", 14, false, Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         DevGramPlugins.fetchReviews(entry.id, reviews -> {
             ownReview = null;
@@ -129,6 +126,14 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
         t.setPadding(0, AndroidUtilities.dp(3), 0, AndroidUtilities.dp(3));
         content.addView(t, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 2));
         return t;
+    }
+
+    private TextView addSectionTitle(String value) {
+        TextView title = addText(value.toUpperCase(java.util.Locale.ROOT), 12, true,
+                Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
+        title.setLetterSpacing(0.08f);
+        title.setPadding(0, AndroidUtilities.dp(10), 0, AndroidUtilities.dp(5));
+        return title;
     }
 
     private LinearLayout section(Context context, int radius) { LinearLayout box = new LinearLayout(context); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(16), AndroidUtilities.dp(18), AndroidUtilities.dp(16)); box.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(radius), Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider))); box.setElevation(AndroidUtilities.dp(2)); return box; }
