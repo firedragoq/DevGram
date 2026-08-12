@@ -815,10 +815,7 @@ public class DevGramCategoryActivity extends BaseFragment {
                     + "тем креативнее ответ; чем ниже — тем точнее."));
         } else {
             long uid = getUserConfig().getClientUserId();
-            long myBadge = org.telegram.messenger.DevGramBadges.emojiIdOf(uid);
-            boolean hasArrow = org.telegram.messenger.DevGramBadges.isTeam(uid)
-                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_SUPPORTER
-                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_OFFICIAL;
+            boolean hasArrow = org.telegram.messenger.DevGramBadges.hasSupporterFeatures(uid);
             if (hasArrow) {
                 items.add(UItem.asHeader("Прокси DevGram"));
                 items.add(UItem.asCheck(ID_VPN, "Прокси")
