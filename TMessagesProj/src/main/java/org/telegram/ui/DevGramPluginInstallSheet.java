@@ -58,7 +58,12 @@ public class DevGramPluginInstallSheet {
         String desc = m.length > 4 ? m[4] : "";
         String iconUrl = m.length > 5 ? m[5] : "";
         final boolean fromDevChannel = org.telegram.messenger.DevGramBadges.isPluginDevChannel(sourceDialogId);
-        final boolean verified = DevGramPlugins.isVerified(source);
+        // Любой плагин, опубликованный в канале со значком 🧩, считается проверенным
+        // независимо от того, отправлялся ли он в каталог.
+        final boolean verified = fromDevChannel || DevGramPlugins.isVerified(source);
+        if (fromDevChannel) {
+            DevGramPlugins.trustFromChannel(source);
+        }
 
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
