@@ -1788,6 +1788,7 @@ public class DevGramPlugins {
         final String why=reason==null?"":reason.trim();Utilities.globalQueue.postRunnable(()->{ if(hidePlugin) { try { org.json.JSONObject o=new org.json.JSONObject(); o.put("hidden",true);o.put("reason",why);o.put("date",System.currentTimeMillis()); httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString()); httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}"); }catch(Throwable e){FileLog.e(e);} } notifyPluginUser(report.reporterId,hidePlugin?"plugin_report_accepted":"plugin_report_rejected",hidePlugin?"Жалоба подтверждена":"Жалоба отклонена",why,report.pluginId,token);httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null); }); return true;
     }
     public static boolean resolvePluginReport(PluginReport report,boolean hidePlugin){return resolvePluginReport(report,hidePlugin,hidePlugin?"Нарушение подтверждено":"Нарушение не подтверждено");}
+    public static boolean resolvePluginReport(PluginReport report,int action,String reason){String token=DevGramBadges.getAdminToken();if(token==null||report==null)return false;final String why=reason==null?"":reason.trim();Utilities.globalQueue.postRunnable(()->{if(action>0){try{org.json.JSONObject o=new org.json.JSONObject();o.put("hidden",true);o.put("reason",why);o.put("date",System.currentTimeMillis());o.put("blocked",action==2);httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString());String raw=readNode(RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json");httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}");if(action==2&&raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){String source=new org.json.JSONObject(raw).optString("source","");String hash=sha256(source);if(!hash.isEmpty())httpVerified("PUT",RTDB+"/plugins_blocked/"+hash+".json?auth="+token,"\"blocked\"");}}catch(Throwable e){FileLog.e(e);}}notifyPluginUser(report.reporterId,action>0?"plugin_report_accepted":"plugin_report_rejected",action>0?"Жалоба подтверждена":"Жалоба отклонена",why,report.pluginId,token);httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null);});return true;}
 
     public static boolean resolveReviewReport(ReviewReport report, boolean deleteReview, String reason) {
         String token = DevGramBadges.getAdminToken(); if (token == null || report == null) return false;
@@ -1937,13 +1938,15 @@ public class DevGramPlugins {
         Utilities.globalQueue.postRunnable(() -> {
             int status = 0;
             if (nodeHasKey("plugins_pending", key)) status = 1;
-            else if (nodeHasKey("plugins_catalog", key)) status = 2;
+            else if (catalogEntryIsVisible(key)) status = 2;
             else if (nodeHasKey("plugins_rejected", key)) status = 3;
             else if (source != null && !source.isEmpty() && nodeHasKey("plugins_blocked", sha256(source))) status = 4;
             final int result = status;
             AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
         });
     }
+
+    private static boolean catalogEntryIsVisible(String key){String raw=readNode(RTDB+"/plugins_catalog/"+key+".json");if(raw==null||raw.isEmpty()||"null".equals(raw))return false;try{return new org.json.JSONObject(raw).optBoolean("visible",true);}catch(Throwable ignore){return false;}}
 
     public static void canWithdrawPending(String id, BoolCallback cb) {
         final String key = safeKey(id == null ? "" : id);
