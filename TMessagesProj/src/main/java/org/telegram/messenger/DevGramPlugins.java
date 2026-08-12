@@ -1783,22 +1783,25 @@ public class DevGramPlugins {
             AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
         });
     }
-    public static boolean resolvePluginReport(PluginReport report, boolean hidePlugin) {
+    public static boolean resolvePluginReport(PluginReport report, boolean hidePlugin, String reason) {
         String token=DevGramBadges.getAdminToken(); if(token==null||report==null)return false;
-        Utilities.globalQueue.postRunnable(()->{ if(hidePlugin) { try { org.json.JSONObject o=new org.json.JSONObject(); o.put("hidden",true);o.put("reason","moderator_report");o.put("date",System.currentTimeMillis()); httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString()); httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}"); }catch(Throwable e){FileLog.e(e);} } httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null); }); return true;
+        final String why=reason==null?"":reason.trim();Utilities.globalQueue.postRunnable(()->{ if(hidePlugin) { try { org.json.JSONObject o=new org.json.JSONObject(); o.put("hidden",true);o.put("reason",why);o.put("date",System.currentTimeMillis()); httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString()); httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}"); }catch(Throwable e){FileLog.e(e);} } notifyPluginUser(report.reporterId,hidePlugin?"plugin_report_accepted":"plugin_report_rejected",hidePlugin?"Жалоба подтверждена":"Жалоба отклонена",why,report.pluginId,token);httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null); }); return true;
     }
+    public static boolean resolvePluginReport(PluginReport report,boolean hidePlugin){return resolvePluginReport(report,hidePlugin,hidePlugin?"Нарушение подтверждено":"Нарушение не подтверждено");}
 
-    public static boolean resolveReviewReport(ReviewReport report, boolean deleteReview) {
+    public static boolean resolveReviewReport(ReviewReport report, boolean deleteReview, String reason) {
         String token = DevGramBadges.getAdminToken(); if (token == null || report == null) return false;
-        Utilities.globalQueue.postRunnable(() -> {
+        final String why=reason==null?"":reason.trim();Utilities.globalQueue.postRunnable(() -> {
             if (deleteReview) {
                 httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(report.pluginId) + "/" + report.reviewUserId + ".json?auth=" + token, null);
                 refreshReviewStats(report.pluginId);
             }
+            notifyPluginUser(report.reporterId,deleteReview?"review_report_accepted":"review_report_rejected",deleteReview?"Отзыв удалён по жалобе":"Жалоба на отзыв отклонена",why,report.pluginId,token);
             httpVerified("DELETE", RTDB + "/plugin_review_reports/" + report.key + ".json?auth=" + token, null);
         });
         return true;
     }
+    public static boolean resolveReviewReport(ReviewReport report,boolean deleteReview){return resolveReviewReport(report,deleteReview,deleteReview?"Нарушение подтверждено":"Нарушение не подтверждено");}
 
     private static String readHttp(java.io.InputStream in) throws Exception {
         java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8));
@@ -1808,6 +1811,8 @@ public class DevGramPlugins {
         br.close();
         return sb.toString().trim();
     }
+    static String readPublicHttp(java.io.InputStream in) throws Exception { return readHttp(in); }
+    private static void notifyPluginUser(long userId,String type,String title,String reason,String pluginId,String token){if(userId<=0||token==null)return;try{org.json.JSONObject o=new org.json.JSONObject();o.put("type",type);o.put("title",title);o.put("message",(pluginId==null||pluginId.isEmpty()?"":"Плагин: "+pluginId+"\n")+"Причина: "+(reason==null||reason.isEmpty()?"не указана":reason));o.put("pluginId",pluginId==null?"":pluginId);o.put("reason",reason==null?"":reason);o.put("date",System.currentTimeMillis());String key=System.currentTimeMillis()+"_"+Math.abs((type+pluginId+userId).hashCode());httpVerified("PUT",RTDB+"/plugin_user_notifications/"+userId+"/"+key+".json?auth="+token,o.toString());}catch(Throwable e){FileLog.e(e);}}
 
     // Забрать опубликованный каталог.
     public static void fetchCatalog(final CatalogCallback cb) {
@@ -2190,6 +2195,7 @@ public class DevGramPlugins {
                 httpVerified("PUT", RTDB + "/plugins_blocked/" + hash + ".json?auth=" + token, "\"blocked\"");
             }
             appendPluginHistory(e.id, block ? "rejected_blocked" : "rejected", reason, myId(), "Модератор");
+            notifyPluginUser(e.submitterId,"publication_rejected","Публикация отклонена",reason,e.id,token);
         });
         return true;
     }
@@ -2199,20 +2205,22 @@ public class DevGramPlugins {
     }
 
     // Удалить публикацию из каталога без блокировки файла: её можно будет отправить повторно.
-    public static boolean catalogDelete(String pluginId) {
+    public static boolean catalogDelete(CatalogEntry entry, String reason) {
+        String pluginId=entry==null?null:entry.id;
         String token = DevGramBadges.getAdminToken();
         if (token == null || pluginId == null || pluginId.isEmpty()) {
             return false;
         }
         final String safe = safeKey(pluginId);
-        Utilities.globalQueue.postRunnable(() ->
-                httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null));
+        Utilities.globalQueue.postRunnable(() -> {httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null);notifyPluginUser(entry.submitterId,"plugin_deleted","Плагин удалён из каталога",reason,entry.id,token);appendPluginHistory(entry.id,"deleted",reason,myId(),"Модератор");});
         return true;
     }
+    public static boolean catalogDelete(String pluginId){CatalogEntry e=new CatalogEntry();e.id=pluginId;return catalogDelete(e,"Удалено модератором");}
 
     // Удалить плагин из каталога командой + НАВСЕГДА заблокировать его файл (по хешу исходника),
     // чтобы больше нельзя было опубликовать. source — исходник удаляемого плагина.
-    public static boolean catalogDeleteAndBlock(String pluginId, String source) {
+    public static boolean catalogDeleteAndBlock(CatalogEntry entry, String reason) {
+        String pluginId=entry==null?null:entry.id;String source=entry==null?null:entry.source;
         String token = DevGramBadges.getAdminToken();
         if (token == null || pluginId == null || pluginId.isEmpty()) {
             return false;
@@ -2229,9 +2237,11 @@ public class DevGramPlugins {
             if (hash != null) {
                 httpVerified("PUT", RTDB + "/plugins_blocked/" + hash + ".json?auth=" + token, "\"blocked\"");
             }
+            notifyPluginUser(entry.submitterId,"plugin_deleted_blocked","Плагин удалён и заблокирован",reason,entry.id,token);appendPluginHistory(entry.id,"deleted_blocked",reason,myId(),"Модератор");
         });
         return true;
     }
+    public static boolean catalogDeleteAndBlock(String pluginId,String source){CatalogEntry e=new CatalogEntry();e.id=pluginId;e.source=source;return catalogDeleteAndBlock(e,"Удалено и заблокировано модератором");}
 
     // ---- модераторы каталога (/moderators/{uid} = {"email":..,"tg":<telegram_id>}) ----
     // Модератор привязан к Telegram-ID: кнопка модерации показывается только владельцу этого ID

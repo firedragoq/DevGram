@@ -372,6 +372,7 @@ public class ApplicationLoader extends Application {
         // DevGram: своя телеметрия (analytics/crashes в RTDB через REST, без Google-SDK) — ставит
         // обработчик крашей и выгружает накопленное; сбор идёт только если включены тумблеры «Google»
         DevGramTelemetry.init();
+        DevGramPluginNotifications.init();
         // DevGram: система плагинов (Python/Chaquopy) — грузим в фоне, чтобы не тормозить старт
         Utilities.globalQueue.postRunnable(DevGramPlugins::loadAll);
         DevGramBadges.startSync();   // DevGram: подтягиваем значки из облака (Firebase) для всех
@@ -397,6 +398,7 @@ public class ApplicationLoader extends Application {
                 if (wasInBackground) {
                     ensureCurrentNetworkGet(true);
                     DevGramStreaks.refresh(); // DevGram: перепроверить огоньки/потери при возврате в приложение
+                    DevGramPluginNotifications.checkNow();
                 }
             }
         };
