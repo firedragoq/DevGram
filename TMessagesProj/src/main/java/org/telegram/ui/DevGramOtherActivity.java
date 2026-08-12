@@ -32,7 +32,6 @@ public class DevGramOtherActivity extends BaseFragment {
     private static final int ID_SUPPORT_TON = 3;
     private static final int ID_SUPPORT_VTB = 4;
     private static final int ID_SUPPORT_SBER = 5;
-    private static final int ID_SUPPORT_OZON = 6;
     private static final int ID_SUPPORT_ALFA = 7;
     private static final int ID_SUPPORT_TBANK = 8;
     private static final int ID_CRASHLYTICS = 10;
@@ -45,7 +44,6 @@ public class DevGramOtherActivity extends BaseFragment {
 
     private static final String CARD_VTB = "2200248804848272";
     private static final String CARD_SBER = "2202206831130013";
-    private static final String CARD_OZON = "2204240249682131";
     private static final String CARD_ALFA = "2200150522613204";
     private static final String CARD_TBANK = "2200396111123788";
     private static final String TON_ADDRESS = "UQD9m9PQ5BfQa_sAA09HqJ2WLfmFDoyPxsZ8kSEyD-lXMYsx";
@@ -87,8 +85,6 @@ public class DevGramOtherActivity extends BaseFragment {
                 "ВТБ", formatCard(CARD_VTB)));
         items.add(UItem.asButton(ID_SUPPORT_SBER, R.drawable.devgram_bank_sber,
                 "СберБанк", formatCard(CARD_SBER)));
-        items.add(UItem.asButton(ID_SUPPORT_OZON, R.drawable.devgram_bank_ozon,
-                "Ozon Банк", formatCard(CARD_OZON)));
         items.add(UItem.asButton(ID_SUPPORT_ALFA, R.drawable.devgram_bank_alfa,
                 "Альфа-Банк", formatCard(CARD_ALFA)));
         items.add(UItem.asButton(ID_SUPPORT_TBANK, R.drawable.devgram_bank_tbank,
@@ -145,8 +141,6 @@ public class DevGramOtherActivity extends BaseFragment {
             copyCard("ВТБ", CARD_VTB);
         } else if (item.id == ID_SUPPORT_SBER) {
             copyCard("СберБанк", CARD_SBER);
-        } else if (item.id == ID_SUPPORT_OZON) {
-            copyCard("Ozon Банк", CARD_OZON);
         } else if (item.id == ID_SUPPORT_ALFA) {
             copyCard("Альфа-Банк", CARD_ALFA);
         } else if (item.id == ID_SUPPORT_TBANK) {
