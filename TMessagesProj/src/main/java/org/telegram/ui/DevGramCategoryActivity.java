@@ -19,6 +19,7 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalRecyclerView;
@@ -1046,6 +1047,7 @@ public class DevGramCategoryActivity extends BaseFragment {
         } else if (item.id == ID_SYSTEM_FONTS) {
             gToggle("dg_systemFonts", true);
             org.telegram.messenger.AndroidUtilities.invalidateDevgramSystemFonts();
+            showRestartRequiredBulletin();
         } else if (item.id == ID_GOOEY) {
             gToggle("dg_gooey", true);
         } else if (item.id == ID_CUSTOM_THEMES) {
@@ -1301,6 +1303,41 @@ public class DevGramCategoryActivity extends BaseFragment {
             return;
         }
         refreshList();
+    }
+
+    private void showRestartRequiredBulletin() {
+        BulletinFactory.of(this).createSimpleBulletin(
+                R.raw.info,
+                "Для применения системного шрифта перезапустите DevGram",
+                "Перезапустить",
+                10_000,
+                this::restartApplication
+        ).show();
+    }
+
+    private void restartApplication() {
+        Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        android.content.Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (launch == null) {
+            return;
+        }
+        launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        int flags = android.app.PendingIntent.FLAG_CANCEL_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            flags |= android.app.PendingIntent.FLAG_IMMUTABLE;
+        }
+        android.app.PendingIntent pendingIntent = android.app.PendingIntent.getActivity(context, 9184, launch, flags);
+        android.app.AlarmManager alarmManager = (android.app.AlarmManager)
+                context.getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager != null) {
+            alarmManager.set(android.app.AlarmManager.RTC,
+                    System.currentTimeMillis() + 250, pendingIntent);
+            android.os.Process.killProcess(android.os.Process.myPid());
+        }
     }
 
     @Override
