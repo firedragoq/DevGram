@@ -1509,7 +1509,7 @@ public class DevGramPlugins {
         public long submitterId, submittedAt, updatedAt;
         public String submitterUid = "";
         public String submitterName = "", rejectionReason = "", submissionState = "";
-        public boolean update;
+        public boolean update, visible = true;
     }
 
     public interface CatalogCallback {
@@ -1736,7 +1736,9 @@ public class DevGramPlugins {
             java.util.ArrayList<ReviewReport> result = new java.util.ArrayList<>();
             java.net.HttpURLConnection c = null;
             try {
-                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_review_reports.json").openConnection();
+                String token = DevGramBadges.getAdminToken();
+                if (token == null) { AndroidUtilities.runOnUIThread(() -> cb.onResult(result)); return; }
+                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_review_reports.json?auth=" + java.net.URLEncoder.encode(token, "UTF-8")).openConnection();
                 c.setConnectTimeout(12000); c.setReadTimeout(15000);
                 if (c.getResponseCode() == 200) {
                     String raw = readHttp(c.getInputStream());
@@ -1754,6 +1756,36 @@ public class DevGramPlugins {
             } catch (Throwable e) { FileLog.e(e); } finally { if (c != null) c.disconnect(); }
             AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
         });
+    }
+
+    public static class PluginReport {
+        public String key = "", pluginId = "", reason = "";
+        public long reporterId, date;
+    }
+    public interface PluginReportsCallback { void onResult(java.util.ArrayList<PluginReport> items); }
+    public static void fetchPluginReports(PluginReportsCallback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            java.util.ArrayList<PluginReport> result = new java.util.ArrayList<>(); java.net.HttpURLConnection c = null;
+            try {
+                String token = DevGramBadges.getAdminToken();
+                if (token != null) {
+                    c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_reports.json?auth=" + java.net.URLEncoder.encode(token, "UTF-8")).openConnection();
+                    if (c.getResponseCode() == 200) {
+                        String raw = readHttp(c.getInputStream());
+                        if (!raw.isEmpty() && !"null".equals(raw)) {
+                            org.json.JSONObject root = new org.json.JSONObject(raw);
+                            for (java.util.Iterator<String> it = root.keys(); it.hasNext();) { String key = it.next(); org.json.JSONObject o = root.optJSONObject(key); if (o == null) continue; PluginReport r = new PluginReport(); r.key=key; r.pluginId=o.optString("pluginId",""); r.reason=o.optString("reason",""); r.reporterId=o.optLong("reporterId"); r.date=o.optLong("date"); result.add(r); }
+                            result.sort((a,b)->Long.compare(b.date,a.date));
+                        }
+                    }
+                }
+            } catch(Throwable e){FileLog.e(e);} finally {if(c!=null)c.disconnect();}
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
+    }
+    public static boolean resolvePluginReport(PluginReport report, boolean hidePlugin) {
+        String token=DevGramBadges.getAdminToken(); if(token==null||report==null)return false;
+        Utilities.globalQueue.postRunnable(()->{ if(hidePlugin) { try { org.json.JSONObject o=new org.json.JSONObject(); o.put("hidden",true);o.put("reason","moderator_report");o.put("date",System.currentTimeMillis()); httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString()); httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}"); }catch(Throwable e){FileLog.e(e);} } httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null); }); return true;
     }
 
     public static boolean resolveReviewReport(ReviewReport report, boolean deleteReview) {
@@ -1854,6 +1886,10 @@ public class DevGramPlugins {
                             e.updatedAt = o.optLong("updatedAt", 0);
                             e.update = o.optBoolean("update", false);
                             e.rejectionReason = o.optString("reason", "");
+                            e.visible = o.optBoolean("visible", true);
+                            if ("plugins_catalog".equals(node) && !e.visible) {
+                                continue;
+                            }
                             list.add(e);
                         }
                     }

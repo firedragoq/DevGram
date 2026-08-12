@@ -51,6 +51,7 @@ public class DevGramModerationActivity extends BaseFragment {
     private static final int MENU_MODERATORS = 1;
     private static final int MENU_NOTIFY = 2;
     private static final int MENU_REPORTS = 3;
+    private static final int MENU_PLUGIN_REPORTS = 4;
 
     @Override
     public View createView(Context context) {
@@ -71,7 +72,9 @@ public class DevGramModerationActivity extends BaseFragment {
                             .createSimpleBulletin(R.raw.contact_check,
                                     now ? "Уведомления о модерации включены" : "Уведомления о модерации выключены").show();
                 } else if (id == MENU_REPORTS) {
-                    presentFragment(new DevGramReviewReportsActivity());
+                    ensureAdmin(() -> presentFragment(new DevGramReviewReportsActivity()));
+                } else if (id == MENU_PLUGIN_REPORTS) {
+                    ensureAdmin(() -> presentFragment(new DevGramPluginReportsActivity()));
                 }
             }
         });
@@ -79,6 +82,7 @@ public class DevGramModerationActivity extends BaseFragment {
                 actionBar.createMenu().addItem(MENU_OVERFLOW, R.drawable.ic_ab_other);
         more.addSubItem(MENU_NOTIFY, R.drawable.msg_mute, "Уведомления о модерации");
         more.addSubItem(MENU_REPORTS, R.drawable.msg_report, "Жалобы на отзывы");
+        more.addSubItem(MENU_PLUGIN_REPORTS, R.drawable.msg_report, "Жалобы на плагины");
         // управление модераторами — только главному админу
         if (DevGramBadges.isMainAdmin()) {
             more.addSubItem(MENU_MODERATORS, R.drawable.msg_groups, "Модераторы");
