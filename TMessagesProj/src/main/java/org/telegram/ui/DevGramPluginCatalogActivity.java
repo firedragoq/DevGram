@@ -58,6 +58,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private TextView catalogSummary;
     private TextView emptyView;
     private org.telegram.ui.ActionBar.ActionBarMenuItem moderationItem;
+    private int sortMode;
 
     @Override
     public View createView(Context context) {
@@ -73,12 +74,22 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
                     finishFragment();
                 } else if (id == 1) {
                     openModeration();
+                } else if (id == 2) {
+                    presentFragment(new DevGramMySubmissionsActivity());
+                } else if (id >= 10 && id <= 12) {
+                    sortMode = id - 10;
+                    applyFilter();
                 }
             }
         });
         // вход в панель модерации — скрыт по умолчанию, показываем только модераторам (по tg-id)
         moderationItem = actionBar.createMenu().addItem(1, R.drawable.msg_shareout);
         moderationItem.setVisibility(View.GONE);
+        org.telegram.ui.ActionBar.ActionBarMenuItem more = actionBar.createMenu().addItem(3, R.drawable.ic_ab_other);
+        more.addSubItem(2, R.drawable.msg_info, "Мои заявки");
+        more.addSubItem(10, R.drawable.msg_recent, "Сначала новые");
+        more.addSubItem(11, R.drawable.msg_info, "По рейтингу");
+        more.addSubItem(12, R.drawable.msg_discussion, "По отзывам");
 
         LinearLayout container = new LinearLayout(context);
         container.setOrientation(LinearLayout.VERTICAL);
@@ -255,6 +266,9 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         for (DevGramPlugins.CatalogEntry e : all) {
             if (matches(e)) shown.add(e);
         }
+        if (sortMode == 1) shown.sort((a, b) -> Double.compare(b.rating, a.rating));
+        else if (sortMode == 2) shown.sort((a, b) -> Integer.compare(b.reviews, a.reviews));
+        else shown.sort((a, b) -> Long.compare(b.updatedAt, a.updatedAt));
         if (adapter != null) adapter.notifyDataSetChanged();
         if (catalogSummary != null) catalogSummary.setText(shown.size() + " из " + all.size());
         if (emptyView != null) {
@@ -280,6 +294,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
                 Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
         card.setElevation(AndroidUtilities.dp(1));
         card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
+        card.setOnClickListener(v -> presentFragment(new DevGramPluginDetailsActivity(e)));
 
         // шапка
         LinearLayout head = new LinearLayout(context);
@@ -317,6 +332,13 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             subtitle.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
             subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
             titleCol.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
+        }
+        if (e.rating > 0) {
+            TextView rating = new TextView(context);
+            rating.setText(String.format(java.util.Locale.US, "%.1f ★  (%d)", e.rating, e.reviews));
+            rating.setTextColor(0xFFE0A400);
+            rating.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            titleCol.addView(rating, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
         }
         head.addView(titleCol, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, Gravity.CENTER_VERTICAL, 12, 0, 6, 0));
 

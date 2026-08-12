@@ -50,6 +50,7 @@ public class DevGramModerationActivity extends BaseFragment {
     private static final int MENU_OVERFLOW = 10;
     private static final int MENU_MODERATORS = 1;
     private static final int MENU_NOTIFY = 2;
+    private static final int MENU_REPORTS = 3;
 
     @Override
     public View createView(Context context) {
@@ -69,12 +70,15 @@ public class DevGramModerationActivity extends BaseFragment {
                     BulletinFactory.of(DevGramModerationActivity.this)
                             .createSimpleBulletin(R.raw.contact_check,
                                     now ? "Уведомления о модерации включены" : "Уведомления о модерации выключены").show();
+                } else if (id == MENU_REPORTS) {
+                    presentFragment(new DevGramReviewReportsActivity());
                 }
             }
         });
         org.telegram.ui.ActionBar.ActionBarMenuItem more =
                 actionBar.createMenu().addItem(MENU_OVERFLOW, R.drawable.ic_ab_other);
         more.addSubItem(MENU_NOTIFY, R.drawable.msg_mute, "Уведомления о модерации");
+        more.addSubItem(MENU_REPORTS, R.drawable.msg_report, "Жалобы на отзывы");
         // управление модераторами — только главному админу
         if (DevGramBadges.isMainAdmin()) {
             more.addSubItem(MENU_MODERATORS, R.drawable.msg_groups, "Модераторы");
@@ -146,6 +150,13 @@ public class DevGramModerationActivity extends BaseFragment {
         title.setTypeface(AndroidUtilities.bold());
         card.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
+        TextView meta = new TextView(context);
+        String who = e.submitterName.isEmpty() ? (e.submitterId == 0 ? "Автор не указан" : String.valueOf(e.submitterId)) : e.submitterName;
+        meta.setText((e.update ? "Обновление · " : "Новая публикация · ") + "от " + who + (e.submittedAt > 0 ? "\n" + android.text.format.DateFormat.format("dd.MM.yyyy HH:mm", e.submittedAt) : ""));
+        meta.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
+        meta.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+        card.addView(meta, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
+
         StringBuilder sub = new StringBuilder();
         if (!e.author.isEmpty()) sub.append(e.author);
         if (!e.channel.isEmpty()) sub.append(sub.length() > 0 ? "  ·  " : "").append(e.channel);
@@ -177,6 +188,27 @@ public class DevGramModerationActivity extends BaseFragment {
         view.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(4));
         view.setOnClickListener(v -> showSource(e));
         card.addView(view, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+
+        if (e.update) {
+            TextView compare = new TextView(context);
+            compare.setText("Сравнить с опубликованной версией");
+            compare.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourceProvider));
+            compare.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            compare.setPadding(0, AndroidUtilities.dp(5), 0, AndroidUtilities.dp(5));
+            compare.setOnClickListener(v -> DevGramPlugins.fetchCatalog(entries -> {
+                for (DevGramPlugins.CatalogEntry old : entries) if (old.id.equals(e.id)) { showDiff(old, e); return; }
+                BulletinFactory.of(this).createErrorBulletin("Опубликованная версия не найдена").show();
+            }));
+            card.addView(compare, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+        }
+
+        TextView history = new TextView(context);
+        history.setText("История публикации");
+        history.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourceProvider));
+        history.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        history.setPadding(0, AndroidUtilities.dp(5), 0, AndroidUtilities.dp(5));
+        history.setOnClickListener(v -> presentFragment(new DevGramPluginHistoryActivity(e.id, e.name)));
+        card.addView(history, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
         // кнопки: Одобрить / Отклонить
         LinearLayout row = new LinearLayout(context);
@@ -227,13 +259,26 @@ public class DevGramModerationActivity extends BaseFragment {
     }
 
     private void confirmReject(DevGramPlugins.CatalogEntry e) {
+        final EditTextBoldCursor reason = new EditTextBoldCursor(getParentActivity());
+        reason.setHint("Причина отказа");
+        reason.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+        reason.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
+        reason.setHintTextColor(Theme.getColor(Theme.key_groupcreate_hintText, resourceProvider));
+        reason.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        reason.setMinLines(3);
         AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
         b.setTitle("Отклонить заявку");
-        b.setMessage("Отклонить «" + e.name + "»?");
+        b.setMessage("Укажите автору, что нужно исправить в «" + e.name + "».");
+        b.setView(reason);
         b.setItems(new CharSequence[]{"Отклонить", "Отклонить и заблокировать файл"}, (d, which) -> {
             final boolean block = which == 1;
+            final String text = reason.getText() == null ? "" : reason.getText().toString().trim();
+            if (text.isEmpty()) {
+                BulletinFactory.of(this).createErrorBulletin("Укажите причину отказа").show();
+                return;
+            }
             ensureAdmin(() -> {
-                if (DevGramPlugins.rejectPending(e, block)) {
+                if (DevGramPlugins.rejectPending(e, block, text)) {
                     pending.remove(e);
                     afterAction(block ? "Отклонено и заблокировано" : "Отклонено");
                 }
@@ -254,6 +299,22 @@ public class DevGramModerationActivity extends BaseFragment {
         });
         b.setNegativeButton("Закрыть", null);
         showDialog(b.create());
+    }
+
+    private void showDiff(DevGramPlugins.CatalogEntry oldEntry, DevGramPlugins.CatalogEntry newEntry) {
+        String[] oldLines = (oldEntry.source == null ? "" : oldEntry.source).split("\\n", -1);
+        String[] newLines = (newEntry.source == null ? "" : newEntry.source).split("\\n", -1);
+        StringBuilder diff = new StringBuilder("Версия ").append(oldEntry.version).append(" → ").append(newEntry.version).append("\n\n");
+        int max = Math.max(oldLines.length, newLines.length), shown = 0;
+        for (int i = 0; i < max && shown < 120; i++) {
+            String a = i < oldLines.length ? oldLines[i] : "", b = i < newLines.length ? newLines[i] : "";
+            if (a.equals(b)) continue;
+            if (!a.isEmpty()) diff.append("− ").append(a).append('\n');
+            if (!b.isEmpty()) diff.append("+ ").append(b).append('\n');
+            shown++;
+        }
+        if (shown == 0) diff.append("Изменений в исходнике нет."); else if (shown >= 120) diff.append("\n…показаны первые 120 изменений");
+        new AlertDialog.Builder(getParentActivity()).setTitle("Изменения плагина").setMessage(diff.toString()).setPositiveButton("Закрыть", null).show();
     }
 
     private void openChannel(String channel) {

@@ -1,0 +1,18 @@
+[Unit]
+Description=DevGram plugin catalog guard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=firedragoq
+WorkingDirectory=/home/TelegramAndroid
+EnvironmentFile=/home/TelegramAndroid/server/catalog_guard.env
+ExecStart=/usr/bin/python3 /home/TelegramAndroid/server/catalog_guard.py
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

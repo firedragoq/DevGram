@@ -1,0 +1,98 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "badges": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2'"
+    },
+    "streaks": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "plugins_verified": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "plugins_filters": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "plugins_blocked": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "moderators": {
+      ".read": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+      ".write": "auth != null && auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2'"
+    },
+    "mod_notify": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isBoolean()"
+      }
+    },
+    "plugins_pending": {
+      ".read": true,
+      "$pluginId": {
+        ".write": "auth != null && ((!data.exists() && newData.child('submitterUid').val() === auth.uid) || (data.exists() && data.child('submitterUid').val() === auth.uid) || auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+        ".validate": "newData.hasChildren(['id','name','version','author','source','submitterId','submitterUid','submittedAt']) && newData.child('id').val() === $pluginId && newData.child('submitterId').isNumber() && newData.child('submitterUid').val() === auth.uid && newData.child('submittedAt').isNumber() && newData.child('source').isString() && newData.child('source').val().length <= 1048576"
+      }
+    },
+    "plugins_catalog": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "plugins_rejected": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "plugin_reviews": {
+      ".read": true,
+      "$pluginId": {
+        "$userId": {
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid) || auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+          ".validate": "newData.hasChildren(['userId','ownerUid','rating','text','date']) && newData.child('ownerUid').val() === auth.uid && newData.child('userId').isNumber() && newData.child('rating').isNumber() && newData.child('rating').val() >= 1 && newData.child('rating').val() <= 5 && newData.child('text').isString() && newData.child('text').val().length <= 2000 && newData.child('date').isNumber() && newData.child('date').val() <= now"
+        }
+      }
+    },
+    "plugin_review_reports": {
+      ".read": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+      "$reportId": {
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+        ".validate": "newData.hasChildren(['pluginId','reviewUserId','reporterId','ownerUid','reason','date']) && newData.child('ownerUid').val() === auth.uid && newData.child('reason').isString() && newData.child('reason').val().length <= 500 && newData.child('date').isNumber() && newData.child('date').val() <= now"
+      }
+    },
+    "plugin_reports": {
+      ".read": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+      "$reportId": {
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+        ".validate": "newData.hasChildren(['pluginId','reporterId','ownerUid','reason','date']) && newData.child('ownerUid').val() === auth.uid && newData.child('reason').isString() && newData.child('reason').val().length <= 500 && newData.child('date').isNumber() && newData.child('date').val() <= now"
+      }
+    },
+    "plugin_history": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "plugin_backups": {
+      ".read": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "plugins_hidden": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
+    "analytics": {
+      ".read": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+      ".write": true
+    },
+    "crashes": {
+      ".read": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+      ".write": true
+    }
+  }
+}

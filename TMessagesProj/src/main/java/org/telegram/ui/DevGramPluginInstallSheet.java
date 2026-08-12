@@ -50,10 +50,6 @@ public class DevGramPluginInstallSheet {
                     .createErrorBulletin("Это не похоже на плагин DevGram").show();
             return;
         }
-        // плагин из канала-разработчика (🧩) — помечаем доверенным (переживёт синхронизацию)
-        if (org.telegram.messenger.DevGramBadges.isPluginDevChannel(sourceDialogId)) {
-            DevGramPlugins.trustFromChannel(source);
-        }
         String[] m = meta.split("", -1);
         final String id = m.length > 0 ? m[0] : "";
         String name = m.length > 1 && !m[1].isEmpty() ? m[1] : (id.isEmpty() ? "Плагин" : id);
@@ -154,6 +150,22 @@ public class DevGramPluginInstallSheet {
         warn.addView(warnText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         root.addView(warn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 18, 0, 0));
 
+        String lowerSource = source.toLowerCase(java.util.Locale.US);
+        java.util.ArrayList<String> capabilities = new java.util.ArrayList<>();
+        if (lowerSource.contains("wants_request_hooks") || lowerSource.contains("on_request")) capabilities.add("перехват сетевых запросов");
+        if (lowerSource.contains("on_message") || lowerSource.contains("message")) capabilities.add("обработка сообщений");
+        if (lowerSource.contains("open(") || lowerSource.contains("pathlib") || lowerSource.contains("os.path")) capabilities.add("доступ к локальным файлам");
+        if (lowerSource.contains("http://") || lowerSource.contains("https://") || lowerSource.contains("requests.")) capabilities.add("обращение к интернету");
+        if (!capabilities.isEmpty()) {
+            TextView access = new TextView(context);
+            access.setText("Возможности плагина:\n• " + android.text.TextUtils.join("\n• ", capabilities));
+            access.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            access.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            access.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(11), AndroidUtilities.dp(14), AndroidUtilities.dp(11));
+            access.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(12), Theme.getColor(Theme.key_windowBackgroundGray)));
+            root.addView(access, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
+        }
+
         // галка «включить после установки»
         final boolean[] enableAfter = {true};
         CheckBoxCell check = new CheckBoxCell(context, 1, fragment.getResourceProvider());
@@ -250,11 +262,41 @@ public class DevGramPluginInstallSheet {
             });
             root.addView(pubBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
 
-            // Плагин уже на модерации / одобрен / отклонён / заблокирован — прячем кнопку (дубликат не нужен).
-            // Показываем сразу (мгновенно для новой публикации), скрываем асинхронно после проверки состояния.
+            // Для ожидающей заявки оставляем понятный статус вместо кнопки повторной подачи.
             final TextView pubBtnRef = pubBtn;
-            DevGramPlugins.isPluginSubmitted(fId, fSource, submitted -> {
-                if (submitted) {
+            DevGramPlugins.getPluginSubmissionStatus(fId, fSource, status -> {
+                if (status == 1) {
+                    pubBtnRef.setText("⏳ Плагин находится на модерации");
+                    pubBtnRef.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+                    pubBtnRef.setOnClickListener(null);
+                    DevGramPlugins.canWithdrawPending(fId, allowed -> {
+                        if (allowed) {
+                            pubBtnRef.setText("⏳ На модерации  ·  Отозвать");
+                            pubBtnRef.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
+                            pubBtnRef.setOnClickListener(v -> DevGramPlugins.withdrawPending(fId, ok -> {
+                                if (ok) {
+                                    pubBtnRef.setVisibility(android.view.View.GONE);
+                                    org.telegram.ui.Components.BulletinFactory.of(fragment)
+                                            .createSimpleBulletin(R.raw.contact_check, "Заявка отозвана").show();
+                                }
+                            }));
+                        }
+                    });
+                } else if (status == 3) {
+                    DevGramPlugins.fetchRejectionReason(fId, reason -> {
+                        pubBtnRef.setVisibility(android.view.View.VISIBLE);
+                        pubBtnRef.setText(reason.isEmpty() ? "Отклонено модератором" : "Отклонено: " + reason + "\nИсправить и отправить снова");
+                        pubBtnRef.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
+                        pubBtnRef.setOnClickListener(v -> {
+                            DevGramPlugins.clearRejectedForResubmit(fId);
+                            DevGramPlugins.CatalogEntry ce = new DevGramPlugins.CatalogEntry();
+                            ce.id = fId; ce.name = fName; ce.version = fVer; ce.author = fAuthor;
+                            ce.desc = fDesc; ce.icon = fIcon; ce.source = fSource;
+                            ce.channel = channelName(fragment, fChannelId);
+                            choosePublishFilter(fragment, ce);
+                        });
+                    });
+                } else if (status != 0) {
                     pubBtnRef.setVisibility(android.view.View.GONE);
                 }
             });
@@ -360,7 +402,8 @@ public class DevGramPluginInstallSheet {
                     ce.filter = selected;
                     int r = DevGramPlugins.publishToCatalog(ce);
                     String msg = r == 1 ? "Отправлено в каталог"
-                            : (r == -1 ? "Плагин заблокирован — публикация запрещена" : "Не удалось опубликовать");
+                            : (r == -1 ? "Плагин заблокирован — публикация запрещена"
+                            : (r == -2 ? DevGramPlugins.validateCatalogEntry(ce) : "Не удалось опубликовать"));
                     org.telegram.ui.Components.BulletinFactory.of(fragment)
                             .createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
                 });
