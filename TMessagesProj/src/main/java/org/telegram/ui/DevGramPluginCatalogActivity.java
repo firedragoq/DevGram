@@ -176,6 +176,12 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         return fragmentView = container;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (fragmentView != null && !destroyed) loadAll();
+    }
+
     // ---------- чипы ----------
     private void rebuildChips() {
         if (destroyed || chipRow == null || !chipRow.isAttachedToWindow() && fragmentView != null) return;

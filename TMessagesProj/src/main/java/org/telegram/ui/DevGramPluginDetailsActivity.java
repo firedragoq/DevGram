@@ -27,6 +27,7 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
     private final DevGramPlugins.CatalogEntry entry;
     private LinearLayout content;
     private TextView ratingView;
+    private TextView heroRatingView;
     private TextView reviewButton;
     private DevGramPlugins.Review ownReview;
 
@@ -55,7 +56,7 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
         TextView heroTitle = text(context, entry.name, 24, true, Theme.getColor(Theme.key_windowBackgroundWhiteBlackText)); heroInfo.addView(heroTitle);
         String meta = (entry.version.isEmpty() ? "" : "v" + entry.version) + (entry.author.isEmpty() ? "" : (entry.version.isEmpty() ? "" : "  •  ") + entry.author);
         if (!meta.isEmpty()) heroInfo.addView(text(context, meta, 13, false, Theme.getColor(Theme.key_windowBackgroundWhiteGrayText,resourceProvider)),LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,4,0,0));
-        TextView heroRating = text(context, entry.rating > 0 ? String.format(java.util.Locale.US, "★ %.1f  ·  %d отзывов", entry.rating, entry.reviews) : "Новый плагин", 13, true, 0xFFE0A400); heroInfo.addView(heroRating,LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,8,0,0));
+        heroRatingView = text(context, entry.rating > 0 ? String.format(java.util.Locale.US, "★ %.1f  ·  %d отзывов", entry.rating, entry.reviews) : "Новый плагин", 13, true, 0xFFE0A400); heroInfo.addView(heroRatingView,LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,8,0,0));
         heroRow.addView(heroInfo,LayoutHelper.createLinear(0,LayoutHelper.WRAP_CONTENT,1f)); hero.addView(heroRow);
         content.addView(hero, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 12));
         if (!entry.author.isEmpty() && entry.author.contains("@")) addLink("Открыть автора  →", entry.author);
@@ -84,7 +85,7 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
                 sum += r.rating;
                 if (r.userId == DevGramPlugins.myId()) ownReview = r;
             }
-            ratingView.setText(reviews.isEmpty() ? "Пока нет отзывов" : String.format(java.util.Locale.US, "%.1f ★  ·  %d отзывов", sum / reviews.size(), reviews.size()));
+            updateRatingLabels(reviews, sum);
             int shown = 0;
             for (DevGramPlugins.Review r : reviews) {
                 if (shown++ >= 3) break;
@@ -183,7 +184,7 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
                         double sum = 0; for (DevGramPlugins.Review r : reviews) sum += r.rating;
                         for (DevGramPlugins.Review r : reviews) if (r.userId == DevGramPlugins.myId()) ownReview = r;
                         if (reviewButton != null) reviewButton.setText("Изменить мой отзыв");
-                        if (ratingView != null) ratingView.setText(reviews.isEmpty() ? "Пока нет отзывов" : String.format(java.util.Locale.US, "%.1f ★  ·  %d отзывов", sum / reviews.size(), reviews.size()));
+                        updateRatingLabels(reviews, sum);
                     });
                 }))
                 .setNegativeButton("Отмена", null).show();
@@ -191,6 +192,12 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
 
     private void updateStars(TextView[] stars, int selected) {
         for (int i = 0; i < stars.length; i++) stars[i].setText(i < selected ? "★" : "☆");
+    }
+
+    private void updateRatingLabels(java.util.ArrayList<DevGramPlugins.Review> reviews, double sum) {
+        String compact = reviews.isEmpty() ? "Новый плагин" : String.format(java.util.Locale.US, "★ %.1f  ·  %d отзывов", sum / reviews.size(), reviews.size());
+        if (ratingView != null) ratingView.setText(reviews.isEmpty() ? "Пока нет отзывов" : String.format(java.util.Locale.US, "%.1f ★  ·  %d отзывов", sum / reviews.size(), reviews.size()));
+        if (heroRatingView != null) heroRatingView.setText(compact);
     }
 
     private void showCustomReportDialog(Context context, long reviewUserId) {
@@ -218,7 +225,8 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
     }
 
     private LinearLayout reviewCard(Context context, DevGramPlugins.Review r){LinearLayout card=section(context,16);LinearLayout head=new LinearLayout(context);head.setGravity(Gravity.CENTER_VERTICAL);TextView title=text(context,"★".repeat(Math.max(0,Math.min(5,r.rating)))+"  "+r.name,14,true,0xFFE0A400);head.addView(title,LayoutHelper.createLinear(0,LayoutHelper.WRAP_CONTENT,1f));TextView more=text(context,"⋮",28,true,Theme.getColor(Theme.key_windowBackgroundWhiteGrayText,resourceProvider));more.setGravity(Gravity.CENTER);more.setOnClickListener(v->showReviewActions(context,r,card));head.addView(more,LayoutHelper.createLinear(42,42));card.addView(head);card.addView(text(context,r.text,14,false,Theme.getColor(Theme.key_windowBackgroundWhiteBlackText,resourceProvider)));content.addView(card,LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,6,0,6));return card;}
-    private void showReviewActions(Context context,DevGramPlugins.Review r,View card){boolean own=r.userId==DevGramPlugins.myId(),dev=org.telegram.messenger.DevGramBadges.hasDeveloperFeatures(DevGramPlugins.myId());java.util.ArrayList<String>a=new java.util.ArrayList<>();if(own){a.add("Изменить отзыв");a.add("Удалить отзыв");}else{a.add("Пожаловаться на отзыв");if(dev)a.add("Удалить отзыв");}new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle(r.name).setItems(a.toArray(new CharSequence[0]),(d,w)->{String x=a.get(w);if(x.startsWith("Изменить"))showReviewDialog(context,r);else if(x.startsWith("Пожаловаться"))showReportReasonMenu(context,r.userId);else if(own)DevGramPlugins.deleteOwnReview(entry.id,ok->{if(ok)card.setVisibility(View.GONE);});else DevGramPlugins.deleteReviewAsDeveloper(entry.id,r.userId,ok->{if(ok)card.setVisibility(View.GONE);});}).setNegativeButton("Закрыть",null).show();}
+    private void showReviewActions(Context context,DevGramPlugins.Review r,View card){boolean own=r.userId==DevGramPlugins.myId(),dev=org.telegram.messenger.DevGramBadges.hasDeveloperFeatures(DevGramPlugins.myId());java.util.ArrayList<String>a=new java.util.ArrayList<>();if(own){a.add("Изменить отзыв");a.add("Удалить отзыв");}else{a.add("Пожаловаться на отзыв");if(dev)a.add("Удалить отзыв");}new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle(r.name).setItems(a.toArray(new CharSequence[0]),(d,w)->{String x=a.get(w);if(x.startsWith("Изменить"))showReviewDialog(context,r);else if(x.startsWith("Пожаловаться"))showReportReasonMenu(context,r.userId);else if(own)DevGramPlugins.deleteOwnReview(entry.id,ok->afterReviewDeleted(ok,card));else DevGramPlugins.deleteReviewAsDeveloper(entry.id,r.userId,ok->afterReviewDeleted(ok,card));}).setNegativeButton("Закрыть",null).show();}
+    private void afterReviewDeleted(boolean ok,View card){if(!ok){BulletinFactory.of(this).createErrorBulletin("Не удалось удалить отзыв").show();return;}card.setVisibility(View.GONE);ownReview=null;if(reviewButton!=null)reviewButton.setText("Оставить отзыв");DevGramPlugins.fetchReviews(entry.id,reviews->{double sum=0;for(DevGramPlugins.Review review:reviews)sum+=review.rating;updateRatingLabels(reviews,sum);});}
     void showReportReasonMenu(Context context,long uid){new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle("Почему вы жалуетесь?").setMessage("Жалоба будет отправлена команде DevGram на проверку.").setItems(new CharSequence[]{"Спам или реклама","Оскорбления и травля","Ложная информация","Другая причина"},(d,w)->{if(w==3)showCustomReportDialog(context,uid);else sendReviewReport(uid,w==0?"Спам или реклама":w==1?"Оскорбления и травля":"Ложная информация");}).setNegativeButton("Отмена",null).show();}
     private void showPluginReportMenu(Context context){new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle("Сообщить о проблеме").setMessage("Опишите нарушение — команда проверит плагин.").setItems(new CharSequence[]{"Вредоносный код","Спам или обман","Нарушение авторских прав","Плагин не работает","Другая причина"},(d,w)->{if(w==4){EditText i=new EditText(context);i.setHint("Опишите проблему");i.setTextColor(Theme.getColor(Theme.key_dialogTextBlack,resourceProvider));new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle("Другая причина").setView(i).setPositiveButton("Отправить",(dd,ww)->sendPluginReport(i.getText().toString())).setNegativeButton("Отмена",null).show();}else sendPluginReport(new String[]{"Вредоносный код","Спам или обман","Нарушение авторских прав","Плагин не работает"}[w]);}).setNegativeButton("Отмена",null).show();}
     private void sendPluginReport(String reason){reason=reason==null?"":reason.trim();if(reason.isEmpty()){BulletinFactory.of(this).createErrorBulletin("Укажите причину").show();return;}DevGramPlugins.reportPlugin(entry.id,reason,ok->BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,ok?"Жалоба отправлена команде":"Не удалось отправить жалобу").show());}
