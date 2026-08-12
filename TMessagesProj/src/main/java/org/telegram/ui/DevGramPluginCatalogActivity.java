@@ -459,18 +459,22 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     }
 
     private void confirmDelete(DevGramPlugins.CatalogEntry e) {
+        EditTextBoldCursor reason = makeInput(getParentActivity(), "Причина удаления", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
         b.setTitle("Удалить из каталога");
         b.setMessage("Выберите обычное удаление или удаление с блокировкой файла. При обычном удалении плагин можно будет опубликовать снова.");
+        b.setView(reason);
         b.setNeutralButton("Удалить", (d, w) -> ensureAdmin(() -> {
-            if (DevGramPlugins.catalogDelete(e.id)) {
+            String why=reason.getText().toString().trim();if(why.isEmpty()){BulletinFactory.of(this).createErrorBulletin("Укажите причину удаления").show();return;}
+            if (DevGramPlugins.catalogDelete(e,why)) {
                 all.remove(e);
                 applyFilter();
                 BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Удалено из каталога").show();
             }
         }));
         b.setPositiveButton("Удалить и заблокировать", (d, w) -> ensureAdmin(() -> {
-            if (DevGramPlugins.catalogDeleteAndBlock(e.id, e.source)) {
+            String why=reason.getText().toString().trim();if(why.isEmpty()){BulletinFactory.of(this).createErrorBulletin("Укажите причину удаления").show();return;}
+            if (DevGramPlugins.catalogDeleteAndBlock(e,why)) {
                 all.remove(e);
                 applyFilter();
                 BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Удалено и заблокировано").show();

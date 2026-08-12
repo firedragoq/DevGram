@@ -36,6 +36,10 @@
         ".validate": "newData.isBoolean()"
       }
     },
+    "plugin_user_notifications": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
+    },
     "plugins_pending": {
       ".read": true,
       "$pluginId": {
