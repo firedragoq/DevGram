@@ -183,6 +183,10 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
         updateStars(starViews, selected[0]);
         form.addView(stars, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
         EditText input = new EditText(context); input.setHint("Ваш отзыв"); input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE); input.setMinLines(3);
+        input.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
+        input.setHintTextColor(Theme.getColor(Theme.key_groupcreate_hintText, resourceProvider));
+        input.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(14), Theme.getColor(Theme.key_dialogBackground, resourceProvider)));
+        input.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(12), AndroidUtilities.dp(14), AndroidUtilities.dp(12));
         if (existing != null) input.setText(existing.text);
         form.addView(input, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle(existing == null ? "Отзыв о плагине" : "Изменить отзыв").setView(form)
@@ -203,6 +207,8 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
     private void showCustomReportDialog(Context context, long reviewUserId) {
         EditText input = new EditText(context);
         input.setHint("Опишите причину жалобы");
+        input.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
+        input.setHintTextColor(Theme.getColor(Theme.key_groupcreate_hintText, resourceProvider));
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         input.setMinLines(3);
         input.setMaxLines(6);
