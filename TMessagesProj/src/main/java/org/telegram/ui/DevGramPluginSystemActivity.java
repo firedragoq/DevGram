@@ -87,7 +87,15 @@ public class DevGramPluginSystemActivity extends BaseFragment {
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
         if (item.id == ID_SAFE_MODE) {
-            DevGramPlugins.setFlag("safe_mode", !DevGramPlugins.isSafeMode());
+            boolean safeMode = !DevGramPlugins.isSafeMode();
+            DevGramPlugins.setFlag("safe_mode", safeMode);
+            if (!safeMode) {
+                int n = DevGramPlugins.reload();
+                BulletinFactory.of(this).createSimpleBulletin(
+                        R.raw.contact_check,
+                        "Безопасный режим выключен. Загружено плагинов: " + n
+                ).show();
+            }
         } else if (item.id == ID_COMPACT) {
             DevGramPlugins.setFlag("compact_view", !DevGramPlugins.flag("compact_view", false));
         } else if (item.id == ID_DEV_MODE) {

@@ -231,6 +231,9 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             all.addAll(entries);
             loading = false;
             applyFilter();
+            // Фильтры и каталог загружаются параллельно. Категории могли отрисоваться раньше,
+            // когда список all был ещё пустым, поэтому обновляем их счётчики после каталога.
+            rebuildChips();
         });
         // показать вход в модерацию только модераторам (по их Telegram-ID)
         DevGramPlugins.fetchModerators(m -> {
@@ -342,25 +345,29 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
 
+        LinearLayout tags = new LinearLayout(context);
+        tags.setOrientation(LinearLayout.HORIZONTAL);
+        tags.setGravity(Gravity.CENTER_VERTICAL);
+        bottom.addView(tags, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, Gravity.CENTER_VERTICAL, 0, 0, 6, 0));
+
         if (!e.channel.isEmpty()) {
             TextView ch = pill(context, "🧩 " + e.channel, true);
             ch.setOnClickListener(v -> openChannel(e.channel));
-            bottom.addView(ch, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 6, 0));
+            tags.addView(ch, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 6, 0));
         }
         if (!e.filter.isEmpty()) {
-            bottom.addView(pill(context, e.filter, false), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+            tags.addView(pill(context, e.filter, false), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
         }
-
-        bottom.addView(new View(context), LayoutHelper.createLinear(0, 1, 1f));
 
         final boolean installed = DevGramPlugins.isInstalled(e.id);
         TextView btn = new TextView(context);
         btn.setText(installed ? "Обновить" : "Установить");
         btn.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider));
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         btn.setTypeface(AndroidUtilities.bold());
         btn.setGravity(Gravity.CENTER);
-        btn.setPadding(AndroidUtilities.dp(22), AndroidUtilities.dp(9), AndroidUtilities.dp(22), AndroidUtilities.dp(9));
+        btn.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(9), AndroidUtilities.dp(14), AndroidUtilities.dp(9));
+        btn.setMinWidth(0);
         btn.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(18),
                 Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider),
                 Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourceProvider)));
@@ -377,13 +384,13 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private TextView pill(Context ctx, String text, boolean accent) {
         TextView t = new TextView(ctx);
         t.setText(text);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
         t.setSingleLine(true);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         int col = accent ? Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider)
                 : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider);
         t.setTextColor(col);
-        t.setPadding(AndroidUtilities.dp(9), AndroidUtilities.dp(5), AndroidUtilities.dp(9), AndroidUtilities.dp(5));
+        t.setPadding(AndroidUtilities.dp(7), AndroidUtilities.dp(5), AndroidUtilities.dp(7), AndroidUtilities.dp(5));
         t.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(9),
                 Theme.multAlpha(col, 0.12f)));
         return t;
