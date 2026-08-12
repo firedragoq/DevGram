@@ -927,7 +927,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     public void setTitleIcons(Drawable leftIcon, Drawable mutedIcon) {
         // DevGram: значок бренда — слева от имени, если левый слот свободен (нет замка/бот-верификации).
         // значок не показываем на чате с самим собой («Избранное»)
-        final boolean devgramBadged = parentFragment != null && DevGramBadges.isBadged(parentFragment.getDialogId())
+        final boolean devgramBadged = parentFragment != null
+                && !(parentFragment.isTopic && parentFragment.getDialogId() < 0)
+                && DevGramBadges.isBadged(parentFragment.getDialogId())
                 && parentFragment.getDialogId() != UserConfig.getInstance(currentAccount).getClientUserId();
         final long devgramBadgeDialogId = parentFragment != null ? parentFragment.getDialogId() : 0;
         boolean devgramInLeft = false;
