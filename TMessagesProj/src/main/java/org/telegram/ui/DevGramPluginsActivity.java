@@ -76,8 +76,7 @@ public class DevGramPluginsActivity extends BaseFragment {
 
         items.add(UItem.asHeader("Плагины (" + rows.size() + ")"));
         if (rows.isEmpty()) {
-            items.add(UItem.asShadow("Плагинов нет.\n\nПоложи .py или .plugin в папку и перезапусти приложение:\n"
-                    + DevGramPlugins.pluginsDir().getAbsolutePath()));
+            items.add(UItem.asShadow("Плагинов нет."));
         } else {
             for (String[] p : rows) {
                 items.add(UItem.asCustom(createPluginCard(getContext(), p)));
