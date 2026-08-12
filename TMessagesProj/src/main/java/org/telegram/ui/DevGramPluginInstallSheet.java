@@ -243,8 +243,13 @@ public class DevGramPluginInstallSheet {
             TextView pubBtn = new TextView(context);
             pubBtn.setGravity(Gravity.CENTER);
             pubBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            pubBtn.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
-            pubBtn.setPadding(0, AndroidUtilities.dp(team ? 4 : 12), 0, AndroidUtilities.dp(6));
+            pubBtn.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
+            pubBtn.setGravity(Gravity.CENTER);
+            pubBtn.setTypeface(AndroidUtilities.bold());
+            pubBtn.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(12));
+            pubBtn.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(14),
+                    Theme.getColor(Theme.key_featuredStickers_addButton),
+                    Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
             pubBtn.setText("📚 Опубликовать в каталог");
             final String fId = id, fName = name, fVer = ver, fAuthor = author, fDesc = desc, fIcon = iconUrl, fSource = source;
             final long fChannelId = sourceDialogId;
@@ -260,14 +265,25 @@ public class DevGramPluginInstallSheet {
                 ce.channel = channelName(fragment, fChannelId);
                 choosePublishFilter(fragment, ce);
             });
-            root.addView(pubBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
+            TextView rejectionInfo = new TextView(context);
+            rejectionInfo.setVisibility(View.GONE);
+            rejectionInfo.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            rejectionInfo.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
+            rejectionInfo.setLineSpacing(AndroidUtilities.dp(3), 1f);
+            rejectionInfo.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(12), AndroidUtilities.dp(14), AndroidUtilities.dp(12));
+            rejectionInfo.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(14),
+                    Theme.multAlpha(Theme.getColor(Theme.key_text_RedRegular), 0.12f)));
+            root.addView(rejectionInfo, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 8));
+            root.addView(pubBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 4));
 
             // Для ожидающей заявки оставляем понятный статус вместо кнопки повторной подачи.
             final TextView pubBtnRef = pubBtn;
             DevGramPlugins.getPluginSubmissionStatus(fId, fSource, status -> {
                 if (status == 1) {
+                    rejectionInfo.setVisibility(View.GONE);
                     pubBtnRef.setText("⏳ Плагин находится на модерации");
                     pubBtnRef.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+                    pubBtnRef.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(14), Theme.getColor(Theme.key_windowBackgroundGray)));
                     pubBtnRef.setOnClickListener(null);
                     DevGramPlugins.canWithdrawPending(fId, allowed -> {
                         if (allowed) {
@@ -285,8 +301,13 @@ public class DevGramPluginInstallSheet {
                 } else if (status == 3) {
                     DevGramPlugins.fetchRejectionReason(fId, reason -> {
                         pubBtnRef.setVisibility(android.view.View.VISIBLE);
-                        pubBtnRef.setText(reason.isEmpty() ? "Отклонено модератором" : "Отклонено: " + reason + "\nИсправить и отправить снова");
-                        pubBtnRef.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
+                        rejectionInfo.setVisibility(View.VISIBLE);
+                        rejectionInfo.setText("Заявка отклонена\n" + (reason.isEmpty() ? "Модератор не указал причину." : reason));
+                        pubBtnRef.setText("Исправить и отправить снова  →");
+                        pubBtnRef.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
+                        pubBtnRef.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(14),
+                                Theme.getColor(Theme.key_featuredStickers_addButton),
+                                Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
                         pubBtnRef.setOnClickListener(v -> {
                             DevGramPlugins.clearRejectedForResubmit(fId);
                             DevGramPlugins.CatalogEntry ce = new DevGramPlugins.CatalogEntry();
