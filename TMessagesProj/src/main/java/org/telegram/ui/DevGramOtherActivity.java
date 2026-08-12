@@ -79,15 +79,16 @@ public class DevGramOtherActivity extends BaseFragment {
 
         // Поддержка — реквизиты; серая подпись снизу кликабельна и открывает лист «Поддержать DevGram».
         items.add(UItem.asHeader("Поддержка"));
-        items.add(UItem.asButton(ID_SUPPORT_TON,
-                ctx != null ? ctx.getDrawable(R.drawable.devgram_tonkeeper) : null, "Tonkeeper"));
-        items.add(UItem.asButton(ID_SUPPORT_VTB, R.drawable.devgram_bank_vtb,
+        boolean dark = !Theme.isCurrentThemeDay();
+        items.add(bankButton(ctx, ID_SUPPORT_TON, dark ? R.drawable.devgram_ton_dark : R.drawable.devgram_ton_light,
+                "Tonkeeper", null));
+        items.add(bankButton(ctx, ID_SUPPORT_VTB, dark ? R.drawable.devgram_bank_vtb_dark : R.drawable.devgram_bank_vtb,
                 "ВТБ", formatCard(CARD_VTB)));
-        items.add(UItem.asButton(ID_SUPPORT_SBER, R.drawable.devgram_bank_sber,
+        items.add(bankButton(ctx, ID_SUPPORT_SBER, dark ? R.drawable.devgram_bank_sber_dark : R.drawable.devgram_bank_sber,
                 "СберБанк", formatCard(CARD_SBER)));
-        items.add(UItem.asButton(ID_SUPPORT_ALFA, R.drawable.devgram_bank_alfa,
+        items.add(bankButton(ctx, ID_SUPPORT_ALFA, dark ? R.drawable.devgram_bank_alfa_dark : R.drawable.devgram_bank_alfa,
                 "Альфа-Банк", formatCard(CARD_ALFA)));
-        items.add(UItem.asButton(ID_SUPPORT_TBANK, R.drawable.devgram_bank_tbank,
+        items.add(bankButton(ctx, ID_SUPPORT_TBANK, dark ? R.drawable.devgram_bank_tbank_dark : R.drawable.devgram_bank_tbank,
                 "Т-Банк", formatCard(CARD_TBANK)));
         items.add(UItem.asShadow(supportCaption()));
 
@@ -165,6 +166,11 @@ public class DevGramOtherActivity extends BaseFragment {
     private static String formatCard(String card) {
         return card.substring(0, 4) + " " + card.substring(4, 8) + " "
                 + card.substring(8, 12) + " " + card.substring(12, 16);
+    }
+
+    private UItem bankButton(Context context, int id, int icon, CharSequence text, CharSequence value) {
+        android.graphics.drawable.Drawable drawable = context != null ? context.getDrawable(icon) : null;
+        return value == null ? UItem.asButton(id, drawable, text) : UItem.asButton(id, drawable, text, value);
     }
 
     private void copyCard(String bank, String card) {
