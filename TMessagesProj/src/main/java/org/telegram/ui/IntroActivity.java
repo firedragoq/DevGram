@@ -23,6 +23,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -803,28 +804,19 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             // круга (22) ниже. Так делаем, потому что квад самолёта в нативном GL мелкий, и
             // самолёт выходил маленьким; в текстуре круга размер контролируем полностью.
             loadTexture(v -> Bitmap.createBitmap(dp(82), dp(74), Bitmap.Config.ARGB_8888), 21);
-            // Текстура круга: чёрная «монетка» + НАСТОЯЩАЯ иконка приложения (icon_01_foreground,
-            // 3D-самолёт с </>) крупно по центру (~76% диаметра). Не перерисовка — реальный PNG.
+            // DevGram: только для приветственного экрана вырезаем полную launcher-иконку кругом.
+            // Adaptive foreground непрозрачный, поэтому его обрезка давала фиолетовый квадрат
+            // внутри чёрного круга на первой странице.
             loadTexture(v -> {
                 int size = dp(ICON_HEIGHT_DP);
                 Bitmap bm = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
                 Canvas c = new Canvas(bm);
-                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                paint.setColor(0xFF000000); // чёрный круг (как иконка)
-                c.drawCircle(size / 2f, size / 2f, size / 2f, paint);
-                Drawable d = getParentActivity().getResources().getDrawable(R.mipmap.icon_01_foreground);
-                if (d instanceof BitmapDrawable) {
-                    Bitmap src = ((BitmapDrawable) d).getBitmap();
-                    int sw = src.getWidth(), sh = src.getHeight();
-                    // плотный bbox самолёта (без свечения): x[0.231..0.765] y[0.265..0.728]
-                    Rect srcR = new Rect(Math.round(sw * 0.231f), Math.round(sh * 0.265f),
-                            Math.round(sw * 0.765f), Math.round(sh * 0.728f));
-                    float pw = size * 0.76f;
-                    float ph = pw * srcR.height() / (float) srcR.width();
-                    int l = Math.round((size - pw) / 2f), t = Math.round((size - ph) / 2f);
-                    c.drawBitmap(src, srcR, new Rect(l, t, Math.round(l + pw), Math.round(t + ph)),
-                            new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
-                }
+                Path circle = new Path();
+                circle.addCircle(size / 2f, size / 2f, size / 2f, Path.Direction.CW);
+                c.clipPath(circle);
+                Drawable d = getParentActivity().getResources().getDrawable(R.mipmap.ic_launcher);
+                d.setBounds(0, 0, size, size);
+                d.draw(c);
                 return bm;
             }, 22);
             loadTexture(telegramMaskProvider, 23);
