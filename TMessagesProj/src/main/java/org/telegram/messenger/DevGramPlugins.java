@@ -161,6 +161,7 @@ public class DevGramPlugins {
             int n = loader().callAttr("load_dir", dir.getAbsolutePath()).toInt();
             applySavedEnabled();    // восстановить вкл/выкл, сохранённые пользователем
             refreshWantsUpdates();
+            refreshRequestHooks();  // повесить хук TL-запросов, если плагины их используют
             FileLog.d("[DevGramPlugins] загружено плагинов: " + n + " из " + dir.getAbsolutePath());
         } catch (Throwable e) {
             FileLog.e(e);
@@ -210,6 +211,7 @@ public class DevGramPlugins {
             prefs().edit().putBoolean("enabled_" + id, enabled).apply(); // персистим состояние
             loader().callAttr("set_enabled", id, enabled);
             refreshWantsUpdates();
+            refreshRequestHooks();
         } catch (Throwable ignore) {
         }
     }
@@ -323,6 +325,148 @@ public class DevGramPlugins {
         } catch (Throwable e) {
             return "";
         }
+    }
+
+    public static int currentAccount() {
+        return UserConfig.selectedAccount;
+    }
+
+    // ---- client_utils: доступ к контроллерам (текущий аккаунт) ----
+    public static Object accountInstance()      { return AccountInstance.getInstance(UserConfig.selectedAccount); }
+    public static Object messagesController()    { return MessagesController.getInstance(UserConfig.selectedAccount); }
+    public static Object connectionsManager()    { return org.telegram.tgnet.ConnectionsManager.getInstance(UserConfig.selectedAccount); }
+    public static Object userConfig()            { return UserConfig.getInstance(UserConfig.selectedAccount); }
+    public static Object sendMessagesHelper()    { return SendMessagesHelper.getInstance(UserConfig.selectedAccount); }
+    public static Object mediaDataController()   { return MediaDataController.getInstance(UserConfig.selectedAccount); }
+    public static Object contactsController()    { return ContactsController.getInstance(UserConfig.selectedAccount); }
+    public static Object messagesStorage()       { return MessagesStorage.getInstance(UserConfig.selectedAccount); }
+    public static Object notificationCenter()    { return NotificationCenter.getInstance(UserConfig.selectedAccount); }
+    public static Object fileLoader()            { return FileLoader.getInstance(UserConfig.selectedAccount); }
+
+    // ---- client_utils: богатая отправка ----
+    // Отправить фото из файла (path — абсолютный путь), с подписью.
+    public static void sendPhoto(long dialogId, String path, String caption) {
+        if (path == null || path.isEmpty()) return;
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                AccountInstance ai = AccountInstance.getInstance(UserConfig.selectedAccount);
+                SendMessagesHelper.prepareSendingPhoto(ai, path, null, dialogId, null, null, null,
+                        caption, null, null, null, 0, null, true, 0, 0, null, 0);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    // Отправить файл из пути (универсально: видео/аудио/документ — Telegram сам определит тип по mime).
+    public static void sendFile(long dialogId, String path, String caption) {
+        if (path == null || path.isEmpty()) return;
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                AccountInstance ai = AccountInstance.getInstance(UserConfig.selectedAccount);
+                SendMessagesHelper.prepareSendingDocument(ai, path, path, null, caption, null, dialogId,
+                        null, null, null, null, null, true, 0, null, null, 0, false);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    // Отправить текст с ответом на сообщение (replyToMsgId — id сообщения в этом же диалоге; 0 = без ответа).
+    public static void sendMessageReply(long dialogId, String text, int replyToMsgId) {
+        if (text == null || text.isEmpty()) return;
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                int account = UserConfig.selectedAccount;
+                MessageObject reply = null;
+                if (replyToMsgId != 0) {
+                    org.telegram.tgnet.TLRPC.Message m = MessagesStorage.getInstance(account).getMessage(dialogId, replyToMsgId);
+                    if (m != null) {
+                        reply = new MessageObject(account, m, false, true);
+                    }
+                }
+                SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(
+                        text, dialogId, reply, null, null, true, null, null, null, true, 0, 0, null, false);
+                SendMessagesHelper.getInstance(account).sendMessage(params);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    // Отредактировать текст своего сообщения (через TL messages.editMessage).
+    public static void editMessageText(long dialogId, int messageId, String newText) {
+        if (newText == null) return;
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                int account = UserConfig.selectedAccount;
+                org.telegram.tgnet.TLRPC.TL_messages_editMessage req = new org.telegram.tgnet.TLRPC.TL_messages_editMessage();
+                req.peer = MessagesController.getInstance(account).getInputPeer(dialogId);
+                req.id = messageId;
+                req.message = newText;
+                req.flags |= 2048; // message
+                org.telegram.tgnet.ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
+                    if (error != null) {
+                        FileLog.e("[DevGramPlugins] editMessage: " + error.text);
+                    }
+                });
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    // Сырой TL-запрос: request — Java-объект TLObject (плагин строит через jclass),
+    // callback (может быть null) зовётся с (response, errorText). Возвращает токен запроса.
+    public static int sendRequest(final Object request, final com.chaquo.python.PyObject callback) {
+        try {
+            if (!(request instanceof org.telegram.tgnet.TLObject)) {
+                return 0;
+            }
+            int account = UserConfig.selectedAccount;
+            return org.telegram.tgnet.ConnectionsManager.getInstance(account).sendRequest((org.telegram.tgnet.TLObject) request,
+                    (response, error) -> {
+                        if (callback == null) return;
+                        try {
+                            callback.call(response, error != null ? error.text : null);
+                        } catch (Throwable e) {
+                            FileLog.e(e);
+                        }
+                    });
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return 0;
+        }
+    }
+
+    // ---- android_utils: потоки ----
+    // Выполнить Python-функцию на UI-потоке (delayMs — задержка в мс).
+    public static void runOnUi(final com.chaquo.python.PyObject fn, long delayMs) {
+        if (fn == null) return;
+        Runnable r = () -> {
+            try {
+                fn.call();
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        };
+        if (delayMs > 0) {
+            AndroidUtilities.runOnUIThread(r, delayMs);
+        } else {
+            AndroidUtilities.runOnUIThread(r);
+        }
+    }
+
+    // Выполнить Python-функцию в фоновой очереди (не блокирует UI).
+    public static void runOnQueue(final com.chaquo.python.PyObject fn) {
+        if (fn == null) return;
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                fn.call();
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
     }
 
     // ---- android_utils: буфер обмена ----
@@ -759,6 +903,185 @@ public class DevGramPlugins {
         } catch (Throwable e) {
             FileLog.e(e);
             return false;
+        }
+    }
+
+    // ============ Хуки TL-запросов/ответов ============
+    // Плагин переопределяет on_send_request(name, req) и/или on_receive_response(name, resp, err).
+    // Реализовано через Pine-хук ConnectionsManager.sendRequest(TLObject, RequestDelegate):
+    // до оригинала — dispatch_request; делегат ответа оборачиваем java.lang.reflect.Proxy → dispatch_response.
+    private static volatile boolean requestHooksInstalled;
+    private static volatile boolean wantsRequestHooksFlag;
+
+    public static void refreshRequestHooks() {
+        try {
+            wantsRequestHooksFlag = loader().callAttr("wants_request_hooks").toBoolean();
+        } catch (Throwable e) {
+            wantsRequestHooksFlag = false;
+        }
+        if (wantsRequestHooksFlag) {
+            installRequestHooks();
+        }
+    }
+
+    private static synchronized void installRequestHooks() {
+        if (requestHooksInstalled || isSafeMode() || !initHooks()) {
+            return;
+        }
+        try {
+            Class<?> cm = Class.forName("org.telegram.tgnet.ConnectionsManager");
+            Class<?> tlObject = Class.forName("org.telegram.tgnet.TLObject");
+            final Class<?> reqDelegate = Class.forName("org.telegram.tgnet.RequestDelegate");
+            java.lang.reflect.Method m = cm.getDeclaredMethod("sendRequest", tlObject, reqDelegate);
+            m.setAccessible(true);
+            top.canyie.pine.Pine.hook(m, new top.canyie.pine.callback.MethodHook() {
+                @Override
+                public void beforeCall(top.canyie.pine.Pine.CallFrame frame) {
+                    if (!wantsRequestHooksFlag) return;
+                    try {
+                        final Object req = frame.args != null && frame.args.length > 0 ? frame.args[0] : null;
+                        final String name = req != null ? req.getClass().getSimpleName() : "";
+                        // pre-хук: плагины видят исходящий запрос (могут менять поля объекта на месте)
+                        try { loader().callAttr("dispatch_request", name, req); } catch (Throwable ignore) {}
+                        // оборачиваем делегат ответа, чтобы поймать ответ/ошибку
+                        final Object origDelegate = frame.args != null && frame.args.length > 1 ? frame.args[1] : null;
+                        Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                                reqDelegate.getClassLoader(), new Class<?>[]{reqDelegate},
+                                (p, method, mArgs) -> {
+                                    if ("run".equals(method.getName()) && mArgs != null && mArgs.length == 2) {
+                                        try {
+                                            Object resp = mArgs[0];
+                                            Object err = mArgs[1];
+                                            String errText = null;
+                                            if (err != null) {
+                                                try { errText = String.valueOf(err.getClass().getField("text").get(err)); } catch (Throwable ignore) {}
+                                            }
+                                            loader().callAttr("dispatch_response", name, resp, errText);
+                                        } catch (Throwable ignore) {}
+                                    }
+                                    if (origDelegate != null) {
+                                        try {
+                                            return method.invoke(origDelegate, mArgs);
+                                        } catch (java.lang.reflect.InvocationTargetException ite) {
+                                            throw ite.getCause() != null ? ite.getCause() : ite;
+                                        }
+                                    }
+                                    return null;
+                                });
+                        if (frame.args != null && frame.args.length > 1) {
+                            frame.args[1] = proxy;
+                        }
+                    } catch (Throwable e) {
+                        FileLog.e(e);
+                    }
+                }
+            });
+            requestHooksInstalled = true;
+            FileLog.d("[DevGramPlugins] request hooks installed");
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    // ============ Class Proxy (DexMaker): реальные Java-подклассы из Python ============
+    // Плагин: logic — Python-объект с методами-переопределениями; overrideNames — их имена.
+    // Java-вызовы этих методов маршрутизируются в logic (первым аргументом идёт сам объект-proxy,
+    // чтобы можно было звать super), остальные методы уходят в оригинал (ProxyBuilder.callSuper).
+    // Текущий (proxy, method, args) во время исполнения override хранится в thread-local для call_super.
+    private static final ThreadLocal<java.util.ArrayDeque<Object[]>> currentSuper =
+            ThreadLocal.withInitial(java.util.ArrayDeque::new);
+
+    private static Object defaultValue(Class<?> rt) {
+        if (rt == boolean.class) return Boolean.FALSE;
+        if (rt == int.class) return 0;
+        if (rt == long.class) return 0L;
+        if (rt == float.class) return 0f;
+        if (rt == double.class) return 0d;
+        if (rt == short.class) return (short) 0;
+        if (rt == byte.class) return (byte) 0;
+        if (rt == char.class) return (char) 0;
+        return null;
+    }
+
+    public static Object subclass(String baseName, final com.chaquo.python.PyObject logic,
+                                  java.util.List<String> overrideNames,
+                                  java.util.List<String> argTypeNames,
+                                  java.util.List<Object> args) {
+        if (isSafeMode()) {
+            return null;
+        }
+        try {
+            final Class<?> base = ApplicationLoader.applicationContext.getClassLoader().loadClass(baseName);
+            final java.util.HashSet<String> overrides = new java.util.HashSet<>(
+                    overrideNames == null ? java.util.Collections.emptyList() : overrideNames);
+            Class<?>[] ctorTypes = new Class<?>[argTypeNames == null ? 0 : argTypeNames.size()];
+            for (int i = 0; i < ctorTypes.length; i++) {
+                ctorTypes[i] = resolveType(argTypeNames.get(i));
+            }
+            Object[] ctorArgs = args == null ? new Object[0] : args.toArray(new Object[0]);
+
+            java.io.File dexCache = ApplicationLoader.applicationContext.getDir("dexmaker", Context.MODE_PRIVATE);
+            java.lang.reflect.InvocationHandler handler = (proxy, method, mArgs) -> {
+                String name = method.getName();
+                if (!overrides.contains(name)) {
+                    return com.android.dx.stock.ProxyBuilder.callSuper(proxy, method, mArgs);
+                }
+                currentSuper.get().push(new Object[]{proxy, method, mArgs});
+                try {
+                    Object[] callArgs;
+                    if (mArgs == null) {
+                        callArgs = new Object[]{proxy};
+                    } else {
+                        callArgs = new Object[mArgs.length + 1];
+                        callArgs[0] = proxy;
+                        System.arraycopy(mArgs, 0, callArgs, 1, mArgs.length);
+                    }
+                    com.chaquo.python.PyObject r = logic.callAttr(name, callArgs);
+                    Class<?> rt = method.getReturnType();
+                    if (rt == void.class) {
+                        return null;
+                    }
+                    return r == null ? defaultValue(rt) : r.toJava(rt);
+                } catch (Throwable e) {
+                    FileLog.e(e);
+                    try {
+                        return com.android.dx.stock.ProxyBuilder.callSuper(proxy, method, mArgs);
+                    } catch (Throwable e2) {
+                        Class<?> rt = method.getReturnType();
+                        return rt == void.class ? null : defaultValue(rt);
+                    }
+                } finally {
+                    currentSuper.get().pop();
+                }
+            };
+
+            return com.android.dx.stock.ProxyBuilder.forClass(base)
+                    .dexCache(dexCache)
+                    .constructorArgTypes(ctorTypes)
+                    .constructorArgValues(ctorArgs)
+                    .handler(handler)
+                    .build();
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
+        }
+    }
+
+    // Вызвать оригинальный (super) метод из тела Python-override. argsOverride == null → те же аргументы.
+    public static Object callSuper(java.util.List<Object> argsOverride) {
+        java.util.ArrayDeque<Object[]> stack = currentSuper.get();
+        if (stack.isEmpty()) {
+            return null;
+        }
+        Object[] cur = stack.peek();
+        try {
+            Object proxy = cur[0];
+            java.lang.reflect.Method m = (java.lang.reflect.Method) cur[1];
+            Object[] a = argsOverride != null ? argsOverride.toArray(new Object[0]) : (Object[]) cur[2];
+            return com.android.dx.stock.ProxyBuilder.callSuper(proxy, m, a);
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
         }
     }
 

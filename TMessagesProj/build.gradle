@@ -25,6 +25,9 @@ dependencies {
     // DevGram: Xposed-style хуки Java-методов для плагинов (Pine — чистый Java-API)
     implementation 'top.canyie.pine:core:0.3.0'
 
+    // DevGram: DexMaker — рантайм-генерация Java-подклассов для Class Proxy плагинов (ProxyBuilder)
+    implementation 'com.linkedin.dexmaker:dexmaker:2.28.3'
+
     // DevGram: офлайн-распознавание голоса (Vosk) — приносит libvosk.so (все ABI) + JNA + классы org.vosk
     implementation 'com.alphacephei:vosk-android:0.3.47'
 
