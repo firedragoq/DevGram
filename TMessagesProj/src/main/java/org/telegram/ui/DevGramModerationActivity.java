@@ -28,6 +28,7 @@ import org.telegram.messenger.browser.Browser;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.EditTextBoldCursor;
@@ -143,20 +144,26 @@ public class DevGramModerationActivity extends BaseFragment {
     private View createCard(Context context, DevGramPlugins.CatalogEntry e) {
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16),
-                Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
-        card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
+        card.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(20),
+                Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider), Theme.getColor(Theme.key_listSelector, resourceProvider)));
+        card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(15), AndroidUtilities.dp(16), AndroidUtilities.dp(15));
 
         TextView title = new TextView(context);
-        title.setText(e.name + (e.version.isEmpty() ? "" : "  v" + e.version));
+        title.setText(e.name);
         title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
         title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         title.setTypeface(AndroidUtilities.bold());
         card.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
+        LinearLayout badges = new LinearLayout(context);
+        badges.addView(statusChip(context, e.update ? "ОБНОВЛЕНИЕ" : "НОВЫЙ", true));
+        if (!e.version.isEmpty()) badges.addView(statusChip(context, "v" + e.version, false), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 6, 0));
+        if (!e.filter.isEmpty()) badges.addView(statusChip(context, e.filter, false), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 6, 0));
+        card.addView(badges, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 7, 0, 2));
+
         TextView meta = new TextView(context);
         String who = e.submitterName.isEmpty() ? (e.submitterId == 0 ? "Автор не указан" : String.valueOf(e.submitterId)) : e.submitterName;
-        meta.setText((e.update ? "Обновление · " : "Новая публикация · ") + "от " + who + (e.submittedAt > 0 ? "\n" + android.text.format.DateFormat.format("dd.MM.yyyy HH:mm", e.submittedAt) : ""));
+        meta.setText("Отправил: " + who + (e.submittedAt > 0 ? "  •  " + android.text.format.DateFormat.format("dd.MM.yyyy HH:mm", e.submittedAt) : ""));
         meta.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
         meta.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
         card.addView(meta, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
@@ -251,8 +258,15 @@ public class DevGramModerationActivity extends BaseFragment {
         t.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         t.setTypeface(AndroidUtilities.bold());
         t.setPadding(0, AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10));
-        t.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(12), bg));
+        t.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(14), bg, Theme.multAlpha(bg, .78f)));
         return t;
+    }
+
+    private TextView statusChip(Context context, String value, boolean accent) {
+        TextView text = new TextView(context); text.setText(value); text.setTextSize(11); text.setTypeface(AndroidUtilities.bold());
+        int color = accent ? Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider) : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider);
+        text.setTextColor(color); text.setPadding(AndroidUtilities.dp(7), AndroidUtilities.dp(3), AndroidUtilities.dp(7), AndroidUtilities.dp(3));
+        text.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(7), Theme.multAlpha(color, .12f))); return text;
     }
 
     private void afterAction(String msg) {
@@ -336,34 +350,25 @@ public class DevGramModerationActivity extends BaseFragment {
     private void showModerators(ArrayList<DevGramPlugins.Moderator> mods) {
         Context ctx = getParentActivity();
         if (ctx == null) return;
-        ArrayList<CharSequence> items = new ArrayList<>();
+        LinearLayout root = new LinearLayout(ctx); root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(22));
+        TextView heading = new TextView(ctx); heading.setText("Модераторы"); heading.setTextSize(21); heading.setTypeface(AndroidUtilities.bold()); heading.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
+        root.addView(heading, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 2));
+        TextView caption = new TextView(ctx); caption.setText(mods.size() + " человек имеют доступ к каталогу"); caption.setTextSize(13); caption.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
+        root.addView(caption, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 14));
+        final BottomSheet[] sheet = new BottomSheet[1];
         for (DevGramPlugins.Moderator m : mods) {
-            String label = (m.email == null || m.email.isEmpty() ? m.uid : m.email);
-            if (m.tg != 0) label += "  ·  id " + m.tg;
-            items.add(label);
+            LinearLayout row = moderatorRow(ctx, m);
+            row.setOnClickListener(v -> confirmRemoveModerator(m, sheet[0]));
+            root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 8));
         }
-        items.add("＋ Добавить модератора");
-        AlertDialog.Builder b = new AlertDialog.Builder(ctx);
-        b.setTitle("Модераторы (" + mods.size() + ")");
-        b.setItems(items.toArray(new CharSequence[0]), (d, which) -> {
-            if (which == mods.size()) {
-                addModeratorDialog();
-            } else {
-                final DevGramPlugins.Moderator m = mods.get(which);
-                AlertDialog.Builder rb = new AlertDialog.Builder(getParentActivity());
-                rb.setTitle("Убрать модератора");
-                rb.setMessage("Убрать доступ у «" + (m.email == null || m.email.isEmpty() ? m.uid : m.email) + "»?");
-                rb.setPositiveButton("Убрать", (dd, ww) -> {
-                    DevGramPlugins.removeModerator(m.uid);
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Доступ убран").show();
-                });
-                rb.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-                showDialog(rb.create());
-            }
-        });
-        b.setNegativeButton("Закрыть", null);
-        showDialog(b.create());
+        TextView add = pillButton(ctx, "＋  Добавить модератора", Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider), Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider));
+        add.setOnClickListener(v -> { sheet[0].dismiss(); addModeratorDialog(); }); root.addView(add, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
+        BottomSheet.Builder builder = new BottomSheet.Builder(ctx); builder.setApplyBottomPadding(false); builder.setCustomView(root); sheet[0] = builder.create(); sheet[0].show();
     }
+
+    private LinearLayout moderatorRow(Context ctx, DevGramPlugins.Moderator m) { LinearLayout row=new LinearLayout(ctx);row.setOrientation(LinearLayout.VERTICAL);row.setPadding(AndroidUtilities.dp(15),AndroidUtilities.dp(12),AndroidUtilities.dp(15),AndroidUtilities.dp(12));row.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(15),Theme.getColor(Theme.key_windowBackgroundGray,resourceProvider),Theme.getColor(Theme.key_listSelector,resourceProvider)));TextView n=new TextView(ctx);n.setText(m.email==null||m.email.isEmpty()?m.uid:m.email);n.setTextSize(15);n.setTypeface(AndroidUtilities.bold());n.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText,resourceProvider));row.addView(n);TextView s=new TextView(ctx);s.setText((m.tg==0?"Telegram ID не указан":"Telegram ID: "+m.tg)+"  •  нажмите для управления");s.setTextSize(12);s.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText,resourceProvider));row.addView(s,LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,3,0,0));return row; }
+    private void confirmRemoveModerator(DevGramPlugins.Moderator m, BottomSheet sheet){new AlertDialog.Builder(getParentActivity()).setTitle("Убрать модератора?").setMessage("Доступ к панели и жалобам будет отозван.").setPositiveButton("Убрать",(d,w)->{DevGramPlugins.removeModerator(m.uid);if(sheet!=null)sheet.dismiss();BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,"Доступ убран").show();}).setNegativeButton("Отмена",null).show();}
 
     private void addModeratorDialog() {
         Context ctx = getParentActivity();
