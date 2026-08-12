@@ -315,24 +315,26 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private View createCard(Context context, DevGramPlugins.CatalogEntry e) {
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16), Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
-        card.setElevation(AndroidUtilities.dp(1));
-        card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
+        card.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(20),
+                Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider),
+                Theme.getColor(Theme.key_listSelector, resourceProvider)));
+        card.setPadding(AndroidUtilities.dp(15), AndroidUtilities.dp(13), AndroidUtilities.dp(13), AndroidUtilities.dp(13));
         card.setOnClickListener(v -> presentFragment(new DevGramPluginDetailsActivity(e)));
 
         // шапка
         LinearLayout head = new LinearLayout(context);
         head.setOrientation(LinearLayout.HORIZONTAL);
-        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setGravity(Gravity.TOP);
 
         ImageView icon = new ImageView(context);
         icon.setImageResource(R.drawable.devgram_plugins);
         icon.setColorFilter(Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider));
-        icon.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(13), Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider), 0.12f)));
-        icon.setPadding(AndroidUtilities.dp(9), AndroidUtilities.dp(9), AndroidUtilities.dp(9), AndroidUtilities.dp(9));
+        icon.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16), Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider)));
+        icon.setColorFilter(Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider));
+        icon.setPadding(AndroidUtilities.dp(13), AndroidUtilities.dp(13), AndroidUtilities.dp(13), AndroidUtilities.dp(13));
         icon.setClipToOutline(true);
         if (e.icon != null && !e.icon.isEmpty()) loadIcon(icon, e.icon);
-        head.addView(icon, LayoutHelper.createLinear(48, 48));
+        head.addView(icon, LayoutHelper.createLinear(56, 56, Gravity.TOP, 0, 2, 0, 0));
 
         LinearLayout titleCol = new LinearLayout(context);
         titleCol.setOrientation(LinearLayout.VERTICAL);
@@ -341,22 +343,25 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         title.setSingleLine(true);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
-        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
         title.setTypeface(AndroidUtilities.bold());
         titleCol.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         StringBuilder sub = new StringBuilder();
-        if (!e.author.isEmpty()) sub.append(e.author);
-        if (!e.version.isEmpty()) sub.append(sub.length() > 0 ? "  ·  v" : "v").append(e.version);
+        if (!e.version.isEmpty()) sub.append("v").append(e.version);
+        if (!e.author.isEmpty()) sub.append(sub.length() > 0 ? "  •  " : "").append(e.author);
         if (sub.length() > 0) {
             TextView subtitle = new TextView(context);
             subtitle.setText(sub.toString());
             subtitle.setSingleLine(true);
             subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
             subtitle.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
-            subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
             titleCol.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
         }
-        if (e.rating > 0) { TextView rating = new TextView(context); rating.setText(String.format(java.util.Locale.US, "%.1f ★  (%d)", e.rating, e.reviews)); rating.setTextColor(0xFFE0A400); rating.setTextSize(12); titleCol.addView(rating); }
+        LinearLayout micro = new LinearLayout(context); micro.setGravity(Gravity.CENTER_VERTICAL);
+        if (e.rating > 0) { TextView rating = pill(context, String.format(java.util.Locale.US, "★ %.1f", e.rating), true); micro.addView(rating, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 7, 5, 0)); }
+        if (!e.filter.isEmpty()) micro.addView(pill(context, e.filter, false), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 7, 5, 0));
+        if (micro.getChildCount() > 0) titleCol.addView(micro);
         head.addView(titleCol, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, Gravity.CENTER_VERTICAL, 12, 0, 6, 0));
 
         if (team) {
@@ -375,8 +380,10 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             desc.setText(e.desc);
             desc.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
             desc.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            desc.setMaxLines(2);
+            desc.setEllipsize(android.text.TextUtils.TruncateAt.END);
             desc.setLineSpacing(AndroidUtilities.dp(2), 1f);
-            card.addView(desc, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
+            card.addView(desc, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 11, 0, 0));
         }
 
         // низ: чипы (канал 🧩 + фильтр) слева, кнопка справа
@@ -394,9 +401,6 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             ch.setOnClickListener(v -> openChannel(e.channel));
             tags.addView(ch, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 6, 0));
         }
-        if (!e.filter.isEmpty()) {
-            tags.addView(pill(context, e.filter, false), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
-        }
 
         final boolean installed = DevGramPlugins.isInstalled(e.id);
         TextView btn = new TextView(context);
@@ -412,10 +416,10 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
                 Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourceProvider)));
         btn.setOnClickListener(v -> install(e));
         bottom.addView(btn, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
-        card.addView(bottom, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
+        card.addView(bottom, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 11, 0, 0));
 
         LinearLayout outer = new LinearLayout(context);
-        outer.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(5), AndroidUtilities.dp(12), AndroidUtilities.dp(5));
+        outer.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(4), AndroidUtilities.dp(12), AndroidUtilities.dp(4));
         outer.addView(card, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         return outer;
     }
@@ -429,8 +433,8 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         int col = accent ? Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider)
                 : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider);
         t.setTextColor(col);
-        t.setPadding(AndroidUtilities.dp(7), AndroidUtilities.dp(5), AndroidUtilities.dp(7), AndroidUtilities.dp(5));
-        t.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(9),
+        t.setPadding(AndroidUtilities.dp(7), AndroidUtilities.dp(3), AndroidUtilities.dp(7), AndroidUtilities.dp(3));
+        t.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(7),
                 Theme.multAlpha(col, 0.12f)));
         return t;
     }
