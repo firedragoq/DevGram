@@ -27,12 +27,14 @@ public class DevGramGlassMenu {
 
     private static final int DOWNSCALE = 8;
     private static final int BLUR_RADIUS = 15;
+    private static boolean snapshotInProgress;
 
     // Снять и размыть контент. Вернёт null, если вью ещё не измерена.
     public static Bitmap snapshot(View root) {
-        if (root == null || root.getWidth() <= 0 || root.getHeight() <= 0) {
+        if (snapshotInProgress || root == null || root.getWidth() <= 0 || root.getHeight() <= 0) {
             return null;
         }
+        snapshotInProgress = true;
         try {
             int w = Math.max(1, root.getWidth() / DOWNSCALE);
             int h = Math.max(1, root.getHeight() / DOWNSCALE);
@@ -44,6 +46,8 @@ public class DevGramGlassMenu {
             return bmp;
         } catch (Throwable e) {
             return null;
+        } finally {
+            snapshotInProgress = false;
         }
     }
 
