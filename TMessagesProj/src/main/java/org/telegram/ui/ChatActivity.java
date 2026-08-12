@@ -1919,7 +1919,6 @@ public class ChatActivity extends BaseFragment implements
     private final static int hideTitle = 34;
     private final static int goToFirstMessage = 35;
     private final static int devgram_deleted_history = 9091; // DevGram: история удалёнок
-    private final static int devgram_chat_theme = 9092; // DevGram: локальная тема чата
     private final static int deleteAllYourMessages = 36;
     private final static int deleteAllUnpinnedMessages = 37;
     private final static int deleteAllYourMessagesInAllTopics = 38;
@@ -3435,10 +3434,6 @@ public class ChatActivity extends BaseFragment implements
 
 
         themeDelegate = parentThemeDelegate != null ? parentThemeDelegate : new ThemeDelegate();
-        String devgramLocalTheme = getDevgramChatTheme();
-        if (parentThemeDelegate == null && !TextUtils.isEmpty(devgramLocalTheme)) {
-            themeDelegate.devgramApplyLocalTheme(devgramLocalTheme);
-        }
         if (themeDelegate.isThemeChangeAvailable(false)) {
             globalObserversGroup.add(NotificationCenter.needSetDayNightTheme);
         }
@@ -4423,8 +4418,6 @@ public class ChatActivity extends BaseFragment implements
                     jumpToDate(1375350800);
                 } else if (id == devgram_deleted_history) {
                     presentFragment(new DevGramDeletedHistoryActivity(dialog_id, getTopicId()));
-                } else if (id == devgram_chat_theme) {
-                    showDevgramChatThemePicker();
                 } else if (id == deleteAllYourMessages) {
                     org.telegram.messenger.forkgram.ForkDialogs.CreateDeleteAllYourMessagesAlert(
                         currentAccount,
@@ -4860,11 +4853,6 @@ public class ChatActivity extends BaseFragment implements
                     && !DevGramMessagesController.skipDialog(currentAccount, getDialogId())) {
                 headerItem.addSubItem(devgram_deleted_history, R.drawable.msg_delete, "История удалёнок", themeDelegate);
             }
-            // DevGram: локальная тема этого чата («Различные темы в чатах»)
-            if (MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", true) && chatMode == MODE_DEFAULT) {
-                headerItem.addSubItem(devgram_chat_theme, R.drawable.msg_theme, "Тема этого чата", themeDelegate);
-            }
-
             if (currentUser != null && chatMode != MODE_SAVED) {
                 headerItem.lazilyAddSubItem(call, R.drawable.msg_callback, LocaleController.getString(R.string.Call));
                 headerItem.lazilyAddSubItem(video_call, R.drawable.msg_videocall, LocaleController.getString(R.string.VideoCall));
@@ -44304,32 +44292,6 @@ public class ChatActivity extends BaseFragment implements
         });
     }
 
-    // DevGram: выбор ЛОКАЛЬНОЙ темы приложения для этого чата («Различные темы в чатах»)
-    private void showDevgramChatThemePicker() {
-        if (getParentActivity() == null || themeDelegate == null) {
-            return;
-        }
-        String current = MessagesController.getGlobalMainSettings().getString("dg_chattheme_" + dialog_id, null);
-        DevGramChatThemeSheet sheet = new DevGramChatThemeSheet(getParentActivity(), dialog_id, current, themeDelegate, chosen -> {
-            android.content.SharedPreferences.Editor e = MessagesController.getGlobalMainSettings().edit();
-            if (chosen == null) {
-                e.remove("dg_chattheme_" + dialog_id);
-            } else {
-                e.putString("dg_chattheme_" + dialog_id, chosen);
-            }
-            e.apply();
-            themeDelegate.devgramApplyLocalTheme(chosen);
-        });
-        showDialog(sheet);
-    }
-
-    private String getDevgramChatTheme() {
-        if (!MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", true)) {
-            return null;
-        }
-        return MessagesController.getGlobalMainSettings().getString("dg_chattheme_" + dialog_id, null);
-    }
-
     private void setChatThemeEmoticon(final TLRPC.ChatTheme theme) {
         if (themeDelegate == null || parentThemeDelegate != null) {
             return;
@@ -44337,15 +44299,6 @@ public class ChatActivity extends BaseFragment implements
         ThemeKey key = ThemeKey.of(theme);
         ChatThemeController chatThemeController = ChatThemeController.getInstance(currentAccount);
         chatThemeController.setDialogTheme(dialog_id, theme, false);
-
-        // A locally selected .attheme is intentionally stronger than Telegram's
-        // emoji chat theme. It is stored only for this dialog and must also be
-        // restored after reopening it.
-        String localTheme = getDevgramChatTheme();
-        if (!TextUtils.isEmpty(localTheme)) {
-            themeDelegate.devgramApplyLocalTheme(localTheme);
-            return;
-        }
 
         if (theme instanceof TLRPC.TL_chatThemeUniqueGift) {
             chatThemeController.putThemeIfNeeded(theme);
@@ -44538,11 +44491,6 @@ public class ChatActivity extends BaseFragment implements
         }
 
         public boolean isThemeChangeAvailable(boolean canEdit) {
-            // DevGram: «Различные темы в чатах» — разблокировать локальные темы для всех чатов
-            if (currentEncryptedChat == null
-                    && MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", true)) {
-                return true;
-            }
             return currentEncryptedChat == null && (
                 (!canEdit /*|| currentChat != null && ChatObject.isChannelAndNotMegaGroup(currentChat) && ChatObject.canChangeChatInfo(currentChat)*/) ||
                 currentChat == null && currentUser != null && !currentUser.bot

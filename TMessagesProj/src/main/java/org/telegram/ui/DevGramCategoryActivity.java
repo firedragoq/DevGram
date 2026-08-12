@@ -151,7 +151,6 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_TAB_COUNTER = 45;
     private static final int ID_SYSTEM_FONTS = 46;
     private static final int ID_GOOEY = 47;
-    private static final int ID_CUSTOM_THEMES = 48;
     private static final int ID_SEPARATE_HEADERS = 49;
     private static final int ID_ACTIONBAR_TITLE = 59;
     private static final int ID_DIVIDER_STYLE = 60;
@@ -541,11 +540,6 @@ public class DevGramCategoryActivity extends BaseFragment {
             }
             items.add(UItem.asCheck(ID_GOOEY, "«Липкая» анимация аватарок")
                     .setChecked(gPref("dg_gooey", true)));
-            items.add(UItem.asCheck(ID_CUSTOM_THEMES, "Различные темы в чатах")
-                    .setChecked(gPref("dg_customThemes", true)));
-            items.add(UItem.asShadow("Каждый чат будет отображаться с той темой, которая была "
-                    + "выбрана специально для него."));
-
             items.add(UItem.asHeader("Интерфейс DevGram"));
             items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
                     .setChecked(getUserConfig().showContactsTab));
@@ -1050,8 +1044,6 @@ public class DevGramCategoryActivity extends BaseFragment {
             showRestartRequiredBulletin();
         } else if (item.id == ID_GOOEY) {
             gToggle("dg_gooey", true);
-        } else if (item.id == ID_CUSTOM_THEMES) {
-            gToggle("dg_customThemes", true);
         } else if (item.id == ID_ACTIONBAR_TITLE) {
             showChoice("Текст в заголовке", ACTIONBAR_TITLE_OPTIONS, "dg_actionBarTitle", 0);
             return;
