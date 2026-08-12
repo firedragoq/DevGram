@@ -94,8 +94,21 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
                     });
                 } else {
                     review.setOnLongClickListener(v -> {
-                        new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle("Пожаловаться на отзыв")
-                                .setItems(new CharSequence[]{"Спам", "Оскорбление", "Ложная информация"}, (d, which) -> DevGramPlugins.reportReview(entry.id, r.userId, which == 0 ? "spam" : which == 1 ? "abuse" : "false_info", ok -> BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, ok ? "Жалоба отправлена" : "Не удалось отправить жалобу").show()))
+                        boolean canModerate = org.telegram.messenger.DevGramBadges.hasDeveloperFeatures(DevGramPlugins.myId());
+                        CharSequence[] actions = canModerate ? new CharSequence[]{"Пожаловаться", "Удалить отзыв"} : new CharSequence[]{"Спам", "Оскорбление", "Ложная информация", "Другая причина"};
+                        new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle(canModerate ? "Управление отзывом" : "Пожаловаться на отзыв")
+                                .setItems(actions, (d, which) -> {
+                                    if (canModerate && which == 1) {
+                                        DevGramPlugins.deleteReviewAsDeveloper(entry.id, r.userId, ok -> BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, ok ? "Отзыв удалён" : "Нет прав или ошибка удаления").show());
+                                    } else {
+                                        if (canModerate || which == 3) {
+                                            showCustomReportDialog(context, r.userId);
+                                        } else {
+                                            String reason = which == 0 ? "Спам" : which == 1 ? "Оскорбление" : "Ложная информация";
+                                            sendReviewReport(r.userId, reason);
+                                        }
+                                    }
+                                })
                                 .setNegativeButton("Отмена", null).show();
                         return true;
                     });
@@ -185,5 +198,27 @@ public class DevGramPluginDetailsActivity extends BaseFragment {
 
     private void updateStars(TextView[] stars, int selected) {
         for (int i = 0; i < stars.length; i++) stars[i].setText(i < selected ? "★" : "☆");
+    }
+
+    private void showCustomReportDialog(Context context, long reviewUserId) {
+        EditText input = new EditText(context);
+        input.setHint("Опишите причину жалобы");
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setMinLines(3);
+        input.setMaxLines(6);
+        new org.telegram.ui.ActionBar.AlertDialog.Builder(context)
+                .setTitle("Причина жалобы")
+                .setView(input)
+                .setPositiveButton("Отправить", (d, w) -> {
+                    String reason = input.getText() == null ? "" : input.getText().toString().trim();
+                    if (reason.isEmpty()) BulletinFactory.of(this).createErrorBulletin("Напишите причину жалобы").show();
+                    else sendReviewReport(reviewUserId, reason);
+                })
+                .setNegativeButton("Отмена", null).show();
+    }
+
+    private void sendReviewReport(long reviewUserId, String reason) {
+        DevGramPlugins.reportReview(entry.id, reviewUserId, reason,
+                ok -> BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, ok ? "Жалоба отправлена" : "Не удалось отправить жалобу").show());
     }
 }

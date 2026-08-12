@@ -33,6 +33,9 @@ public class DevGramPlugins {
 
     // Реестр проверенных плагинов: множество SHA-256 доверенных исходников (из облака).
     private static final String RTDB = "https://devgram-d03e4-default-rtdb.europe-west1.firebasedatabase.app";
+    private static final String FIREBASE_API_KEY = "AIzaSyAj-Fq-7707X54Yr8t51mFAkJmCLEKtYoU";
+    private static volatile String firebaseAnonToken;
+    private static volatile String firebaseAnonUid;
     private static volatile java.util.Set<String> verifiedHashes = new java.util.HashSet<>();
 
     // Пример-плагин, который кладём при первом запуске (чтобы было что показать).
@@ -1504,6 +1507,7 @@ public class DevGramPlugins {
         public double rating;
         public int reviews;
         public long submitterId, submittedAt, updatedAt;
+        public String submitterUid = "";
         public String submitterName = "", rejectionReason = "", submissionState = "";
         public boolean update;
     }
@@ -1571,6 +1575,7 @@ public class DevGramPlugins {
             o.put("rating", Math.max(1, Math.min(5, rating)));
             o.put("text", text == null ? "" : text.trim());
             o.put("date", System.currentTimeMillis());
+            o.put("ownerUid", firebaseAnonUid());
             String url = RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + userId + ".json";
             String body = o.toString();
             Utilities.globalQueue.postRunnable(() -> {
@@ -1586,6 +1591,19 @@ public class DevGramPlugins {
     public static void deleteOwnReview(String pluginId, BoolCallback cb) {
         Utilities.globalQueue.postRunnable(() -> {
             boolean ok = httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + myId() + ".json", null);
+            if (ok) refreshReviewStats(pluginId);
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
+        });
+    }
+
+    /** Удаление чужого отзыва для участника DevGram с правом Разработчик. */
+    public static void deleteReviewAsDeveloper(String pluginId, long reviewUserId, BoolCallback cb) {
+        if (!DevGramBadges.hasDeveloperFeatures(myId())) {
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(false));
+            return;
+        }
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean ok = httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + reviewUserId + ".json", null);
             if (ok) refreshReviewStats(pluginId);
             AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
         });
@@ -1630,6 +1648,7 @@ public class DevGramPlugins {
             o.put("reporterId", myId());
             o.put("reason", reason == null ? "" : reason.trim());
             o.put("date", System.currentTimeMillis());
+            o.put("ownerUid", firebaseAnonUid());
             String key = safeKey(pluginId) + "_" + reviewUserId + "_" + myId();
             Utilities.globalQueue.postRunnable(() -> {
                 boolean ok = httpVerified("PUT", RTDB + "/plugin_review_reports/" + key + ".json", o.toString());
@@ -1647,6 +1666,7 @@ public class DevGramPlugins {
             o.put("reporterId", myId());
             o.put("reason", reason == null ? "" : reason.trim());
             o.put("date", System.currentTimeMillis());
+            o.put("ownerUid", firebaseAnonUid());
             String key = safeKey(pluginId == null ? "" : pluginId) + "_" + myId();
             Utilities.globalQueue.postRunnable(() -> {
                 boolean ok = httpVerified("PUT", RTDB + "/plugin_reports/" + key + ".json", o.toString());
@@ -1828,6 +1848,7 @@ public class DevGramPlugins {
                             e.rating = o.optDouble("rating", 0);
                             e.reviews = o.optInt("reviews", 0);
                             e.submitterId = o.optLong("submitterId", 0);
+                            e.submitterUid = o.optString("submitterUid", "");
                             e.submitterName = o.optString("submitterName", "");
                             e.submittedAt = o.optLong("submittedAt", 0);
                             e.updatedAt = o.optLong("updatedAt", 0);
@@ -1993,6 +2014,7 @@ public class DevGramPlugins {
         if (e.rating > 0) o.put("rating", e.rating);
         if (e.reviews > 0) o.put("reviews", e.reviews);
         o.put("submitterId", e.submitterId);
+        o.put("submitterUid", e.submitterUid == null ? "" : e.submitterUid);
         o.put("submitterName", e.submitterName == null ? "" : e.submitterName);
         o.put("submittedAt", e.submittedAt);
         o.put("updatedAt", e.updatedAt);
@@ -2039,6 +2061,7 @@ public class DevGramPlugins {
             e.submitterName = user == null ? String.valueOf(userId) : UserObject.getUserName(user);
             e.submittedAt = System.currentTimeMillis();
             e.updatedAt = e.submittedAt;
+            e.submitterUid = firebaseAnonUid();
             final String body = entryJson(e).toString();
             final String key = safeKey(e.id);
             Utilities.globalQueue.postRunnable(() ->
@@ -2501,6 +2524,11 @@ public class DevGramPlugins {
     private static boolean httpVerified(String method, String urlStr, String body) {
         java.net.HttpURLConnection c = null;
         try {
+            if ((urlStr.contains("/plugin_reviews/") || urlStr.contains("/plugin_reports/") || urlStr.contains("/plugin_review_reports/") || urlStr.contains("/plugins_pending/")) && !urlStr.contains("auth=")) {
+                String auth = firebaseAnonToken();
+                if (auth == null) return false;
+                urlStr += (urlStr.contains("?") ? "&" : "?") + "auth=" + java.net.URLEncoder.encode(auth, "UTF-8");
+            }
             c = (java.net.HttpURLConnection) new java.net.URL(urlStr).openConnection();
             c.setRequestMethod(method);
             c.setConnectTimeout(15000);
@@ -2519,6 +2547,47 @@ public class DevGramPlugins {
                 c.disconnect();
             }
         }
+    }
+
+    private static String firebaseAnonUid() { firebaseAnonToken(); return firebaseAnonUid == null ? "" : firebaseAnonUid; }
+
+    private static synchronized String firebaseAnonToken() {
+        if (firebaseAnonToken != null) return firebaseAnonToken;
+        java.net.HttpURLConnection c = null;
+        try {
+            String savedRefresh = prefs().getString("firebase_refresh", null);
+            if (savedRefresh != null && !savedRefresh.isEmpty()) {
+                String form = "grant_type=refresh_token&refresh_token=" + java.net.URLEncoder.encode(savedRefresh, "UTF-8");
+                c = (java.net.HttpURLConnection) new java.net.URL("https://securetoken.googleapis.com/v1/token?key=" + FIREBASE_API_KEY).openConnection();
+                c.setRequestMethod("POST"); c.setConnectTimeout(12000); c.setReadTimeout(15000); c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                c.getOutputStream().write(form.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                if (c.getResponseCode() >= 200 && c.getResponseCode() < 300) {
+                    String raw = readHttp(c.getInputStream());
+                    org.json.JSONObject refreshed = new org.json.JSONObject(raw);
+                    firebaseAnonToken = refreshed.optString("id_token", null);
+                    firebaseAnonUid = refreshed.optString("user_id", null);
+                    String nextRefresh = refreshed.optString("refresh_token", savedRefresh);
+                    prefs().edit().putString("firebase_refresh", nextRefresh).putString("firebase_uid", firebaseAnonUid).apply();
+                    return firebaseAnonToken;
+                }
+                c.disconnect(); c = null;
+            }
+            org.json.JSONObject body = new org.json.JSONObject();
+            body.put("returnSecureToken", true);
+            c = (java.net.HttpURLConnection) new java.net.URL("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + FIREBASE_API_KEY).openConnection();
+            c.setRequestMethod("POST"); c.setConnectTimeout(12000); c.setReadTimeout(15000); c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            c.getOutputStream().write(body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            if (c.getResponseCode() >= 200 && c.getResponseCode() < 300) {
+                String raw = readHttp(c.getInputStream());
+                org.json.JSONObject created = new org.json.JSONObject(raw);
+                firebaseAnonToken = created.optString("idToken", null);
+                firebaseAnonUid = created.optString("localId", null);
+                prefs().edit().putString("firebase_refresh", created.optString("refreshToken", "")).putString("firebase_uid", firebaseAnonUid).apply();
+            }
+        } catch (Throwable e) { FileLog.e(e); } finally { if (c != null) c.disconnect(); }
+        return firebaseAnonToken;
     }
 
     // Периодический опрос реестра проверенных + блок-листа (вместо постоянного SSE-стрима —
