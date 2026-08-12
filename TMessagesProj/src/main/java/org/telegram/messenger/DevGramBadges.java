@@ -38,6 +38,9 @@ public class DevGramBadges {
     public static final int ROLE_OFFICIAL = 2;   // официальный канал/ресурс DevGram
     public static final int ROLE_CHANNEL = 3;    // обычный канал (верификация DevGram)
 
+    public static final int ACCESS_SUPPORTER = 1;
+    public static final int ACCESS_DEVELOPER = 1 << 1;
+
     // Кастом-эмодзи Telegram, которые рисуются как значок рядом с именем (по document_id).
     public static final long EMOJI_TEAM      = 5413368748289598440L; // ✅ команда проекта
     public static final long EMOJI_SUPPORTER = 5411424042932543123L; // ✈️ поддержавшие форк
@@ -57,9 +60,14 @@ public class DevGramBadges {
     public static class Badge {
         public final long emojiId;
         public final String text;
+        public final int access;
         public Badge(long emojiId, String text) {
+            this(emojiId, text, 0);
+        }
+        public Badge(long emojiId, String text, int access) {
             this.emojiId = emojiId;
             this.text = text == null ? "" : text;
+            this.access = access;
         }
     }
 
@@ -83,9 +91,9 @@ public class DevGramBadges {
         switch (role) {
             case ROLE_OFFICIAL:  return new Badge(EMOJI_OFFICIAL, READY_TEXTS[3]);
             case ROLE_CHANNEL:   return new Badge(EMOJI_CHANNEL, READY_TEXTS[2]);
-            case ROLE_TEAM:      return new Badge(EMOJI_TEAM, READY_TEXTS[0]);
+            case ROLE_TEAM:      return new Badge(EMOJI_TEAM, READY_TEXTS[0], ACCESS_DEVELOPER | ACCESS_SUPPORTER);
             case ROLE_SUPPORTER:
-            default:             return new Badge(EMOJI_SUPPORTER, READY_TEXTS[1]);
+            default:             return new Badge(EMOJI_SUPPORTER, READY_TEXTS[1], ACCESS_SUPPORTER);
         }
     }
 
@@ -453,7 +461,9 @@ public class DevGramBadges {
         if (s.startsWith("{")) {
             try {
                 JSONObject o = new JSONObject(s);
-                return new Badge(o.optLong("e", 0), o.optString("t", ""));
+                long emojiId = o.optLong("e", 0);
+                int access = o.has("p") ? o.optInt("p", 0) : legacyAccess(emojiId);
+                return new Badge(emojiId, o.optString("t", ""), access);
             } catch (Throwable ignore) {
                 return null;
             }
@@ -500,6 +510,32 @@ public class DevGramBadges {
         return userId > 0 && emojiIdOf(userId) == EMOJI_SUPPORTER;
     }
 
+    private static int legacyAccess(long emojiId) {
+        if (emojiId == EMOJI_TEAM) {
+            return ACCESS_DEVELOPER | ACCESS_SUPPORTER;
+        }
+        if (emojiId == EMOJI_SUPPORTER) {
+            return ACCESS_SUPPORTER;
+        }
+        return 0;
+    }
+
+    public static boolean hasSupporterFeatures(long userId) {
+        if (userId <= 0) {
+            return false;
+        }
+        Badge badge = badgeOf(userId);
+        return isTeam(userId) || badge != null && (badge.access & (ACCESS_SUPPORTER | ACCESS_DEVELOPER)) != 0;
+    }
+
+    public static boolean hasDeveloperFeatures(long userId) {
+        if (userId <= 0) {
+            return false;
+        }
+        Badge badge = badgeOf(userId);
+        return isTeam(userId) || badge != null && (badge.access & ACCESS_DEVELOPER) != 0;
+    }
+
     public static boolean isOfficialChat(long chatId) {
         return chatId > 0 && emojiIdOf(-chatId) == EMOJI_OFFICIAL;
     }
@@ -535,6 +571,11 @@ public class DevGramBadges {
     // Выдать произвольный значок: эмодзи (document_id) + подпись-шаблон (с {name}).
     // dialogId: >0 — пользователь, <0 — чат/канал. Пишем в облако объектом {"e","t"}.
     public static void grantBadge(long dialogId, long emojiId, String textTemplate) {
+        grantBadge(dialogId, emojiId, textTemplate, legacyAccess(emojiId));
+    }
+
+    // p — битовая маска доступа к пользовательским функциям. Она не даёт административных прав.
+    public static void grantBadge(long dialogId, long emojiId, String textTemplate, int access) {
         if (dialogId == 0) {
             return;
         }
@@ -543,6 +584,7 @@ public class DevGramBadges {
             JSONObject o = new JSONObject();
             o.put("e", emojiId);
             o.put("t", textTemplate == null ? "" : textTemplate);
+            o.put("p", access);
             json = o.toString();
         } catch (Throwable e) {
             FileLog.e(e);

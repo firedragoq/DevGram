@@ -45,6 +45,7 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
     private final long dialogId;
     private long selEmojiId = DevGramBadges.EMOJI_TEAM;
     private String selText = DevGramBadges.READY_TEXTS[0];
+    private int selAccess = DevGramBadges.ACCESS_DEVELOPER | DevGramBadges.ACCESS_SUPPORTER;
 
     private TextView emojiRow;
     private TextView textRow;
@@ -53,6 +54,7 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
     private TextView previewText;
     private final TextView[] emojiOptions = new TextView[DevGramBadges.READY_EMOJI.length + 1];
     private final TextView[] textOptions = new TextView[DevGramBadges.READY_TEXTS.length + 1];
+    private final TextView[] accessOptions = new TextView[2];
     private SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow pickerPopup;
 
     public DevGramBadgeGrantActivity(long dialogId) {
@@ -61,6 +63,7 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
         if (current != null) {
             selEmojiId = current.emojiId;
             selText = current.text;
+            selAccess = current.access;
         }
     }
 
@@ -115,6 +118,9 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
 
         box.addView(header(context, "Подпись"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 18, 4, 8));
         box.addView(createTextChoices(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        box.addView(header(context, "Доступ к функциям"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 18, 4, 8));
+        box.addView(createAccessChoices(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         box.addView(header(context, "Предпросмотр"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 18, 4, 8));
         box.addView(createPreviewCard(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
@@ -262,6 +268,27 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
         return scroll;
     }
 
+    private View createAccessChoices(Context context) {
+        LinearLayout row = new LinearLayout(context);
+        accessOptions[0] = choice(context, "Поддержавший");
+        accessOptions[0].setOnClickListener(v -> {
+            selAccess ^= DevGramBadges.ACCESS_SUPPORTER;
+            refresh();
+        });
+        row.addView(accessOptions[0], LayoutHelper.createLinear(0, 40, 1f));
+
+        accessOptions[1] = choice(context, "Разработчик");
+        accessOptions[1].setOnClickListener(v -> {
+            selAccess ^= DevGramBadges.ACCESS_DEVELOPER;
+            if ((selAccess & DevGramBadges.ACCESS_DEVELOPER) != 0) {
+                selAccess |= DevGramBadges.ACCESS_SUPPORTER;
+            }
+            refresh();
+        });
+        row.addView(accessOptions[1], LayoutHelper.createLinear(0, 40, 1f, 8, 0, 0, 0));
+        return row;
+    }
+
     private View createPreviewCard(Context context) {
         LinearLayout card = new LinearLayout(context);
         card.setGravity(Gravity.CENTER_VERTICAL);
@@ -308,6 +335,10 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
             updateChoice(textOptions[i], selected, selectedBg, normalBg, selectedText, normalText);
         }
         updateChoice(textOptions[DevGramBadges.READY_TEXTS.length], !readyText,
+                selectedBg, normalBg, selectedText, normalText);
+        updateChoice(accessOptions[0], (selAccess & DevGramBadges.ACCESS_SUPPORTER) != 0,
+                selectedBg, normalBg, selectedText, normalText);
+        updateChoice(accessOptions[1], (selAccess & DevGramBadges.ACCESS_DEVELOPER) != 0,
                 selectedBg, normalBg, selectedText, normalText);
         if (badgePreview != null) {
             badgePreview.setAnimatedEmojiDrawable(AnimatedEmojiDrawable.make(
@@ -437,7 +468,7 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
 
     private void onGrant() {
         ensureAdminSignedIn(() -> {
-            DevGramBadges.grantBadge(dialogId, selEmojiId, selText);
+            DevGramBadges.grantBadge(dialogId, selEmojiId, selText, selAccess);
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.reloadInterface);
             finishFragment();
         });
