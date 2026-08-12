@@ -28,8 +28,12 @@ import java.util.ArrayList;
 // удаление аккаунта). Открывается кнопкой «Другое» из главного экрана настроек DevGram.
 public class DevGramOtherActivity extends BaseFragment {
 
-    private static final int ID_SUPPORT_BOOSTY = 2;
     private static final int ID_SUPPORT_TON = 3;
+    private static final int ID_SUPPORT_VTB = 4;
+    private static final int ID_SUPPORT_SBER = 5;
+    private static final int ID_SUPPORT_OZON = 6;
+    private static final int ID_SUPPORT_ALFA = 7;
+    private static final int ID_SUPPORT_TBANK = 8;
     private static final int ID_CRASHLYTICS = 10;
     private static final int ID_ANALYTICS = 11;
     private static final int ID_EXPORT = 20;
@@ -38,7 +42,11 @@ public class DevGramOtherActivity extends BaseFragment {
     private static final int ID_DELETE_ACCOUNT = 23;
     private static final int REQ_IMPORT = 9021;
 
-    private static final String LINK_BOOSTY = "https://boosty.to/devgram";
+    private static final String CARD_VTB = "2200248804848272";
+    private static final String CARD_SBER = "2202206831130013";
+    private static final String CARD_OZON = "2204240249682131";
+    private static final String CARD_ALFA = "2200150522613204";
+    private static final String CARD_TBANK = "2200396111123788";
     private static final String TON_ADDRESS = "UQD9m9PQ5BfQa_sAA09HqJ2WLfmFDoyPxsZ8kSEyD-lXMYsx";
     private static final String LINK_TONKEEPER = "https://app.tonkeeper.com/transfer/" + TON_ADDRESS;
 
@@ -72,10 +80,18 @@ public class DevGramOtherActivity extends BaseFragment {
 
         // Поддержка — реквизиты; серая подпись снизу кликабельна и открывает лист «Поддержать DevGram».
         items.add(UItem.asHeader("Поддержка"));
-        items.add(UItem.asButton(ID_SUPPORT_BOOSTY,
-                ctx != null ? ctx.getDrawable(R.drawable.devgram_boosty) : null, "Boosty"));
         items.add(UItem.asButton(ID_SUPPORT_TON,
                 ctx != null ? ctx.getDrawable(R.drawable.devgram_tonkeeper) : null, "Tonkeeper"));
+        items.add(UItem.asButton(ID_SUPPORT_VTB, R.drawable.devgram_bank_vtb,
+                "ВТБ", formatCard(CARD_VTB)));
+        items.add(UItem.asButton(ID_SUPPORT_SBER, R.drawable.devgram_bank_sber,
+                "СберБанк", formatCard(CARD_SBER)));
+        items.add(UItem.asButton(ID_SUPPORT_OZON, R.drawable.devgram_bank_ozon,
+                "Ozon Банк", formatCard(CARD_OZON)));
+        items.add(UItem.asButton(ID_SUPPORT_ALFA, R.drawable.devgram_bank_alfa,
+                "Альфа-Банк", formatCard(CARD_ALFA)));
+        items.add(UItem.asButton(ID_SUPPORT_TBANK, R.drawable.devgram_bank_tbank,
+                "Т-Банк", formatCard(CARD_TBANK)));
         items.add(UItem.asShadow(supportCaption()));
 
         // Сбор данных
@@ -122,10 +138,18 @@ public class DevGramOtherActivity extends BaseFragment {
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == ID_SUPPORT_BOOSTY) {
-            Browser.openUrl(getContext(), LINK_BOOSTY);
-        } else if (item.id == ID_SUPPORT_TON) {
+        if (item.id == ID_SUPPORT_TON) {
             openTonkeeper();
+        } else if (item.id == ID_SUPPORT_VTB) {
+            copyCard("ВТБ", CARD_VTB);
+        } else if (item.id == ID_SUPPORT_SBER) {
+            copyCard("СберБанк", CARD_SBER);
+        } else if (item.id == ID_SUPPORT_OZON) {
+            copyCard("Ozon Банк", CARD_OZON);
+        } else if (item.id == ID_SUPPORT_ALFA) {
+            copyCard("Альфа-Банк", CARD_ALFA);
+        } else if (item.id == ID_SUPPORT_TBANK) {
+            copyCard("Т-Банк", CARD_TBANK);
         } else if (item.id == ID_CRASHLYTICS) {
             DevGramConfig.setCrashlyticsEnabled(!DevGramConfig.crashlyticsEnabled);
             refreshList();
@@ -140,6 +164,24 @@ public class DevGramOtherActivity extends BaseFragment {
             confirmReset();
         } else if (item.id == ID_DELETE_ACCOUNT) {
             confirmDeleteAccount();
+        }
+    }
+
+    private static String formatCard(String card) {
+        return card.substring(0, 4) + " " + card.substring(4, 8) + " "
+                + card.substring(8, 12) + " " + card.substring(12, 16);
+    }
+
+    private void copyCard(String bank, String card) {
+        Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                context.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText(bank, card));
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.copy, "Номер карты скопирован").show();
         }
     }
 

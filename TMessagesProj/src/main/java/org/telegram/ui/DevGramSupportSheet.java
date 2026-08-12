@@ -123,7 +123,7 @@ public class DevGramSupportSheet {
         ton_span.setSize(AndroidUtilities.dp(14)); // тон-значок берёт цвет текста абзаца (серый)
         sb.setSpan(ton_span, iconStart, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         sb.append(" ").append(ton).append(" TON или ").append(rub).append(" ₽) любым удобным способом. ")
-                .append("Реквизиты Boosty и Tonkeeper лежат тут же, в разделе ");
+                .append("Банковские карты и Tonkeeper находятся в разделе ");
         int oStart = sb.length();
         sb.append("«Другое»");
         sb.setSpan(new android.text.style.ClickableSpan() {
