@@ -13,6 +13,8 @@ import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
+import org.telegram.tgnet.TLRPC;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,8 @@ public class DevGramPlugins {
 
     private static PyObject loaderModule;
     private static volatile boolean loaded;
+    private static volatile boolean loading;
+    private static volatile boolean loadRetryScheduled;
     private static volatile boolean wantsUpdatesFlag; // хоть один плагин подписан на TL-апдейты
 
     // Защита от «кирпича»: если прошлый запуск упал — авто-безопасный режим + ошибка в буфер.
@@ -123,11 +127,11 @@ public class DevGramPlugins {
     }
 
     // Загрузить все плагины (один раз на старте). Тяжёлое — звать в фоне.
-    public static void loadAll() {
-        if (loaded) {
+    public static synchronized void loadAll() {
+        if (loaded || loading) {
             return;
         }
-        loaded = true;
+        loading = true;
 
         // ---- защита от «кирпича» ----
         installCrashHandler();
@@ -162,9 +166,22 @@ public class DevGramPlugins {
             applySavedEnabled();    // восстановить вкл/выкл, сохранённые пользователем
             refreshWantsUpdates();
             refreshRequestHooks();  // повесить хук TL-запросов, если плагины их используют
+            loaded = true;
+            loading = false;
             FileLog.d("[DevGramPlugins] загружено плагинов: " + n + " из " + dir.getAbsolutePath());
         } catch (Throwable e) {
             FileLog.e(e);
+            // Chaquopy/файловая система могут быть ещё не готовы после аварийного запуска.
+            // Оставляем loaded=false, чтобы повторная попытка действительно восстановила реестр.
+            loaded = false;
+            loading = false;
+            if (!loadRetryScheduled) {
+                loadRetryScheduled = true;
+                Utilities.globalQueue.postRunnable(() -> {
+                    loadRetryScheduled = false;
+                    loadAll();
+                }, 2000);
+            }
         }
     }
 
@@ -195,6 +212,9 @@ public class DevGramPlugins {
     // Список плагинов для менеджера: строки id␟name␟version␟author␟enabled.
     public static List<String> listPlugins() {
         List<String> res = new ArrayList<>();
+        if (!loaded) {
+            loadAll();
+        }
         try {
             PyObject list = loader().callAttr("list_plugins");
             for (PyObject o : list.asList()) {
@@ -1371,14 +1391,13 @@ public class DevGramPlugins {
         }
     }
 
-    // Проверен ли плагин нами: хеш в облачном реестре ИЛИ плагин пришёл из канала-разработчика
-    // плагинов (🧩) и был локально помечен доверенным при установке.
+    // Проверен ли плагин нами: только хеш в облачном реестре после решения модератора.
     public static boolean isVerified(String source) {
         if (source == null) {
             return false;
         }
         String h = sha256(source);
-        return verifiedHashes.contains(h) || trustedFromChannel().contains(h);
+        return verifiedHashes.contains(h);
     }
 
     // Локальный (не облачный) набор хешей плагинов, доверенных через канал 🧩. Переживает
@@ -1482,10 +1501,257 @@ public class DevGramPlugins {
     // Запись каталога: карточка плагина с метаданными + исходником для установки.
     public static class CatalogEntry {
         public String id = "", name = "", author = "", version = "", desc = "", icon = "", channel = "", source = "", filter = "";
+        public double rating;
+        public int reviews;
+        public long submitterId, submittedAt, updatedAt;
+        public String submitterName = "", rejectionReason = "", submissionState = "";
+        public boolean update;
     }
 
     public interface CatalogCallback {
         void onResult(java.util.ArrayList<CatalogEntry> entries);
+    }
+
+    public static class Review {
+        public long userId;
+        public String name = "", text = "";
+        public int rating;
+        public long date;
+    }
+
+    public interface ReviewsCallback {
+        void onResult(java.util.ArrayList<Review> reviews);
+    }
+
+    public static void fetchReviews(String pluginId, ReviewsCallback cb) {
+        final String key = safeKey(pluginId == null ? "" : pluginId);
+        Utilities.globalQueue.postRunnable(() -> {
+            java.util.ArrayList<Review> result = new java.util.ArrayList<>();
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_reviews/" + key + ".json").openConnection();
+                c.setConnectTimeout(12000);
+                c.setReadTimeout(15000);
+                if (c.getResponseCode() == 200) {
+                    String json = readHttp(c.getInputStream());
+                    if (!json.isEmpty() && !"null".equals(json)) {
+                        org.json.JSONObject root = new org.json.JSONObject(json);
+                        for (java.util.Iterator<String> it = root.keys(); it.hasNext();) {
+                            org.json.JSONObject o = root.optJSONObject(it.next());
+                            if (o == null) continue;
+                            Review r = new Review();
+                            r.userId = o.optLong("userId");
+                            r.name = o.optString("name", "Пользователь");
+                            r.text = o.optString("text", "");
+                            r.rating = o.optInt("rating", 0);
+                            r.date = o.optLong("date", 0);
+                            result.add(r);
+                        }
+                        result.sort((a, b) -> Long.compare(b.date, a.date));
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
+    }
+
+    public static void saveReview(String pluginId, int rating, String text, BoolCallback cb) {
+        long userId = myId();
+        String name = "Пользователь";
+        TLRPC.User user = MessagesController.getInstance(UserConfig.selectedAccount).getUser(userId);
+        if (user != null) name = UserObject.getUserName(user);
+        try {
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("userId", userId);
+            o.put("name", name);
+            o.put("rating", Math.max(1, Math.min(5, rating)));
+            o.put("text", text == null ? "" : text.trim());
+            o.put("date", System.currentTimeMillis());
+            String url = RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + userId + ".json";
+            String body = o.toString();
+            Utilities.globalQueue.postRunnable(() -> {
+                boolean ok = httpVerified("PUT", url, body);
+                if (ok) refreshReviewStats(pluginId);
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
+            });
+        } catch (Throwable e) {
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(false));
+        }
+    }
+
+    public static void deleteOwnReview(String pluginId, BoolCallback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean ok = httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + myId() + ".json", null);
+            if (ok) refreshReviewStats(pluginId);
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
+        });
+    }
+
+    private static void refreshReviewStats(String pluginId) {
+        java.net.HttpURLConnection c = null;
+        try {
+            c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_reviews/" + safeKey(pluginId) + ".json").openConnection();
+            c.setConnectTimeout(12000);
+            c.setReadTimeout(15000);
+            int count = 0;
+            double sum = 0;
+            if (c.getResponseCode() == 200) {
+                String json = readHttp(c.getInputStream());
+                if (!json.isEmpty() && !"null".equals(json)) {
+                    org.json.JSONObject root = new org.json.JSONObject(json);
+                    for (java.util.Iterator<String> it = root.keys(); it.hasNext();) {
+                        org.json.JSONObject review = root.optJSONObject(it.next());
+                        if (review == null) continue;
+                        sum += Math.max(1, Math.min(5, review.optInt("rating", 0)));
+                        count++;
+                    }
+                }
+            }
+            org.json.JSONObject stats = new org.json.JSONObject();
+            stats.put("rating", count == 0 ? 0 : sum / count);
+            stats.put("reviews", count);
+            httpVerified("PATCH", RTDB + "/plugins_catalog/" + safeKey(pluginId) + ".json", stats.toString());
+        } catch (Throwable e) {
+            FileLog.e(e);
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    public static void reportReview(String pluginId, long reviewUserId, String reason, BoolCallback cb) {
+        try {
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("pluginId", pluginId);
+            o.put("reviewUserId", reviewUserId);
+            o.put("reporterId", myId());
+            o.put("reason", reason == null ? "" : reason.trim());
+            o.put("date", System.currentTimeMillis());
+            String key = safeKey(pluginId) + "_" + reviewUserId + "_" + myId();
+            Utilities.globalQueue.postRunnable(() -> {
+                boolean ok = httpVerified("PUT", RTDB + "/plugin_review_reports/" + key + ".json", o.toString());
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
+            });
+        } catch (Throwable e) {
+            cb.onResult(false);
+        }
+    }
+
+    public static void reportPlugin(String pluginId, String reason, BoolCallback cb) {
+        try {
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("pluginId", pluginId == null ? "" : pluginId);
+            o.put("reporterId", myId());
+            o.put("reason", reason == null ? "" : reason.trim());
+            o.put("date", System.currentTimeMillis());
+            String key = safeKey(pluginId == null ? "" : pluginId) + "_" + myId();
+            Utilities.globalQueue.postRunnable(() -> {
+                boolean ok = httpVerified("PUT", RTDB + "/plugin_reports/" + key + ".json", o.toString());
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
+            });
+        } catch (Throwable e) { cb.onResult(false); }
+    }
+
+    private static void appendPluginHistory(String pluginId, String action, String details, long actorId, String actorName) {
+        try {
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("action", action);
+            o.put("details", details == null ? "" : details);
+            o.put("actorId", actorId);
+            o.put("actorName", actorName == null ? "" : actorName);
+            o.put("date", System.currentTimeMillis());
+            String key = System.currentTimeMillis() + "_" + Math.abs((action + actorId).hashCode());
+            httpVerified("PUT", RTDB + "/plugin_history/" + safeKey(pluginId) + "/" + key + ".json", o.toString());
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    public static class HistoryEntry {
+        public String action = "", details = "", actorName = "";
+        public long actorId, date;
+    }
+
+    public interface HistoryCallback { void onResult(java.util.ArrayList<HistoryEntry> items); }
+
+    public static void fetchPluginHistory(String pluginId, HistoryCallback cb) {
+        final String id = safeKey(pluginId == null ? "" : pluginId);
+        Utilities.globalQueue.postRunnable(() -> {
+            java.util.ArrayList<HistoryEntry> result = new java.util.ArrayList<>();
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_history/" + id + ".json").openConnection();
+                c.setConnectTimeout(12000); c.setReadTimeout(15000);
+                if (c.getResponseCode() == 200) {
+                    String raw = readHttp(c.getInputStream());
+                    if (!raw.isEmpty() && !"null".equals(raw)) {
+                        org.json.JSONObject root = new org.json.JSONObject(raw);
+                        for (java.util.Iterator<String> it = root.keys(); it.hasNext();) {
+                            org.json.JSONObject o = root.optJSONObject(it.next()); if (o == null) continue;
+                            HistoryEntry h = new HistoryEntry();
+                            h.action = o.optString("action", ""); h.details = o.optString("details", "");
+                            h.actorId = o.optLong("actorId"); h.actorName = o.optString("actorName", ""); h.date = o.optLong("date");
+                            result.add(h);
+                        }
+                        result.sort((a, b) -> Long.compare(b.date, a.date));
+                    }
+                }
+            } catch (Throwable e) { FileLog.e(e); } finally { if (c != null) c.disconnect(); }
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
+    }
+
+    public static class ReviewReport {
+        public String key = "", pluginId = "", reason = "";
+        public long reviewUserId, reporterId, date;
+    }
+
+    public interface ReportsCallback { void onResult(java.util.ArrayList<ReviewReport> items); }
+
+    public static void fetchReviewReports(ReportsCallback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            java.util.ArrayList<ReviewReport> result = new java.util.ArrayList<>();
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_review_reports.json").openConnection();
+                c.setConnectTimeout(12000); c.setReadTimeout(15000);
+                if (c.getResponseCode() == 200) {
+                    String raw = readHttp(c.getInputStream());
+                    if (!raw.isEmpty() && !"null".equals(raw)) {
+                        org.json.JSONObject root = new org.json.JSONObject(raw);
+                        for (java.util.Iterator<String> it = root.keys(); it.hasNext();) {
+                            String key = it.next(); org.json.JSONObject o = root.optJSONObject(key); if (o == null) continue;
+                            ReviewReport r = new ReviewReport(); r.key = key; r.pluginId = o.optString("pluginId", "");
+                            r.reason = o.optString("reason", ""); r.reviewUserId = o.optLong("reviewUserId");
+                            r.reporterId = o.optLong("reporterId"); r.date = o.optLong("date"); result.add(r);
+                        }
+                        result.sort((a, b) -> Long.compare(b.date, a.date));
+                    }
+                }
+            } catch (Throwable e) { FileLog.e(e); } finally { if (c != null) c.disconnect(); }
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
+    }
+
+    public static boolean resolveReviewReport(ReviewReport report, boolean deleteReview) {
+        String token = DevGramBadges.getAdminToken(); if (token == null || report == null) return false;
+        Utilities.globalQueue.postRunnable(() -> {
+            if (deleteReview) httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(report.pluginId) + "/" + report.reviewUserId + ".json?auth=" + token, null);
+            httpVerified("DELETE", RTDB + "/plugin_review_reports/" + report.key + ".json?auth=" + token, null);
+        });
+        return true;
+    }
+
+    private static String readHttp(java.io.InputStream in) throws Exception {
+        java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = br.readLine()) != null) sb.append(line);
+        br.close();
+        return sb.toString().trim();
     }
 
     // Забрать опубликованный каталог.
@@ -1496,6 +1762,31 @@ public class DevGramPlugins {
     // Забрать заявки на модерацию.
     public static void fetchPending(final CatalogCallback cb) {
         fetchEntries("plugins_pending", cb);
+    }
+
+    public static void fetchRejected(final CatalogCallback cb) {
+        fetchEntries("plugins_rejected", cb);
+    }
+
+    public static void fetchMySubmissions(final CatalogCallback cb) {
+        final long uid = myId();
+        java.util.ArrayList<CatalogEntry> result = new java.util.ArrayList<>();
+        final int[] remaining = {3};
+        CatalogCallback pending = items -> {
+            for (CatalogEntry e : items) { e.submissionState = "pending"; if (e.submitterId == uid) result.add(e); }
+            if (--remaining[0] == 0) cb.onResult(result);
+        };
+        CatalogCallback published = items -> {
+            for (CatalogEntry e : items) { e.submissionState = "published"; if (e.submitterId == uid) result.add(e); }
+            if (--remaining[0] == 0) cb.onResult(result);
+        };
+        CatalogCallback rejected = items -> {
+            for (CatalogEntry e : items) { e.submissionState = "rejected"; if (e.submitterId == uid) result.add(e); }
+            if (--remaining[0] == 0) cb.onResult(result);
+        };
+        fetchEntries("plugins_pending", pending);
+        fetchEntries("plugins_catalog", published);
+        fetchEntries("plugins_rejected", rejected);
     }
 
     // Общий загрузчик списка CatalogEntry из узла RTDB (catalog / pending).
@@ -1534,6 +1825,14 @@ public class DevGramPlugins {
                             e.channel = o.optString("channel", "");
                             e.source = o.optString("source", "");
                             e.filter = o.optString("filter", "");
+                            e.rating = o.optDouble("rating", 0);
+                            e.reviews = o.optInt("reviews", 0);
+                            e.submitterId = o.optLong("submitterId", 0);
+                            e.submitterName = o.optString("submitterName", "");
+                            e.submittedAt = o.optLong("submittedAt", 0);
+                            e.updatedAt = o.optLong("updatedAt", 0);
+                            e.update = o.optBoolean("update", false);
+                            e.rejectionReason = o.optString("reason", "");
                             list.add(e);
                         }
                     }
@@ -1553,22 +1852,100 @@ public class DevGramPlugins {
         void onResult(boolean value);
     }
 
+    public interface SubmissionCallback {
+        void onResult(int status); // 0 нет заявки, 1 модерация, 2 одобрено, 3 отклонено, 4 заблокировано
+    }
+
     // Плагин уже «в обработке», повторно публиковать незачем: на модерации (plugins_pending),
     // одобрен (plugins_catalog), отклонён (plugins_rejected) или заблокирован по файлу (plugins_blocked).
     // Лёгкая shallow-проверка по ключу (id / хеш источника), результат — на UI-потоке.
     public static void isPluginSubmitted(final String id, final String source, final BoolCallback cb) {
+        getPluginSubmissionStatus(id, source, status -> cb.onResult(status != 0));
+    }
+
+    public static void getPluginSubmissionStatus(final String id, final String source, final SubmissionCallback cb) {
         if (id == null || id.trim().isEmpty()) {
-            AndroidUtilities.runOnUIThread(() -> cb.onResult(false));
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(0));
             return;
         }
         final String key = safeKey(id.trim());
         Utilities.globalQueue.postRunnable(() -> {
-            boolean hit = nodeHasKey("plugins_pending", key)
-                    || nodeHasKey("plugins_catalog", key)
-                    || nodeHasKey("plugins_rejected", key)
-                    || (source != null && !source.isEmpty() && nodeHasKey("plugins_blocked", sha256(source)));
-            AndroidUtilities.runOnUIThread(() -> cb.onResult(hit));
+            int status = 0;
+            if (nodeHasKey("plugins_pending", key)) status = 1;
+            else if (nodeHasKey("plugins_catalog", key)) status = 2;
+            else if (nodeHasKey("plugins_rejected", key)) status = 3;
+            else if (source != null && !source.isEmpty() && nodeHasKey("plugins_blocked", sha256(source))) status = 4;
+            final int result = status;
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
         });
+    }
+
+    public static void canWithdrawPending(String id, BoolCallback cb) {
+        final String key = safeKey(id == null ? "" : id);
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean allowed = false;
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugins_pending/" + key + "/submitterId.json").openConnection();
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(10000);
+                if (c.getResponseCode() == 200) {
+                    String value = readHttp(c.getInputStream()).replace("\"", "");
+                    allowed = String.valueOf(myId()).equals(value);
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            final boolean result = allowed;
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
+    }
+
+    public static void withdrawPending(String id, BoolCallback cb) {
+        canWithdrawPending(id, allowed -> {
+            if (!allowed) {
+                cb.onResult(false);
+                return;
+            }
+            Utilities.globalQueue.postRunnable(() -> {
+                boolean ok = httpVerified("DELETE", RTDB + "/plugins_pending/" + safeKey(id) + ".json", null);
+                AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
+            });
+        });
+    }
+
+    public interface StringCallback {
+        void onResult(String value);
+    }
+
+    public static void fetchRejectionReason(String id, StringCallback cb) {
+        final String key = safeKey(id == null ? "" : id);
+        Utilities.globalQueue.postRunnable(() -> {
+            String reason = "";
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugins_rejected/" + key + "/reason.json").openConnection();
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(10000);
+                if (c.getResponseCode() == 200) {
+                    String raw = readHttp(c.getInputStream());
+                    if (!"null".equals(raw)) reason = new org.json.JSONTokener(raw).nextValue().toString();
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            final String result = reason;
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
+    }
+
+    public static void clearRejectedForResubmit(String id) {
+        Utilities.globalQueue.postRunnable(() ->
+                httpVerified("DELETE", RTDB + "/plugins_rejected/" + safeKey(id) + ".json", null));
     }
 
     // true, если по пути RTDB/node/key есть значение (shallow — тянет только сам ключ, не весь узел).
@@ -1613,11 +1990,34 @@ public class DevGramPlugins {
         o.put("channel", e.channel);
         o.put("source", e.source);
         o.put("filter", e.filter == null ? "" : e.filter);
+        if (e.rating > 0) o.put("rating", e.rating);
+        if (e.reviews > 0) o.put("reviews", e.reviews);
+        o.put("submitterId", e.submitterId);
+        o.put("submitterName", e.submitterName == null ? "" : e.submitterName);
+        o.put("submittedAt", e.submittedAt);
+        o.put("updatedAt", e.updatedAt);
+        o.put("update", e.update);
         return o;
     }
 
     private static String safeKey(String id) {
         return id.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+    }
+
+    public static String validateCatalogEntry(CatalogEntry e) {
+        if (e == null) return "Пустая заявка";
+        if (e.id == null || !e.id.matches("[a-zA-Z0-9_\\-]{2,64}")) return "ID: 2–64 символа, только буквы, цифры, _ и -";
+        if (e.name == null || e.name.trim().length() < 2) return "Укажите название плагина";
+        if (e.version == null || e.version.trim().isEmpty()) return "Укажите версию плагина";
+        if (e.author == null || e.author.trim().isEmpty()) return "Укажите автора плагина";
+        if (e.source == null || e.source.trim().isEmpty()) return "Исходник плагина пуст";
+        if (e.source.length() > 1024 * 1024) return "Плагин больше 1 МБ";
+        if (parseMeta(e.source).isEmpty()) return "Не удалось разобрать метаданные или синтаксис плагина";
+        String lower = e.source.toLowerCase(java.util.Locale.US);
+        if (lower.contains("import subprocess") || lower.contains("from subprocess") || lower.contains("os.system(")) {
+            return "Запрещён запуск системных команд (subprocess/os.system)";
+        }
+        return "";
     }
 
     // Отправить плагин НА МОДЕРАЦИЮ (узел plugins_pending, запись открыта). Модератор одобрит →
@@ -1629,11 +2029,23 @@ public class DevGramPlugins {
         if (isBlocked(e.source)) {
             return -1;
         }
+        if (!validateCatalogEntry(e).isEmpty()) {
+            return -2;
+        }
         try {
+            long userId = myId();
+            TLRPC.User user = MessagesController.getInstance(UserConfig.selectedAccount).getUser(userId);
+            e.submitterId = userId;
+            e.submitterName = user == null ? String.valueOf(userId) : UserObject.getUserName(user);
+            e.submittedAt = System.currentTimeMillis();
+            e.updatedAt = e.submittedAt;
             final String body = entryJson(e).toString();
             final String key = safeKey(e.id);
             Utilities.globalQueue.postRunnable(() ->
-                    httpVerified("PUT", RTDB + "/plugins_pending/" + key + ".json", body));
+            {
+                httpVerified("PUT", RTDB + "/plugins_pending/" + key + ".json", body);
+                appendPluginHistory(e.id, e.update ? "update_submitted" : "submitted", e.version, e.submitterId, e.submitterName);
+            });
             return 1;
         } catch (Throwable ex) {
             FileLog.e(ex);
@@ -1650,10 +2062,21 @@ public class DevGramPlugins {
         try {
             final String body = entryJson(e).toString();
             final String key = safeKey(e.id);
+            final String hash = sha256(e.source == null ? "" : e.source);
             Utilities.globalQueue.postRunnable(() -> {
+                String previous = readNode(RTDB + "/plugins_catalog/" + key + ".json");
+                if (previous != null && !previous.isEmpty() && !"null".equals(previous))
+                    httpVerified("PUT", RTDB + "/plugin_backups/" + key + "/" + System.currentTimeMillis() + ".json?auth=" + token, previous);
                 httpVerified("PUT", RTDB + "/plugins_catalog/" + key + ".json?auth=" + token, body);
+                if (!hash.isEmpty()) {
+                    httpVerified("PUT", RTDB + "/plugins_verified/" + hash + ".json?auth=" + token, "\"verified\"");
+                    java.util.Set<String> set = new java.util.HashSet<>(verifiedHashes);
+                    set.add(hash);
+                    verifiedHashes = set;
+                }
                 httpVerified("DELETE", RTDB + "/plugins_pending/" + key + ".json?auth=" + token, null);
                 httpVerified("DELETE", RTDB + "/plugins_rejected/" + key + ".json?auth=" + token, null);
+                appendPluginHistory(e.id, "approved", e.version, myId(), "Модератор");
             });
             return true;
         } catch (Throwable ex) {
@@ -1662,8 +2085,24 @@ public class DevGramPlugins {
         }
     }
 
+    public static boolean rollbackPlugin(String pluginId, String backupKey) {
+        String token = DevGramBadges.getAdminToken();
+        if (token == null || pluginId == null || backupKey == null) return false;
+        String raw = readNode(RTDB + "/plugin_backups/" + safeKey(pluginId) + "/" + safeKey(backupKey) + ".json");
+        if (raw == null || raw.isEmpty() || "null".equals(raw)) return false;
+        final String key = safeKey(pluginId);
+        Utilities.globalQueue.postRunnable(() -> { httpVerified("PUT", RTDB + "/plugins_catalog/" + key + ".json?auth=" + token, raw); appendPluginHistory(pluginId, "rollback", backupKey, myId(), "Модератор"); });
+        return true;
+    }
+
+    private static String readNode(String url) {
+        java.net.HttpURLConnection c = null;
+        try { c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection(); c.setConnectTimeout(10000); c.setReadTimeout(12000); return c.getResponseCode() == 200 ? readHttp(c.getInputStream()) : ""; }
+        catch (Throwable e) { FileLog.e(e); return ""; } finally { if (c != null) c.disconnect(); }
+    }
+
     // Отклонить заявку (модератор): убрать из pending. block=true — ещё и заблокировать файл.
-    public static boolean rejectPending(CatalogEntry e, boolean block) {
+    public static boolean rejectPending(CatalogEntry e, boolean block, String reason) {
         String token = DevGramBadges.getAdminToken();
         if (token == null || e == null || e.id == null || e.id.isEmpty()) {
             return false;
@@ -1677,13 +2116,24 @@ public class DevGramPlugins {
         }
         Utilities.globalQueue.postRunnable(() -> {
             httpVerified("DELETE", RTDB + "/plugins_pending/" + key + ".json?auth=" + token, null);
-            // метка «отклонён» (по id) — чтобы кнопка «Опубликовать» больше не показывалась
-            httpVerified("PUT", RTDB + "/plugins_rejected/" + key + ".json?auth=" + token, "true");
+            try {
+                org.json.JSONObject rejected = entryJson(e);
+                rejected.put("reason", reason == null ? "" : reason.trim());
+                rejected.put("rejectedAt", System.currentTimeMillis());
+                httpVerified("PUT", RTDB + "/plugins_rejected/" + key + ".json?auth=" + token, rejected.toString());
+            } catch (Throwable ex) {
+                FileLog.e(ex);
+            }
             if (hash != null) {
                 httpVerified("PUT", RTDB + "/plugins_blocked/" + hash + ".json?auth=" + token, "\"blocked\"");
             }
+            appendPluginHistory(e.id, block ? "rejected_blocked" : "rejected", reason, myId(), "Модератор");
         });
         return true;
+    }
+
+    public static boolean rejectPending(CatalogEntry e, boolean block) {
+        return rejectPending(e, block, "");
     }
 
     // Удалить публикацию из каталога без блокировки файла: её можно будет отправить повторно.
