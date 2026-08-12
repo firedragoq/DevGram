@@ -248,6 +248,12 @@ public class UItem extends AdapterWithDiffUtils.Item {
         return i;
     }
 
+    public static UItem asButton(int id, Drawable icon, CharSequence text, CharSequence value) {
+        UItem i = asButton(id, icon, text);
+        i.textValue = value;
+        return i;
+    }
+
     public static UItem asButton(int id, CharSequence text, CharSequence value) {
         UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TEXT, false);
         i.id = id;
