@@ -684,6 +684,25 @@ public class DevGramBadges {
             } catch (Throwable ignore) {
             }
         }
+        // DevGram: у описания любого значка показываем переход к инструкции по поддержке проекта.
+        // Все места показа значков используют этот единый метод, включая кастомные значки.
+        try {
+            if (b.getLayout() instanceof org.telegram.ui.Components.Bulletin.ButtonLayout) {
+                org.telegram.ui.Components.Bulletin.ButtonLayout layout =
+                        (org.telegram.ui.Components.Bulletin.ButtonLayout) b.getLayout();
+                layout.setButton(new org.telegram.ui.Components.Bulletin.UndoButton(
+                        layout.getContext(), true, null)
+                        .setText("Подробнее")
+                        .setUndoAction(() -> {
+                            org.telegram.ui.ActionBar.BaseFragment fragment =
+                                    org.telegram.ui.LaunchActivity.getSafeLastFragment();
+                            if (fragment != null) {
+                                org.telegram.ui.DevGramSupportSheet.show(fragment);
+                            }
+                        }));
+            }
+        } catch (Throwable ignore) {
+        }
         b.show();
     }
 }
