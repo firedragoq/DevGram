@@ -2123,6 +2123,37 @@ public class DevGramPlugins {
         }
     }
 
+    /** Асинхронная публикация с подтверждением фактической записи Firebase. */
+    public static void publishToCatalog(CatalogEntry e, SubmissionCallback cb) {
+        if (e == null || e.id == null || e.id.isEmpty()) { AndroidUtilities.runOnUIThread(() -> cb.onResult(0)); return; }
+        if (isBlocked(e.source)) { AndroidUtilities.runOnUIThread(() -> cb.onResult(-1)); return; }
+        if (!validateCatalogEntry(e).isEmpty()) { AndroidUtilities.runOnUIThread(() -> cb.onResult(-2)); return; }
+        Utilities.globalQueue.postRunnable(() -> {
+            int result = 0;
+            try {
+                long userId = myId();
+                TLRPC.User user = MessagesController.getInstance(UserConfig.selectedAccount).getUser(userId);
+                e.submitterId = userId;
+                e.submitterName = user == null ? String.valueOf(userId) : UserObject.getUserName(user);
+                e.submittedAt = System.currentTimeMillis(); e.updatedAt = e.submittedAt;
+                e.submitterUid = firebaseAnonUid();
+                if (e.submitterUid != null && !e.submitterUid.isEmpty()) {
+                    String key = safeKey(e.id);
+                    boolean written = false;
+                    for (int attempt = 0; attempt < 3 && !written; attempt++) {
+                        written = httpVerified("PUT", RTDB + "/plugins_pending/" + key + ".json", entryJson(e).toString());
+                    }
+                    if (written && nodeHasKey("plugins_pending", key)) {
+                        appendPluginHistory(e.id, e.update ? "update_submitted" : "submitted", e.version, e.submitterId, e.submitterName);
+                        result = 1;
+                    }
+                }
+            } catch (Throwable ex) { FileLog.e(ex); }
+            final int value = result;
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(value));
+        });
+    }
+
     // Одобрить заявку (модератор): перенести из pending в каталог + убрать из pending. Нужен токен.
     public static boolean approvePending(CatalogEntry e) {
         String token = DevGramBadges.getAdminToken();

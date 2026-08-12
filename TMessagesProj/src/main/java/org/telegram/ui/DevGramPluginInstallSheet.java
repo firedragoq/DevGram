@@ -427,15 +427,18 @@ public class DevGramPluginInstallSheet {
                 arrow.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon));
                 row.addView(arrow, LayoutHelper.createLinear(24, 24, Gravity.CENTER_VERTICAL));
                 row.setOnClickListener(v -> {
-                    if (sheetRef[0] != null) sheetRef[0].dismiss();
+                    row.setEnabled(false);
+                    name.setText("Отправляем…");
                     ce.filter = selected;
-                    int r = DevGramPlugins.publishToCatalog(ce);
-                    String msg = r == 1 ? "Отправлено в каталог"
-                            : (r == -1 ? "Плагин заблокирован — публикация запрещена"
-                            : (r == -2 ? DevGramPlugins.validateCatalogEntry(ce) : "Не удалось опубликовать"));
-                    org.telegram.ui.Components.BulletinFactory.of(fragment)
-                            .createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
-                    if (r == 1 && onSubmitted != null) onSubmitted.run();
+                    DevGramPlugins.publishToCatalog(ce, r -> {
+                        if (r == 1 && sheetRef[0] != null) sheetRef[0].dismiss();
+                        String msg = r == 1 ? "Заявка отправлена на модерацию"
+                                : (r == -1 ? "Плагин заблокирован — публикация запрещена"
+                                : (r == -2 ? DevGramPlugins.validateCatalogEntry(ce) : "Firebase не подтвердил отправку. Нажмите ещё раз"));
+                        org.telegram.ui.Components.BulletinFactory.of(fragment).createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
+                        if (r == 1) { if (onSubmitted != null) onSubmitted.run(); }
+                        else { row.setEnabled(true); name.setText(selected.isEmpty() ? "Без категории" : selected); }
+                    });
                 });
                 root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 8));
             }
