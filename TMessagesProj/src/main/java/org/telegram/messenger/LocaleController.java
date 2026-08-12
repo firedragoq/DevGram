@@ -2726,6 +2726,13 @@ public class LocaleController {
 
     public static String formatDateOnline(long date, boolean[] madeShorter) {
         try {
+            if (DevGramGeneralConfig.isRelativeLastSeen()) {
+                long diff = System.currentTimeMillis() / 1000L - date;
+                if (diff < 0) diff = 0;
+                if (diff < 86400) {
+                    return LocaleController.formatString(R.string.LastSeenDateFormatted, formatRelativeDate(diff));
+                }
+            }
             date *= 1000;
             Calendar rightNow = Calendar.getInstance();
             int day = rightNow.get(Calendar.DAY_OF_YEAR);

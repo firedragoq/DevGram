@@ -136,6 +136,7 @@ import org.telegram.messenger.ChatThemeController;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.DevGramConfig;
+import org.telegram.messenger.DevGramGeneralConfig;
 import org.telegram.messenger.DevGramRegDate;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
@@ -4407,7 +4408,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (position == idRow && did != 0) {
                 try {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip = android.content.ClipData.newPlainText("label", did + "");
+                    android.content.ClipData clip = android.content.ClipData.newPlainText("label", devgramDisplayedId());
                     clipboard.setPrimaryClip(clip);
                     Toast.makeText(getParentActivity(), LocaleController.getString("TextCopied", R.string.TextCopied), Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -10761,7 +10762,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     numberSectionRow = rowCount++;
                     numberRow = rowCount++;
                     setUsernameRow = rowCount++;
-                    idRow = rowCount++;
+                    if (DevGramGeneralConfig.getShowIdAndDc() != 0) idRow = rowCount++;
                     bioRow = rowCount++;
                 }
 
@@ -10846,7 +10847,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
                 infoStartRow = rowCount;
-                if (!isBot && (hasPhone || !hasInfo) && !(myProfile && SharedConfig.hideSensitiveData())) {
+                boolean hideOwnPhone = DevGramGeneralConfig.isHidePhoneNumber()
+                        && user != null && user.id == getUserConfig().getClientUserId();
+                if (!hideOwnPhone && !isBot && (hasPhone || !hasInfo) && !(myProfile && SharedConfig.hideSensitiveData())) {
                     phoneRow = rowCount++;
                 }
                 if (userInfo != null && !TextUtils.isEmpty(userInfo.about) && !(myProfile && SharedConfig.hideSensitiveData())) {
@@ -10870,7 +10873,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
                 if (!(myProfile && SharedConfig.hideSensitiveData())) {
-                    idRow = rowCount++;
+                    if (DevGramGeneralConfig.getShowIdAndDc() != 0) idRow = rowCount++;
                 }
                 if (actionsView == null && userId != getUserConfig().getClientUserId()) {
                     notificationsRow = rowCount++;
@@ -11030,7 +11033,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 notificationsRow = rowCount++;
             }
-            idRow = rowCount++;
+            if (DevGramGeneralConfig.getShowIdAndDc() != 0) idRow = rowCount++;
             if (rowCount > 0) {
                 infoSectionRow = rowCount++;
             }
@@ -11280,6 +11283,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             default: loc = null; break;
         }
         return loc != null ? ("DC" + dc + ", " + loc) : ("DC" + dc);
+    }
+
+    private String devgramDisplayedId() {
+        int mode = DevGramGeneralConfig.getShowIdAndDc();
+        if (userId != 0) {
+            return String.valueOf(userId);
+        }
+        if (chatId != 0) {
+            if (mode == 2) {
+                return ChatObject.isChannel(currentChat) ? "-100" + chatId : String.valueOf(-chatId);
+            }
+            return String.valueOf(chatId);
+        }
+        long did = getDialogId();
+        return String.valueOf(did);
     }
 
     // DevGram: показать примерную дату регистрации по ID пользователя.
@@ -13849,7 +13867,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         if (did != 0) {
                             // DevGram: под ID показываем датацентр по аватарке (как на скрине)
                             String dc = devgramDcInfo();
-                            detailCell.setTextAndValue(did + "", dc != null ? dc : "ID", false);
+                            detailCell.setTextAndValue(devgramDisplayedId(), dc != null ? dc : "ID", false);
                         }
                     } else if (position == usernameRow) {
                         String username = null;
@@ -14927,6 +14945,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     new SearchResult(11, getString(R.string.NotificationsService), "notificationsServiceRow", getString(R.string.NotificationsAndSounds), R.drawable.msg_notifications, () -> f.presentFragment(new NotificationsSettingsActivity())),
                     new SearchResult(12, getString(R.string.NotificationsServiceConnection), "notificationsServiceConnectionRow", getString(R.string.NotificationsAndSounds), R.drawable.msg_notifications, () -> f.presentFragment(new NotificationsSettingsActivity())),
                     new SearchResult(13, getString(R.string.RepeatNotifications), "repeatRow", getString(R.string.NotificationsAndSounds), R.drawable.msg_notifications, () -> f.presentFragment(new NotificationsSettingsActivity())),
+                    new SearchResult(14, getString(R.string.DisableUnifiedPush), "disableUnifiedPushRow", getString(R.string.NotificationsAndSounds), R.drawable.msg_notifications, () -> f.presentFragment(new NotificationsSettingsActivity().highlightUnifiedPush())),
 
                     new SearchResult(100, getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> f.presentFragment(new PrivacySettingsActivity())).withLink("tg://settings/privacy"),
                     new SearchResult(109, getString(R.string.TwoStepVerification), getString(R.string.PrivacySettings), R.drawable.msg2_secret, () -> f.presentFragment(new TwoStepVerificationActivity())).withLink("tg://settings/privacy/2sv"),

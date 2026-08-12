@@ -38,12 +38,14 @@ import java.util.concurrent.CountDownLatch;
 public class PushListenerController {
     public static final int PUSH_TYPE_FIREBASE = 2,
         PUSH_TYPE_SIMPLE = 4,
+        PUSH_TYPE_WEB = 10,
         PUSH_TYPE_HUAWEI = 13;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({
             PUSH_TYPE_FIREBASE,
             PUSH_TYPE_SIMPLE,
+            PUSH_TYPE_WEB,
             PUSH_TYPE_HUAWEI
     })
     public @interface PushType {}
@@ -1776,10 +1778,13 @@ public class PushListenerController {
                         SharedConfig.pushStringGetTimeStart = SystemClock.elapsedRealtime();
                         SharedConfig.saveConfig();
                         if (UnifiedPush.getAckDistributor(ApplicationLoader.applicationContext) == null) {
+                            String savedDistributor = UnifiedPush.getSavedDistributor(ApplicationLoader.applicationContext);
                             List<String> distributors = UnifiedPush.getDistributors(ApplicationLoader.applicationContext);
-                            if (distributors.size() > 0) {
-                                String distributor = distributors.get(0);
-                                UnifiedPush.saveDistributor(ApplicationLoader.applicationContext, distributor);
+                            if (savedDistributor == null || !distributors.contains(savedDistributor)) {
+                                if (distributors.isEmpty()) {
+                                    return;
+                                }
+                                UnifiedPush.saveDistributor(ApplicationLoader.applicationContext, distributors.get(0));
                             }
                         }
                         UnifiedPush.register(

@@ -156,6 +156,14 @@ public class SharedConfig {
                 .apply();
     }
 
+    public static void toggleDisableUnifiedPush() {
+        disableUnifiedPush = !disableUnifiedPush;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("disableUnifiedPush", disableUnifiedPush)
+                .apply();
+    }
+
     public static void toggleSurfaceInStories() {
         useSurfaceInStories = !useSurfaceInStories;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -698,7 +706,10 @@ public class SharedConfig {
             photoHighQualityDefault = preferences.getBoolean("photoHighQualityDefault", false);
             photoLiveDefault = preferences.getBoolean("photoLiveDefault", false);
             disableUnifiedPush = preferences.getBoolean("disableUnifiedPush", false);
-            unifiedPushGateway = preferences.getString("unifiedPushGateway", "https://p2p.belloworld.it/");
+            unifiedPushGateway = preferences.getString("unifiedPushGateway", "");
+            if ("https://p2p.belloworld.it/".equals(unifiedPushGateway)) {
+                unifiedPushGateway = "";
+            }
 
             loadDebugConfig(preferences);
 
@@ -1883,6 +1894,14 @@ public class SharedConfig {
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
                 .edit()
                 .putBoolean("useCamera2Force_2", useCamera2Force = !isUsingCamera2(currentAccount))
+                .apply();
+    }
+
+    // DevGram: явно задать бэкенд камеры (тип камеры): false = Camera 1, true = Camera 2
+    public static void setUseCamera2Force(boolean value) {
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("useCamera2Force_2", useCamera2Force = value)
                 .apply();
     }
 

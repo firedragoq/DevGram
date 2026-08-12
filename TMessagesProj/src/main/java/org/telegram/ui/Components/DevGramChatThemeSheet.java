@@ -108,7 +108,10 @@ public class DevGramChatThemeSheet extends BottomSheet {
                 if (t == null || android.text.TextUtils.isEmpty(t.getName())) {
                     continue;
                 }
-                items.add(new Item(t.getName(), t.getName(), t));
+                // getName() is a localized/display title. getKey() is the stable
+                // identifier used by Theme.getTheme(), including imported and
+                // separately installed remote themes.
+                items.add(new Item(t.getKey(), t.getName(), t));
             }
         }
         return items;
@@ -213,14 +216,14 @@ public class DevGramChatThemeSheet extends BottomSheet {
 
     private final java.util.HashMap<String, SparseIntArray> colorCache = new java.util.HashMap<>();
     private SparseIntArray getColors(Theme.ThemeInfo t) {
-        SparseIntArray c = colorCache.get(t.getName());
+        SparseIntArray c = colorCache.get(t.getKey());
         if (c == null) {
             try {
                 c = Theme.getThemeFileValues(t.pathToFile != null ? new File(t.pathToFile) : null, t.assetName, null);
             } catch (Throwable e) {
                 c = new SparseIntArray();
             }
-            colorCache.put(t.getName(), c);
+            colorCache.put(t.getKey(), c);
         }
         return c;
     }

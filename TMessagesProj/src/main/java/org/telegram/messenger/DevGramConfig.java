@@ -79,6 +79,7 @@ public class DevGramConfig {
     public static boolean removeMessageTail = false;
     public static boolean replaceEditedWithIcon = false;
     public static boolean hideShareButton = false;
+    public static boolean hideStickerTime = false; // скрыть время на стикерах (как exteraGram)
 
     // --- гейт для разрешённых пакетов чтения (например, ручная отметка «прочитано») ---
     private static final Object readSync = new Object();
@@ -125,6 +126,7 @@ public class DevGramConfig {
             removeMessageTail = preferences.getBoolean("removeMessageTail", false);
             replaceEditedWithIcon = preferences.getBoolean("replaceEditedWithIcon", false);
             hideShareButton = preferences.getBoolean("hideShareButton", false);
+            hideStickerTime = preferences.getBoolean("hideStickerTime", false);
             loaded = true;
         }
     }
@@ -207,6 +209,24 @@ public class DevGramConfig {
         MessagesController.getGlobalMainSettings().edit().putFloat("stickerSize", v).apply();
     }
 
+    // Двойное нажатие — раздельные действия для входящих/исходящих (индекс в списке DevGramDoubleTapUtils).
+    // По умолчанию 1 = «Реакции» (совпадает со старым поведением).
+    public static int getDoubleTapActionIn() {
+        return MessagesController.getGlobalMainSettings().getInt("dg_doubletap_in", 1);
+    }
+
+    public static void setDoubleTapActionIn(int v) {
+        MessagesController.getGlobalMainSettings().edit().putInt("dg_doubletap_in", v).apply();
+    }
+
+    public static int getDoubleTapActionOut() {
+        return MessagesController.getGlobalMainSettings().getInt("dg_doubletap_out", 1);
+    }
+
+    public static void setDoubleTapActionOut(int v) {
+        MessagesController.getGlobalMainSettings().edit().putInt("dg_doubletap_out", v).apply();
+    }
+
     // Стиль вкладок папок (0..2) — pref в глобальных настройках, читается FolderIcons.
     public static int getFolderTabsStyle() {
         return MessagesController.getGlobalMainSettings().getInt("folderTabsStyle", 0);
@@ -257,6 +277,60 @@ public class DevGramConfig {
     public static void setHideShareButton(boolean v) {
         hideShareButton = v;
         if (preferences != null) preferences.edit().putBoolean("hideShareButton", v).apply();
+    }
+
+    public static void setHideStickerTime(boolean v) {
+        hideStickerTime = v;
+        if (preferences != null) preferences.edit().putBoolean("hideStickerTime", v).apply();
+    }
+
+    // Язык офлайн-распознавания голоса (Vosk). "none" = выключено (используется штатная серверная транскрипция).
+    public static String getRecognitionLanguage() {
+        return MessagesController.getGlobalMainSettings().getString("dg_recognitionLanguage", "none");
+    }
+
+    public static void setRecognitionLanguage(String lang) {
+        MessagesController.getGlobalMainSettings().edit().putString("dg_recognitionLanguage", lang == null ? "none" : lang).apply();
+    }
+
+    public static boolean isVoskRecognitionEnabled() {
+        return !"none".equals(getRecognitionLanguage());
+    }
+
+    // ИИ-постобработка распознанного текста (через DevGramAiClient).
+    public static boolean isRecognitionAiPostProcessing() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_recognitionAi", false);
+    }
+
+    public static void setRecognitionAiPostProcessing(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_recognitionAi", v).apply();
+    }
+
+    // Запоминать последнюю использованную камеру для кружков (сохраняет rearVideoMessages при флипе).
+    public static boolean isRememberLastCamera() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_rememberLastCamera", false);
+    }
+
+    public static void setRememberLastCamera(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_rememberLastCamera", v).apply();
+    }
+
+    // Слайдер зума в камере кружков (переиспользуем базовый ZoomControlView).
+    public static boolean isZoomSlider() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_zoomSlider", false);
+    }
+
+    public static void setZoomSlider(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_zoomSlider", v).apply();
+    }
+
+    // Статичный зум — не сбрасывать зум после жеста pinch.
+    public static boolean isStaticZoom() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_staticZoom", false);
+    }
+
+    public static void setStaticZoom(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_staticZoom", v).apply();
     }
 
     // Формат времени сообщений с секундами. Флаг живёт в глобальных настройках (getGlobalMainSettings),

@@ -58,6 +58,7 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -2599,7 +2600,22 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         }
         if (stopService) {
             CastSync.stop();
+            stopMediaSessionPlayback();
         }
+    }
+
+    private void stopMediaSessionPlayback() {
+        if (playingMessageObject != null) {
+            return;
+        }
+        TelegramMediaSession mediaSession = TelegramMediaSession.peekInstance();
+        if (mediaSession == null) {
+            return;
+        }
+        mediaSession.publishPlaybackState(new PlaybackStateCompat.Builder()
+                .setState(PlaybackStateCompat.STATE_STOPPED, 0, 0f)
+                .setActions(mediaSession.getAvailableActions())
+                .build());
     }
 
     public boolean isGoingToShowMessageObject(MessageObject messageObject) {
@@ -2707,6 +2723,23 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             return 0;
         }
         return audioPlayer.getDuration();
+    }
+
+    // DevGram: пауза голосового/кружка при сворачивании приложения (как exteraGram PauseOnMinimize).
+    public void devgramPauseInBackgroundIfNeeded() {
+        android.content.SharedPreferences p = MessagesController.getGlobalMainSettings();
+        if (!p.getBoolean("dg_pauseOnMinimize", false)) {
+            return;
+        }
+        MessageObject playing = getPlayingMessageObject();
+        if (playing == null) {
+            return;
+        }
+        boolean pauseVoice = playing.isVoice() && p.getBoolean("dg_pauseVoiceOnMinimize", false);
+        boolean pauseRound = playing.isRoundVideo() && p.getBoolean("dg_pauseRoundOnMinimize", false);
+        if ((pauseVoice || pauseRound) && isPlayingMessage(playing) && !isMessagePaused()) {
+            pauseMessage(playing);
+        }
     }
 
     public MessageObject getPlayingMessageObject() {
@@ -5176,7 +5209,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                         } else {
                             dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                         }
-                        dir.mkdir();
+                        dir = new File(DevGramGeneralConfig.mediaFolder(dir.getAbsolutePath()));
+                        dir.mkdirs();
                         for (int b = 0, N = messageObjects.size(); b < N; b++) {
                             MessageObject message = messageObjects.get(b);
                             if (processLivePhotoMessage(message)) {
@@ -5330,7 +5364,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             if (Build.VERSION.SDK_INT >= 29) {
                 final ContentValues cv = new ContentValues();
                 final Uri uriToInsert = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-                final File dirDest = new File(Environment.DIRECTORY_DOWNLOADS, "DevGram");
+                final File dirDest = new File(DevGramGeneralConfig.mediaFolder(Environment.DIRECTORY_DOWNLOADS));
                 cv.put(MediaStore.MediaColumns.RELATIVE_PATH, dirDest + File.separator);
                 cv.put(MediaStore.Downloads.DISPLAY_NAME, filename);
                 cv.put(MediaStore.MediaColumns.MIME_TYPE, outputMime);
@@ -5352,7 +5386,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     }
                 }
             } else {
-                final File destDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DevGram");
+                final File destDir = new File(DevGramGeneralConfig.mediaFolder(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()));
                 destDir.mkdirs();
                 File destFile = new File(destDir, filename);
                 if (!destFile.exists()) {
@@ -5572,11 +5607,13 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     } else {
                         File destFile;
                         if (type == 0) {
-                            destFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DevGram");
+                            destFile = new File(DevGramGeneralConfig.mediaFolder(
+                                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath()));
                             destFile.mkdirs();
                             destFile = new File(destFile, AndroidUtilities.generateFileName(0, FileLoader.getFileExtension(sourceFile)));
                         } else if (type == 1) {
-                            destFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "DevGram");
+                            destFile = new File(DevGramGeneralConfig.mediaFolder(
+                                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES).getAbsolutePath()));
                             destFile.mkdirs();
                             destFile = new File(destFile, AndroidUtilities.generateFileName(1, FileLoader.getFileExtension(sourceFile)));
                         } else {
@@ -5586,7 +5623,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                             } else {
                                 dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
                             }
-                            dir = new File(dir, "DevGram");
+                            dir = new File(DevGramGeneralConfig.mediaFolder(dir.getAbsolutePath()));
                             dir.mkdirs();
                             destFile = new File(dir, name);
                             if (destFile.exists()) {
@@ -5731,7 +5768,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     final String filename = AndroidUtilities.generateFileName(0, "jpg");
                     final ContentValues cv = new ContentValues();
                     final Uri uriToInsert = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-                    final File dirDest = new File(Environment.DIRECTORY_PICTURES, "DevGram");
+                    final File dirDest = new File(DevGramGeneralConfig.mediaFolder(Environment.DIRECTORY_PICTURES));
                     cv.put(MediaStore.MediaColumns.RELATIVE_PATH, dirDest + File.separator);
                     cv.put(MediaStore.Images.Media.DISPLAY_NAME, filename);
                     cv.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
@@ -5753,7 +5790,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                         }
                     }
                 } else {
-                    final File destDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DevGram");
+                    final File destDir = new File(DevGramGeneralConfig.mediaFolder(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath()));
                     destDir.mkdirs();
                     File destFile = new File(destDir, AndroidUtilities.generateFileName(0, "jpg"));
                     if (!destFile.exists()) {
@@ -5923,7 +5961,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     filename = AndroidUtilities.generateFileName(0, extension);
                 }
                 uriToInsert = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-                File dirDest = new File(Environment.DIRECTORY_PICTURES, "DevGram");
+                File dirDest = new File(DevGramGeneralConfig.mediaFolder(Environment.DIRECTORY_PICTURES));
                 contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, dirDest + File.separator);
                 contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, filename);
                 contentValues.put(MediaStore.Images.Media.MIME_TYPE, mimeType);
@@ -5935,7 +5973,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 if (filename == null) {
                     filename = AndroidUtilities.generateFileName(1, extension);
                 }
-                File dirDest = new File(Environment.DIRECTORY_MOVIES, "DevGram");
+                File dirDest = new File(DevGramGeneralConfig.mediaFolder(Environment.DIRECTORY_MOVIES));
                 contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, dirDest + File.separator);
                 uriToInsert = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
                 contentValues.put(MediaStore.Video.Media.DISPLAY_NAME, filename);
@@ -5946,7 +5984,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 if (filename == null) {
                     filename = sourceFile.getName();
                 }
-                File dirDest = new File(Environment.DIRECTORY_DOWNLOADS, "DevGram");
+                File dirDest = new File(DevGramGeneralConfig.mediaFolder(Environment.DIRECTORY_DOWNLOADS));
                 contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, dirDest + File.separator);
                 uriToInsert = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
                 contentValues.put(MediaStore.Downloads.DISPLAY_NAME, filename);
@@ -5957,7 +5995,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 if (filename == null) {
                     filename = sourceFile.getName();
                 }
-                File dirDest = new File(Environment.DIRECTORY_MUSIC, "DevGram");
+                File dirDest = new File(DevGramGeneralConfig.mediaFolder(Environment.DIRECTORY_MUSIC));
                 contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, dirDest + File.separator);
                 uriToInsert = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
                 contentValues.put(MediaStore.Audio.Media.DISPLAY_NAME, filename);

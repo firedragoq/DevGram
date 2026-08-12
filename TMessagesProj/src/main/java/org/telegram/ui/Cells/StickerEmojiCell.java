@@ -36,6 +36,7 @@ import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SendMessagesHelper;
@@ -100,6 +101,8 @@ public class StickerEmojiCell extends FrameLayout implements NotificationCenter.
         };
         imageView.setAspectFit(true);
         imageView.setAllowLoadingOnAttachedOnly(true);
+        imageView.setRoundRadiusDirect(MessagesController.getGlobalMainSettings().getInt("dg_stickerShape", 0) == 0
+                ? 0 : dp(4));
         imageView.setLayerNum(1);
 
         emojiTextView = new TextView(context);

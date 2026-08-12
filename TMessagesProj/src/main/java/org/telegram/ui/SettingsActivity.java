@@ -12,6 +12,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
@@ -39,6 +40,7 @@ import android.media.MediaCodecList;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -70,6 +72,7 @@ import org.telegram.messenger.AuthTokensHelper;
 import org.telegram.messenger.BirthdayController;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChatThemeController;
+import org.telegram.messenger.DevGramGeneralConfig;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
@@ -503,6 +506,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        if (listView != null) {
+            listView.adapter.update(true);
+        }
+    }
+
+    @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
 
@@ -543,7 +554,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         avatarView.setForUserOrChat(user, avatarDrawable);
         titleView.setText(UserObject.getUserName(user));
         final SpannableStringBuilder sb = new SpannableStringBuilder();
-        if (user != null && !TextUtils.isEmpty(user.phone)) {
+        if (user != null && !TextUtils.isEmpty(user.phone) && !DevGramGeneralConfig.isHidePhoneNumber()) {
             sb.append(spoilerIfSensitive(PhoneFormat.getInstance().format("+" + user.phone)));
         }
         final String username = UserObject.getPublicUsername(user);
@@ -661,8 +672,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             ));
             items.add(UItem.asShadow(null));
         } else if (suggestions.contains("VALIDATE_PHONE_NUMBER") && getUserConfig().getCurrentUser() != null) {
+            String formattedPhone = PhoneFormat.getInstance().format("+" + getUserConfig().getCurrentUser().phone);
+            CharSequence phoneSuggestionTitle = formatString(R.string.CheckPhoneNumber, formattedPhone);
+            if (DevGramGeneralConfig.isHidePhoneNumber()) {
+                int start = phoneSuggestionTitle.toString().indexOf(formattedPhone);
+                if (start >= 0) {
+                    SpannableStringBuilder hiddenPhone = SpannableStringBuilder.valueOf(phoneSuggestionTitle);
+                    TextStyleSpan.TextStyleRun run = new TextStyleSpan.TextStyleRun();
+                    run.flags |= TextStyleSpan.FLAG_STYLE_SPOILER;
+                    hiddenPhone.setSpan(new TextStyleSpan(run), start, start + formattedPhone.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    phoneSuggestionTitle = hiddenPhone;
+                }
+            }
             items.add(SuggestionCell.Factory.of(
-                formatString(R.string.CheckPhoneNumber, PhoneFormat.getInstance().format("+" + getUserConfig().getCurrentUser().phone)),
+                phoneSuggestionTitle,
                 replaceSingleTag(getString(R.string.CheckPhoneNumberInfo), () -> {
                     Browser.openUrl(getContext(), getString(R.string.CheckPhoneNumberLearnMoreUrl));
                 }),
@@ -984,6 +1007,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         private SimpleTextView textView;
         private TextView counterView;
         private ImageView arrowView;
+        private ImageView reorderView;
 
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botDrawable;
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatusDrawable;
@@ -1032,11 +1056,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             arrowView.setScaleType(ImageView.ScaleType.CENTER);
             arrowView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
 
+            reorderView = new ImageView(context);
+            reorderView.setImageResource(R.drawable.list_reorder);
+            reorderView.setScaleType(ImageView.ScaleType.CENTER);
+            reorderView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_stickers_menu, resourcesProvider), PorterDuff.Mode.SRC_IN));
+            reorderView.setContentDescription(getString(R.string.FilterReorder));
+            reorderView.setClickable(true);
+            reorderView.setVisibility(GONE);
+
             if (LocaleController.isRTL) {
                 textView.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
                 arrowView.setScaleX(-1);
 
                 addView(arrowView, LayoutHelper.createLinear(24, 24, 0, Gravity.CENTER_VERTICAL | Gravity.LEFT, 12, 0, 0, 0));
+                addView(reorderView, LayoutHelper.createLinear(48, 48, 0, Gravity.CENTER_VERTICAL | Gravity.LEFT));
                 addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
                 addView(textView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, Gravity.FILL, 18, 0, 0, 0));
                 addView(avatarView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 18, 0, 18, 0));
@@ -1047,8 +1080,21 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 addView(avatarView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.LEFT, 18, 0, 18, 0));
                 addView(textView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, Gravity.FILL, 0, 0, 18, 0));
                 addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
+                addView(reorderView, LayoutHelper.createLinear(48, 48, 0, Gravity.CENTER_VERTICAL | Gravity.RIGHT));
                 addView(arrowView, LayoutHelper.createLinear(24, 24, 0, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 12, 0));
             }
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        public void setReorder(boolean reorder, UniversalRecyclerView listView) {
+            arrowView.setVisibility(reorder ? GONE : VISIBLE);
+            reorderView.setVisibility(reorder ? VISIBLE : GONE);
+            reorderView.setOnTouchListener(!reorder ? null : (view, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN && listView != null && listView.itemTouchHelper != null) {
+                    listView.itemTouchHelper.startDrag(listView.getChildViewHolder(this));
+                }
+                return false;
+            });
         }
 
         @Override
@@ -1056,6 +1102,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
             counterView.setBackground(Theme.createRoundRectDrawable(dp(10), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
             arrowView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
+            reorderView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_stickers_menu, resourcesProvider), PorterDuff.Mode.SRC_IN));
         }
 
         public void set(int account) {
@@ -1111,12 +1158,18 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             @Override
             public void bindView(View view, UItem item, boolean divider, UniversalAdapter adapter, UniversalRecyclerView listView) {
                 ((AccountCell) view).set(item.intValue);
+                ((AccountCell) view).setReorder(item.checked, listView);
             }
 
             public static UItem of(int id, int account) {
+                return of(id, account, false);
+            }
+
+            public static UItem of(int id, int account, boolean reorder) {
                 final UItem item = UItem.ofFactory(AccountCell.Factory.class);
                 item.id = id;
                 item.intValue = account;
+                item.checked = reorder;
                 return item;
             }
 

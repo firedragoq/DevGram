@@ -42,6 +42,9 @@ public enum BotWebViewVibrationEffect {
     }
 
     public void vibrate() {
+        if (!DevGramGeneralConfig.isInAppVibration()) {
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             AndroidUtilities.getVibrator().vibrate(getVibrationEffectForOreo());
         } else {

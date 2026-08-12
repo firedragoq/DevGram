@@ -693,6 +693,9 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                         cell.setTextAndValueAndIcon(item.text, item.textValue, item.iconResId, divider);
                     }
                 }
+                // DevGram: двухстрочная кнопка (заголовок + серый подзаголовок), как asButtonWithSubtext у exteraGram.
+                cell.setSubtitle(item.subtext);
+                cell.heightDp = !TextUtils.isEmpty(item.subtext) ? 60 : 50;
                 if (item.accent) {
                     cell.setColors(Theme.key_windowBackgroundWhiteBlueText4, Theme.key_windowBackgroundWhiteBlueText4);
                 } else if (item.red) {

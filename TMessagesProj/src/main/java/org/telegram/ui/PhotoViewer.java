@@ -19160,7 +19160,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         if (videoPlayer != null && playerLooping) {
             videoPlayer.setLooping(allowLoopingOnPause());
         }
-        if (MessagesController.getGlobalMainSettings().getBoolean("dg_pauseVideoOnMinimize", false)
+        if (MessagesController.getGlobalMainSettings().getBoolean("dg_pauseOnMinimize", false)
+                && MessagesController.getGlobalMainSettings().getBoolean("dg_pauseVideoOnMinimize", false)
                 && videoPlayer != null && videoPlayer.isPlaying()) {
             devgramPausedOnMinimize = true;
             videoPlayer.pause();

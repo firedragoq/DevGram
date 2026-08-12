@@ -135,6 +135,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
     private Delegate delegate;
     private Paint paint;
     private RectF rect;
+    private ZoomControlView zoomControlView; // DevGram: слайдер зума камеры кружков
     private final FlashViews.ImageViewInvertable switchCameraButton;
     private final FlashViews.ImageViewInvertable flashButton;
     private final FlashViews.ImageViewInvertable optionsButton;
@@ -183,7 +184,11 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
     private Size aspectRatio = SharedConfig.roundCamera16to9 ? new Size(16, 9) : new Size(4, 3);
     private TextureView textureView;
     private BackupImageView textureOverlayView;
-    private final boolean useCamera2 = SharedConfig.isUsingCamera2(currentAccount);
+    // DevGram: «Camera X» — отдельный бэкенд, едет по Camera2-пути (GL/запись общие), сессия подменяется.
+    private final boolean useCameraX = MessagesController.getGlobalMainSettings().getBoolean("dg_useCameraX", false);
+    private final boolean useCamera2 = useCameraX || SharedConfig.isUsingCamera2(currentAccount);
+    private org.telegram.messenger.camera.DevGramCameraXSession cameraXSessionCurrent;
+    private android.graphics.SurfaceTexture cameraXSurfaceTexture; // GL-текстура для переоткрытия CameraX при флипе
     private CameraSession cameraSession;
     private boolean bothCameras;
     private Camera2Session[] camera2Sessions = new Camera2Session[2];
@@ -191,6 +196,9 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
     private boolean needDrawFlickerStub;
 
     private boolean isCameraSessionInitiated() {
+        if (useCameraX) {
+            return cameraXSessionCurrent != null && cameraXSessionCurrent.isInitiated();
+        }
         if (useCamera2) {
             return camera2SessionCurrent != null && camera2SessionCurrent.isInitiated();
         } else {
@@ -324,6 +332,28 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
 
         buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
         addView(buttonsLayout, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 56, Gravity.LEFT | Gravity.BOTTOM, 1, 0, 0, 0));
+
+        // DevGram: слайдер зума камеры кружков (базовый ZoomControlView, показывается по настройке)
+        zoomControlView = new ZoomControlView(context);
+        zoomControlView.setVisibility(org.telegram.messenger.DevGramConfig.isZoomSlider() ? VISIBLE : GONE);
+        zoomControlView.setDelegate(zoom -> {
+            if (useCameraX) {
+                if (cameraXSessionCurrent != null) {
+                    float min = cameraXSessionCurrent.getMinZoom();
+                    float max = cameraXSessionCurrent.getMaxZoom();
+                    cameraXSessionCurrent.setZoom(min + (max - min) * zoom);
+                }
+            } else if (useCamera2) {
+                if (camera2SessionCurrent != null) {
+                    float min = camera2SessionCurrent.getMinZoom();
+                    float max = camera2SessionCurrent.getMaxZoom();
+                    camera2SessionCurrent.setZoom(min + (max - min) * zoom);
+                }
+            } else if (cameraSession != null) {
+                cameraSession.setZoom(zoom);
+            }
+        });
+        addView(zoomControlView, LayoutHelper.createFrame(180, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 64));
 
         switchCameraButton = new FlashViews.ImageViewInvertable(context);
         switchCameraButton.setScaleType(ImageView.ScaleType.CENTER);
@@ -625,7 +655,13 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
     }
 
     public void destroy(boolean async) {
-        if (useCamera2) {
+        if (useCameraX) {
+            if (cameraXSessionCurrent != null) {
+                cameraXSessionCurrent.destroy(async);
+                cameraXSessionCurrent = null;
+            }
+            cameraXSurfaceTexture = null;
+        } else if (useCamera2) {
             for (int a = 0; a < camera2Sessions.length; ++a) {
                 if (camera2Sessions[a] != null) {
                     camera2Sessions[a].destroy(async);
@@ -762,10 +798,11 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
         cameraReady = false;
         selectedCamera = null;
         if (!fromPaused) {
-            if (!useCamera2) {
-                android.content.SharedPreferences preferences = org.telegram.messenger.MessagesController.getGlobalMainSettings();
-                isFrontface = !(preferences.getBoolean("rearVideoMessages", false));
-            }
+            // DevGram (как exteraGram): сторону камеры кружка берём из rearVideoMessages для ВСЕХ
+            // типов камеры (Camera 1/2/X), а не только Camera 1. Это чинит режимы «Задняя»/«Спросить»
+            // на Camera 2/X (devgramOpenRoundCamera пишет rearVideoMessages до старта записи).
+            android.content.SharedPreferences preferences = org.telegram.messenger.MessagesController.getGlobalMainSettings();
+            isFrontface = !(preferences.getBoolean("rearVideoMessages", false));
             updateFlash();
             recordedTime = 0;
             progress = 0;
@@ -807,7 +844,13 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
             FileLog.d("InstantCamera show round camera " + cameraFile.getAbsolutePath());
         }
 
-        if (useCamera2) {
+        if (useCameraX) {
+            bothCameras = false;
+            int rvs = MessagesController.getInstance(UserConfig.selectedAccount).roundVideoSize;
+            cameraXSessionCurrent = new org.telegram.messenger.camera.DevGramCameraXSession(isFrontface, rvs, rvs);
+            cameraXSessionCurrent.setRecordingVideo(true);
+            previewSize[0] = new Size(cameraXSessionCurrent.getPreviewWidth(), cameraXSessionCurrent.getPreviewHeight());
+        } else if (useCamera2) {
             bothCameras = DualCameraView.roundDualAvailableStatic(getContext());
             if (bothCameras) {
                 for (int a = 0; a < 2; ++a) {
@@ -1167,8 +1210,25 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
             }
         }
         isFrontface = !isFrontface;
+        // DevGram: запоминать последнюю использованную камеру кружков (как exteraGram)
+        if (org.telegram.messenger.DevGramConfig.isRememberLastCamera()) {
+            MessagesController.getGlobalMainSettings().edit().putBoolean("rearVideoMessages", !isFrontface).apply();
+        }
         updateFlash();
-        if (useCamera2) {
+        if (useCameraX) {
+            if (cameraXSessionCurrent != null) {
+                cameraXSessionCurrent.destroy(false);
+                cameraXSessionCurrent = null;
+            }
+            int rvs = MessagesController.getInstance(UserConfig.selectedAccount).roundVideoSize;
+            cameraXSessionCurrent = new org.telegram.messenger.camera.DevGramCameraXSession(isFrontface, rvs, rvs);
+            cameraXSessionCurrent.setRecordingVideo(true);
+            previewSize[0] = new Size(cameraXSessionCurrent.getPreviewWidth(), cameraXSessionCurrent.getPreviewHeight());
+            cameraThread.setCurrentSession(cameraXSessionCurrent);
+            if (cameraXSurfaceTexture != null) {
+                cameraXSessionCurrent.open(cameraXSurfaceTexture);
+            }
+        } else if (useCamera2) {
             if (bothCameras) {
                 camera2SessionCurrent = camera2Sessions[isFrontface ? 0 : 1];
                 cameraThread.flipSurfaces();
@@ -1359,7 +1419,14 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
                 FileLog.d("InstantCamera create camera session " + index);
             }
 
-            if (useCamera2) {
+            if (useCameraX) {
+                if (index == 1) return;
+                cameraXSurfaceTexture = surfaceTexture;
+                if (cameraXSessionCurrent != null) {
+                    cameraThread.setCurrentSession(cameraXSessionCurrent);
+                    cameraXSessionCurrent.open(surfaceTexture);
+                }
+            } else if (useCamera2) {
                 if (bothCameras) {
                     if (camera2Sessions[index] != null) {
                         camera2Sessions[index].open(surfaceTexture);
@@ -1788,6 +1855,14 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
         }
 
         public void setCurrentSession(Camera2Session session) {
+            Handler handler = getHandler();
+            if (handler != null) {
+                sendMessage(handler.obtainMessage(DO_SETSESSION_MESSAGE, session), 0);
+            }
+        }
+
+        // DevGram: сессия CameraX — GL-поток хранит её как Object (использует только getWorldAngle, есть фолбэк 0)
+        public void setCurrentSession(org.telegram.messenger.camera.DevGramCameraXSession session) {
             Handler handler = getHandler();
             if (handler != null) {
                 sendMessage(handler.obtainMessage(DO_SETSESSION_MESSAGE, session), 0);
@@ -3807,7 +3882,12 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
                 return false;
             }
             pinchScale = (float) Math.hypot(ev.getX(index2) - ev.getX(index1), ev.getY(index2) - ev.getY(index1)) / pinchStartDistance;
-            if (useCamera2) {
+            if (useCameraX) {
+                if (cameraXSessionCurrent != null) {
+                    float zoom = Utilities.clamp(pinchScale, cameraXSessionCurrent.getMaxZoom(), cameraXSessionCurrent.getMinZoom());
+                    cameraXSessionCurrent.setZoom(zoom);
+                }
+            } else if (useCamera2) {
                 if (camera2SessionCurrent != null) {
                     float zoom = Utilities.clamp(pinchScale, camera2SessionCurrent.getMaxZoom(), camera2SessionCurrent.getMinZoom());
                     camera2SessionCurrent.setZoom(zoom);
@@ -3827,6 +3907,35 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
 
     public void finishZoom() {
         if (finishZoomTransition != null) {
+            return;
+        }
+        // DevGram: статичный зум — не сбрасывать зум после жеста (как exteraGram getStaticZoom)
+        if (org.telegram.messenger.DevGramConfig.isStaticZoom()) {
+            if (zoomControlView != null && zoomControlView.getVisibility() == VISIBLE) {
+                float sliderVal;
+                if (useCameraX && cameraXSessionCurrent != null) {
+                    float min = cameraXSessionCurrent.getMinZoom();
+                    float max = cameraXSessionCurrent.getMaxZoom();
+                    float z = Utilities.clamp(pinchScale, max, min);
+                    sliderVal = max > min ? (z - min) / (max - min) : 0f;
+                } else if (useCamera2 && camera2SessionCurrent != null) {
+                    float min = camera2SessionCurrent.getMinZoom();
+                    float max = camera2SessionCurrent.getMaxZoom();
+                    float z = Utilities.clamp(pinchScale, max, min);
+                    sliderVal = max > min ? (z - min) / (max - min) : 0f;
+                } else {
+                    sliderVal = Math.min(1f, Math.max(0, pinchScale - 1f));
+                }
+                zoomControlView.setZoom(sliderVal, false);
+            }
+            return;
+        }
+
+        // DevGram: CameraX — сброс зума к минимуму (без общей анимации Camera1/2)
+        if (useCameraX) {
+            if (cameraXSessionCurrent != null) {
+                cameraXSessionCurrent.setZoom(cameraXSessionCurrent.getMinZoom());
+            }
             return;
         }
 

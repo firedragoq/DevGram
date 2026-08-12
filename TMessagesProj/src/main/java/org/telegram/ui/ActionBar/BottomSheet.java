@@ -2256,6 +2256,9 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
 
         public BottomSheet show() {
             bottomSheet.show();
+            org.telegram.messenger.DevGramGeneralConfig.applyHapticFeedbackSetting(bottomSheet.containerView);
+            org.telegram.messenger.DevGramGeneralConfig.applyHapticFeedbackSetting(bottomSheet.customView);
+            org.telegram.messenger.DevGramGeneralConfig.applyHapticFeedbackSetting(bottomSheet.container);
             return bottomSheet;
         }
 

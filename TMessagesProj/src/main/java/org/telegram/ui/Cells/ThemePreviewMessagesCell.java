@@ -48,6 +48,13 @@ public class ThemePreviewMessagesCell extends LinearLayout {
     public final static int TYPE_REACTIONS_DOUBLE_TAP = 2;
     public final static int TYPE_PEER_COLOR = 3;
     public final static int TYPE_GROUP_PEER_COLOR = 4;
+    public final static int TYPE_STICKER_SIZE = 5; // DevGram: превью размера стикеров
+    public final static int TYPE_DEVGRAM_MESSAGES = 6; // DevGram: превью «Сообщения» (правленое + кнопка «Поделиться»)
+
+    // DevGram: ссылки для пересборки превью стикера при изменении слайдера размера
+    private final MessageObject[] stickerMessages = new MessageObject[2];
+    // DevGram: сообщения, реально отданные ячейкам — для форс-пере-лейаута (напр. «Убрать хвост»)
+    private final MessageObject[] appliedMessages = new MessageObject[2];
 
     private final Runnable invalidateRunnable = this::invalidate;
 
@@ -181,6 +188,104 @@ public class ThemePreviewMessagesCell extends LinearLayout {
             message1.customAvatarDrawable = ContextCompat.getDrawable(context, R.drawable.dino_pic);
             message1.overrideLinkColor = 5;
             message1.overrideLinkEmoji = 0;
+        } else if (type == TYPE_DEVGRAM_MESSAGES) {
+            // DevGram: одно правленое входящее сообщение с кнопкой «Поделиться» —
+            // демонстрирует тумблеры «Заменить изменено значком» и «Скрыть Поделиться».
+            TLRPC.Message m = new TLRPC.TL_message();
+            m.message = "Отредактированное сообщение с кнопкой «Поделиться».";
+            m.date = date + 60;
+            m.edit_date = date + 120;
+            m.dialog_id = 1;
+            m.flags = 259 | TLRPC.MESSAGE_FLAG_EDITED;
+            m.from_id = new TLRPC.TL_peerUser();
+            m.from_id.user_id = UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
+            m.id = 1;
+            m.media = new TLRPC.TL_messageMediaEmpty();
+            m.out = false;
+            m.peer_id = new TLRPC.TL_peerUser();
+            m.peer_id.user_id = 0;
+            message2 = new MessageObject(UserConfig.selectedAccount, m, true, false);
+            message2.forceAvatar = true;
+            message2.resetLayout();
+            message2.eventId = 1;
+        } else if (type == TYPE_STICKER_SIZE) {
+            // DevGram: превью размера стикеров как у exteraGram — реальные ChatMessageCell поверх обоев.
+            // Верх (message2 -> cells[0]) — исходящий стикер с котом, ответ на «FireDragoq: вау».
+            // Низ (message1 -> cells[1]) — входящий текст «ого, какой милый!», ответ на стикер («manera»).
+
+            // сообщение, на которое отвечает стикер («FireDragoq: вау»)
+            TLRPC.Message replyMsg = new TLRPC.TL_message();
+            replyMsg.message = "вау";
+            replyMsg.date = date + 60;
+            replyMsg.dialog_id = 1;
+            replyMsg.flags = 259;
+            replyMsg.id = 2;
+            replyMsg.media = new TLRPC.TL_messageMediaEmpty();
+            replyMsg.out = false;
+            replyMsg.from_id = new TLRPC.TL_peerUser();
+            replyMsg.from_id.user_id = 1;
+            replyMsg.peer_id = new TLRPC.TL_peerUser();
+            replyMsg.peer_id.user_id = UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
+            MessageObject replyObject = new MessageObject(UserConfig.selectedAccount, replyMsg, true, false);
+            replyObject.customReplyName = "FireDragoq";
+
+            // исходящий стикер (демо-картинка, масштабируется слайдером размера стикеров)
+            TLRPC.Message stickerMsg = new TLRPC.TL_message();
+            stickerMsg.date = date + 120;
+            stickerMsg.dialog_id = 1;
+            stickerMsg.flags = 259;
+            stickerMsg.id = 3;
+            stickerMsg.from_id = new TLRPC.TL_peerUser();
+            stickerMsg.from_id.user_id = UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
+            stickerMsg.out = true;
+            stickerMsg.peer_id = new TLRPC.TL_peerUser();
+            stickerMsg.peer_id.user_id = 0;
+            TLRPC.TL_messageMediaDocument stickerMedia = new TLRPC.TL_messageMediaDocument();
+            stickerMedia.flags = 1;
+            stickerMedia.document = new TLRPC.TL_document();
+            stickerMedia.document.mime_type = "image/webp";
+            stickerMedia.document.file_reference = new byte[0];
+            stickerMedia.document.access_hash = 0;
+            stickerMedia.document.date = date;
+            TLRPC.TL_documentAttributeSticker attrSticker = new TLRPC.TL_documentAttributeSticker();
+            attrSticker.alt = "🐈‍⬛"; // 🐈‍⬛
+            stickerMedia.document.attributes.add(attrSticker);
+            TLRPC.TL_documentAttributeImageSize attrSize = new TLRPC.TL_documentAttributeImageSize();
+            attrSize.w = 512;
+            attrSize.h = 512;
+            stickerMedia.document.attributes.add(attrSize);
+            stickerMsg.media = stickerMedia;
+            message2 = new MessageObject(UserConfig.selectedAccount, stickerMsg, true, false);
+            message2.useCustomPhoto = true;
+            message2.customReplyName = "FireDragoq";
+            message2.replyMessageObject = replyObject;
+            message2.resetLayout();
+            message2.eventId = 1;
+
+            // входящий текст, отвечающий на стикер
+            TLRPC.Message textMsg = new TLRPC.TL_message();
+            textMsg.message = "ого, какой милый!";
+            textMsg.date = date + 240;
+            textMsg.dialog_id = 1;
+            textMsg.flags = 257 + 8;
+            textMsg.id = 4;
+            textMsg.from_id = new TLRPC.TL_peerUser();
+            textMsg.from_id.user_id = 1;
+            textMsg.reply_to = new TLRPC.TL_messageReplyHeader();
+            textMsg.reply_to.flags |= 16;
+            textMsg.reply_to.reply_to_msg_id = 3;
+            textMsg.media = new TLRPC.TL_messageMediaEmpty();
+            textMsg.out = false;
+            textMsg.peer_id = new TLRPC.TL_peerUser();
+            textMsg.peer_id.user_id = UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
+            message1 = new MessageObject(UserConfig.selectedAccount, textMsg, true, false);
+            message1.customReplyName = "manera";
+            message1.replyMessageObject = message2;
+            message1.resetLayout();
+            message1.eventId = 1;
+
+            stickerMessages[0] = message2;
+            stickerMessages[1] = message1;
         } else {
             TLRPC.Message message = new TLRPC.TL_message();
             if (type == 0) {
@@ -382,6 +487,16 @@ public class ThemePreviewMessagesCell extends LinearLayout {
                     }
                     super.dispatchDraw(canvas);
                 }
+
+                // DevGram: в превью «Сообщения» форсим кнопку «Поделиться» у входящего сообщения
+                // (тумблер «Скрыть Поделиться» учитывается через DevGramConfig.hideShareButton).
+                @Override
+                protected boolean checkNeedDrawShareButton(MessageObject messageObject) {
+                    if (type == TYPE_DEVGRAM_MESSAGES && messageObject != null && !messageObject.isOutOwner()) {
+                        return !org.telegram.messenger.DevGramConfig.hideShareButton;
+                    }
+                    return super.checkNeedDrawShareButton(messageObject);
+                }
             };
             cells[a].setDelegate(new ChatMessageCell.ChatMessageCellDelegate() {
 
@@ -432,6 +547,7 @@ public class ThemePreviewMessagesCell extends LinearLayout {
             if (messageObject == null) {
                 continue;
             }
+            appliedMessages[a] = messageObject; // DevGram: для пере-лейаута превью (напр. смена «Убрать хвост»)
             cells[a].setMessageObject(messageObject, null, false, false, false);
             addView(cells[a], LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         }
@@ -439,6 +555,39 @@ public class ThemePreviewMessagesCell extends LinearLayout {
 
     public ChatMessageCell[] getCells() {
         return cells;
+    }
+
+    // DevGram: форс-пере-лейаут пузырей (напр. после смены «Убрать хвост» — MessageDrawable кэширует путь,
+    // одного invalidate() мало, нужно пере-setMessageObject, чтобы регенерился path).
+    public void reloadMessages() {
+        for (int a = 0; a < cells.length; a++) {
+            if (cells[a] != null && appliedMessages[a] != null) {
+                appliedMessages[a].resetLayout();
+                // Тот же MessageObject обычно не пересобирается ChatMessageCell.
+                // Форма стикера — внешняя настройка, поэтому явно форсим полный
+                // setMessageContent и повторный расчёт радиусов изображения.
+                appliedMessages[a].forceUpdate = true;
+                cells[a].setMessageObject(appliedMessages[a], null, false, false, false);
+                cells[a].requestLayout();
+                cells[a].invalidate();
+            }
+        }
+        requestLayout();
+        invalidate();
+    }
+
+    // DevGram: пересобрать превью стикера, чтобы он перечитал размер ("stickerSize") и перестроил лейаут
+    public void reloadStickerSize() {
+        for (int a = 0; a < cells.length; a++) {
+            if (cells[a] != null && stickerMessages[a] != null) {
+                stickerMessages[a].resetLayout();
+                stickerMessages[a].forceUpdate = true;
+                cells[a].setMessageObject(stickerMessages[a], null, false, false, false);
+                cells[a].requestLayout();
+            }
+        }
+        requestLayout();
+        invalidate();
     }
 
     @Override

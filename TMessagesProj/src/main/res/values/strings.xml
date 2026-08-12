@@ -2908,15 +2908,19 @@
     <string name="DistanceUnitsAutomatic">Automatic</string>
     <string name="DistanceUnitsKilometers">Kilometers</string>
     <string name="DistanceUnitsMiles">Miles</string>
+    <string name="UnifiedPush">UnifiedPush</string>
     <string name="UnifiedPushDistributor">UnifiedPush Distributors</string>
     <string name="UnifiedPushGateway">UnifiedPush PUT to POST gateway</string>
-    <string name="UnifiedPushGatewayInfo">Since DevGram Simple push uses PUT, but UnifiedPush only supports POST, a "PUT to POST" gateway is needed.\n\nPlease insert your gateway (or just keep the default value to use my proxy):</string>
+    <string name="UnifiedPushGatewayInfo">By default the push endpoint is registered with Telegram directly and no gateway is involved.\n\nIf your setup still needs a "PUT to POST" gateway, insert it here or leave the field empty for direct delivery:</string>
+    <string name="UnifiedPushGatewayNone">Not used (direct delivery)</string>
     <string name="DisableUnifiedPush">Disable UnifiedPush</string>
-    <string name="DisableUnifiedPushInfo">Restart required</string>
+    <string name="DisableUnifiedPushInfo">Notifications will rely on the app\'s own background connection</string>
     <string name="WebSocketTransport">Connect over WebSocket</string>
     <string name="WebSocketTransportInfo">Tunnel DevGram traffic through an encrypted WebSocket (WSS) connection. May help when the regular connection is throttled or blocked. Leave the domain empty to use auto-updated public relays, or enter your own domain for reliability. Turn off if the connection stops working.</string>
     <string name="WebSocketDomain">WebSocket domain</string>
     <string name="WebSocketDomainAuto">Automatic</string>
+    <string name="SatelliteDataSaving">Save data on satellite networks</string>
+    <string name="SatelliteDataSavingInfo">Pause automatic media and story downloads while connected to a satellite or bandwidth-constrained network. Manual downloads still work. Requires Android 15 or newer.</string>
     <string name="AuthAnotherClient">Scan QR Code</string>
     <string name="AuthAnotherClientScan">Scan QR Code</string>
     <string name="AuthAnotherClientNotFound">No auth token found</string>
@@ -11387,4 +11391,5 @@
     <string name="FolderTabsStyleIconText">Icons and labels</string>
     <string name="FolderTabsStyleIcon">Icons</string>
     <string name="FolderTabsStyleInfo">Choose how folders appear in the tab bar. Assign an icon to each folder in its settings.</string>
+    <string name="ShareDeleteOriginals">Delete original messages</string>
 </resources>

@@ -1259,6 +1259,10 @@ public class ChatActivity extends BaseFragment implements
 
     public final static int OPTION_DEVGRAM_HISTORY = 990; // DevGram: история изменений сообщения
     public final static int OPTION_DEVGRAM_COPY_PHOTO = 991; // DevGram: копировать фото в буфер (как exteraGram)
+    public final static int OPTION_DEVGRAM_REPEAT = 992; // DevGram: повторить (отправить заново, как exteraGram)
+    public final static int OPTION_DEVGRAM_CLEAR = 993; // DevGram: очистить из кэша
+    public final static int OPTION_DEVGRAM_DETAILS = 994; // DevGram: детали сообщения
+    public final static int OPTION_DEVGRAM_GENERATE = 995; // DevGram: сгенерировать ответ через настроенный ИИ
     public final static int OPTION_DEVGRAM_PLUGIN_BASE = 100000; // DevGram: пункты меню от плагинов (base + index)
     private final ArrayList<String[]> devgramPluginMenu = new ArrayList<>(); // pluginId+label по индексу пункта
 
@@ -1299,6 +1303,42 @@ public class ChatActivity extends BaseFragment implements
     }
 
     // DevGram (как exteraGram): скопировать фото сообщения в буфер обмена как изображение.
+    // DevGram: диалог «Детали сообщения» (id, дата, DC, размер, пересылка) — как exteraGram.
+    private void devgramShowMessageDetails(MessageObject obj) {
+        if (obj == null || obj.messageOwner == null || getParentActivity() == null) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("ID: ").append(obj.getId());
+        try {
+            java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance();
+            sb.append("\nДата: ").append(df.format(new java.util.Date((long) obj.messageOwner.date * 1000L)));
+            if (obj.messageOwner.edit_date != 0) {
+                sb.append("\nИзменено: ").append(df.format(new java.util.Date((long) obj.messageOwner.edit_date * 1000L)));
+            }
+        } catch (Throwable ignore) {
+        }
+        TLRPC.Document doc = obj.getDocument();
+        if (doc != null) {
+            if (doc.dc_id != 0) sb.append("\nДата-центр: DC").append(doc.dc_id);
+            if (doc.size != 0) sb.append("\nРазмер: ").append(AndroidUtilities.formatFileSize(doc.size));
+            if (!TextUtils.isEmpty(doc.mime_type)) sb.append("\nТип: ").append(doc.mime_type);
+        } else {
+            TLRPC.Photo photo = obj.getPhoto();
+            if (photo != null && photo.dc_id != 0) sb.append("\nДата-центр: DC").append(photo.dc_id);
+        }
+        if (obj.isForwarded()) {
+            sb.append("\nПереслано");
+        }
+        final String text = sb.toString();
+        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
+        b.setTitle("Детали сообщения");
+        b.setMessage(text);
+        b.setPositiveButton("Копировать", (d, w) -> AndroidUtilities.addToClipboard(text));
+        b.setNegativeButton(LocaleController.getString(R.string.Close), null);
+        showDialog(b.create());
+    }
+
     private void devgramCopyPhoto(MessageObject obj) {
         if (obj == null || getParentActivity() == null) {
             return;
@@ -2152,7 +2192,7 @@ public class ChatActivity extends BaseFragment implements
 
         @Override
         public void onDoubleTap(View view, int position, float x, float y) {
-            if (getParentActivity() == null || isSecretChat() || isInScheduleMode() || isInPreviewMode() || chatMode == MODE_QUICK_REPLIES) {
+            if (getParentActivity() == null || isSecretChat() || isInPreviewMode() || chatMode == MODE_QUICK_REPLIES) {
                 return;
             }
             MessageObject messageObject;
@@ -2164,6 +2204,33 @@ public class ChatActivity extends BaseFragment implements
                     return;
                 }
             } else {
+                return;
+            }
+            // DevGram: раздельные действия двойного нажатия для входящих/исходящих (как exteraGram).
+            boolean dgOut = messageObject.isOutOwner();
+            int dgAction = org.telegram.messenger.DevGramDoubleTapUtils.resolveAction(dgOut);
+            if (dgAction == org.telegram.messenger.DevGramDoubleTapUtils.ACTION_NONE) {
+                return;
+            }
+            if (dgAction != org.telegram.messenger.DevGramDoubleTapUtils.ACTION_REACTIONS) {
+                if (messageObject.isSecretMedia() || messageObject.isExpiredStory() || messageObject.type == MessageObject.TYPE_JOINED_CHANNEL) {
+                    return;
+                }
+                selectedObject = messageObject;
+                selectedObjectGroup = getValidGroupedMessage(selectedObject);
+                switch (dgAction) {
+                    case org.telegram.messenger.DevGramDoubleTapUtils.ACTION_REPLY: processSelectedOption(OPTION_REPLY); break;
+                    case org.telegram.messenger.DevGramDoubleTapUtils.ACTION_COPY: processSelectedOption(OPTION_COPY); break;
+                    case org.telegram.messenger.DevGramDoubleTapUtils.ACTION_FORWARD: processSelectedOption(OPTION_FORWARD); break;
+                    case org.telegram.messenger.DevGramDoubleTapUtils.ACTION_EDIT: processSelectedOption(OPTION_EDIT); break;
+                    case org.telegram.messenger.DevGramDoubleTapUtils.ACTION_SAVE: processSelectedOption(OPTION_SAVE_TO_GALLERY); break;
+                    case org.telegram.messenger.DevGramDoubleTapUtils.ACTION_DELETE: processSelectedOption(OPTION_DELETE); break;
+                    case org.telegram.messenger.DevGramDoubleTapUtils.ACTION_TRANSLATE: processSelectedOption(OPTION_TRANSLATE); break;
+                }
+                return;
+            }
+            // ACTION_REACTIONS — прежнее поведение (реакция по двойному тапу).
+            if (isInScheduleMode()) {
                 return;
             }
             if (messageObject.isSecret() || !messageObject.canSetReaction() || messageObject.isExpiredStory() || messageObject.type == MessageObject.TYPE_JOINED_CHANNEL) {
@@ -3368,6 +3435,10 @@ public class ChatActivity extends BaseFragment implements
 
 
         themeDelegate = parentThemeDelegate != null ? parentThemeDelegate : new ThemeDelegate();
+        String devgramLocalTheme = getDevgramChatTheme();
+        if (parentThemeDelegate == null && !TextUtils.isEmpty(devgramLocalTheme)) {
+            themeDelegate.devgramApplyLocalTheme(devgramLocalTheme);
+        }
         if (themeDelegate.isThemeChangeAvailable(false)) {
             globalObserversGroup.add(NotificationCenter.needSetDayNightTheme);
         }
@@ -4353,7 +4424,7 @@ public class ChatActivity extends BaseFragment implements
                 } else if (id == devgram_deleted_history) {
                     presentFragment(new DevGramDeletedHistoryActivity(dialog_id, getTopicId()));
                 } else if (id == devgram_chat_theme) {
-                    showChatThemeBottomSheet();
+                    showDevgramChatThemePicker();
                 } else if (id == deleteAllYourMessages) {
                     org.telegram.messenger.forkgram.ForkDialogs.CreateDeleteAllYourMessagesAlert(
                         currentAccount,
@@ -6684,6 +6755,23 @@ public class ChatActivity extends BaseFragment implements
                             canvas.translate(dp(24) * getSideMenuAlpha(), 0f);
                         }
                         imageReceiver.draw(canvas);
+                        if (MessagesController.getGlobalMainSettings().getBoolean("dg_showOnlineStatus", false)) {
+                            long fromId = message != null ? message.getFromChatId() : 0;
+                            if (fromId > 0) {
+                                TLRPC.User user = getMessagesController().getUser(fromId);
+                                boolean online = user != null && !user.bot && !user.self
+                                        && (user.status != null && user.status.expires > getConnectionsManager().getCurrentTime()
+                                        || getMessagesController().onlinePrivacy.containsKey(user.id));
+                                if (online) {
+                                    float cx = imageReceiver.getImageX2() - dp(4);
+                                    float cy = imageReceiver.getImageY2() - dp(4);
+                                    Theme.dialogs_onlineCirclePaint.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                                    canvas.drawCircle(cx, cy, dp(6.5f), Theme.dialogs_onlineCirclePaint);
+                                    Theme.dialogs_onlineCirclePaint.setColor(getThemedColor(Theme.key_chats_onlineCircle));
+                                    canvas.drawCircle(cx, cy, dp(4.5f), Theme.dialogs_onlineCirclePaint);
+                                }
+                            }
+                        }
                         canvas.restore();
 
                         if (!replaceAnimation && child.getTranslationY() != 0) {
@@ -6978,7 +7066,9 @@ public class ChatActivity extends BaseFragment implements
                     scrolled = super.scrollVerticallyBy(dy, recycler, state);
                 }
                 final boolean allowPullingDownScroll = !isInPollAddOptionMode() && !hasSelectedMessages();
-                if (allowPullingDownScroll && dy > 0 && scrolled == 0 && (ChatObject.isChannel(currentChat) && !currentChat.megagroup || isTopic && !UserObject.isBotForum(currentUser)) && chatMode != MODE_SAVED && chatMode != MODE_SCHEDULED && chatListView.getScrollState() == RecyclerView.SCROLL_STATE_DRAGGING && !chatListView.isFastScrollAnimationRunning() && !chatListView.isMultiselect() && !isReport() && !MessagesController.getGlobalMainSettings().getBoolean("disableSlideToNextChannel", false)) {
+                if (allowPullingDownScroll && dy > 0 && scrolled == 0 && (ChatObject.isChannel(currentChat) && !currentChat.megagroup || isTopic && !UserObject.isBotForum(currentUser)) && chatMode != MODE_SAVED && chatMode != MODE_SCHEDULED && chatListView.getScrollState() == RecyclerView.SCROLL_STATE_DRAGGING && !chatListView.isFastScrollAnimationRunning() && !chatListView.isMultiselect() && !isReport()
+                        && MessagesController.getGlobalMainSettings().getBoolean("dg_quickTransitions", true)
+                        && MessagesController.getGlobalMainSettings().getBoolean(isTopic ? "dg_quickTransitionsTopics" : "dg_quickTransitionsChannels", true)) {
                     if (pullingDownOffset == 0 && pullingDownDrawable != null) {
                         if (nextChannels != null && !nextChannels.isEmpty()) {
                             pullingDownDrawable.updateDialog(nextChannels.get(0));
@@ -7120,10 +7210,15 @@ public class ChatActivity extends BaseFragment implements
                         scrollingFloatingTopic = true;
                         checkTextureViewPosition = true;
                         scrollingChatListView = true;
-                        // DevGram (как exteraGram): скрывать клавиатуру при прокрутке списка сообщений
-                        if (org.telegram.messenger.DevGramConfig.hideKeyboardOnScroll && isKeyboardVisible()
-                                && getParentActivity() != null && getParentActivity().getCurrentFocus() != null) {
-                            AndroidUtilities.hideKeyboard(getParentActivity().getCurrentFocus());
+                        // DevGram (как exteraGram): при прокрутке скрывать клавиатуру ИЛИ панель эмодзи/стикеров.
+                        // Раньше закрывалась только системная клавиатура, а popup-панель оставалась «поверх» —
+                        // из-за этого чат не сдвигался. Теперь скрываем и её (hidePopup), как у exteraGram.
+                        if (org.telegram.messenger.DevGramConfig.hideKeyboardOnScroll) {
+                            if (isKeyboardVisible() && getParentActivity() != null && getParentActivity().getCurrentFocus() != null) {
+                                AndroidUtilities.hideKeyboard(getParentActivity().getCurrentFocus());
+                            } else if (chatActivityEnterView != null && chatActivityEnterView.isPopupShowing()) {
+                                chatActivityEnterView.hidePopup(true);
+                            }
                         }
                     }
                     if (SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
@@ -12402,10 +12497,25 @@ public class ChatActivity extends BaseFragment implements
         checkUi_chatListViewPaddings();
     }
 
+    private int devgramLastListInsetForPin = -1;
     private void checkUi_chatListViewPaddings() {
         if (chatListView == null) {
             return;
         }
+
+        // DevGram (как exteraGram): держать новейшее сообщение над клавиатурой.
+        // Список reverseLayout меряется во всю высоту; клавиатура резервируется нижним
+        // паддингом. На самом низу RecyclerView сам НЕ переякоривает позицию 0 вверх
+        // (scrollBy зажат — ниже ничего нет), поэтому новейшее сообщение уезжает под клаву.
+        // Ловим изменение анимируемого нижнего inset и, если список был внизу,
+        // явно перепривязываем позицию 0 к низу — чат плавно поднимается за клавиатурой.
+        final int animBottomInset = (int) windowInsetsStateHolder.getAnimatedMaxBottomInset();
+        final boolean insetChanged = devgramLastListInsetForPin != animBottomInset;
+        final boolean keepPinnedToBottom = insetChanged
+            && !isInsideContainer
+            && chatListView.getChildCount() > 0
+            && !chatListView.canScrollVertically(1);
+        devgramLastListInsetForPin = animBottomInset;
 
         final float paddingBottom;
         if (isInsideContainer && parentChatActivity == null) {
@@ -12422,6 +12532,12 @@ public class ChatActivity extends BaseFragment implements
             topicsTabs.setSideMenuBackgroundMarginTop(0);//Math.max(0, paddingTop - blurredViewTopOffset - dp(5)));
         }
         chatListViewPaddingsAnimator.setPaddings(paddingTop, paddingBottom, !chatListView.fastScrollAnimationRunning);
+        if (keepPinnedToBottom && chatAdapter != null && !messages.isEmpty() && chatLayoutManager != null) {
+            try {
+                chatLayoutManager.scrollToPositionWithOffset(0, 0);
+            } catch (Throwable ignore) {
+            }
+        }
         if (messageMetricsView != null) {
             messageMetricsView.setViewportPadding(
                 getTopicTabsSideSize(TopicsTabsView.Position.LEFT),
@@ -34133,6 +34249,108 @@ public class ChatActivity extends BaseFragment implements
                 devgramCopyPhoto(obj);
                 break;
             }
+            case OPTION_DEVGRAM_REPEAT: {
+                // DevGram: повторить — отправить содержимое заново (новое сообщение, оригинал не трогаем)
+                final MessageObject obj = selectedObject;
+                final long did = getDialogId();
+                closeMenu();
+                try {
+                    if (obj != null && obj.getDocument() instanceof TLRPC.TL_document) {
+                        java.io.File file = FileLoader.getInstance(currentAccount).getPathToMessage(obj.messageOwner);
+                        String path = (file != null && file.exists()) ? file.getAbsolutePath() : obj.messageOwner.attachPath;
+                        String caption = obj.caption != null ? obj.caption.toString() : null;
+                        getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of(
+                                (TLRPC.TL_document) obj.getDocument(), null, path, did, null, null, caption,
+                                null, null, null, true, 0, 0, 0, null, null, false));
+                    } else if (obj != null && obj.messageOwner != null && !TextUtils.isEmpty(obj.messageOwner.message)) {
+                        getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of(obj.messageOwner.message.toString(), did));
+                    }
+                } catch (Throwable e) {
+                    FileLog.e(e);
+                }
+                break;
+            }
+            case OPTION_DEVGRAM_CLEAR: {
+                // DevGram: очистить из кэша — удалить скачанный файл (можно перекачать заново)
+                final MessageObject obj = selectedObject;
+                closeMenu();
+                boolean ok = false;
+                try {
+                    if (obj != null && obj.messageOwner != null) {
+                        java.io.File file = FileLoader.getInstance(currentAccount).getPathToMessage(obj.messageOwner);
+                        if (file != null && file.exists()) {
+                            ok = file.delete();
+                        }
+                        obj.mediaExists = false;
+                    }
+                } catch (Throwable e) {
+                    FileLog.e(e);
+                }
+                try {
+                    if (getParentActivity() != null) {
+                        android.widget.Toast.makeText(getParentActivity(), ok ? "Очищено из кэша" : "Файл не найден", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Throwable ignore) {
+                }
+                break;
+            }
+            case OPTION_DEVGRAM_DETAILS: {
+                // DevGram: детали сообщения — id, дата, DC, размер, пересылка
+                final MessageObject obj = selectedObject;
+                closeMenu();
+                devgramShowMessageDetails(obj);
+                break;
+            }
+            case OPTION_DEVGRAM_GENERATE: {
+                final MessageObject obj = selectedObject;
+                closeMenu();
+                if (!org.telegram.messenger.DevGramAiClient.isConfigured()) {
+                    if (getParentActivity() != null) {
+                        android.widget.Toast.makeText(getParentActivity(), "Укажите API-ключ ИИ в настройках DevGram", android.widget.Toast.LENGTH_LONG).show();
+                    }
+                    break;
+                }
+                String source = obj != null && obj.messageOwner != null ? obj.messageOwner.message : null;
+                if (TextUtils.isEmpty(source) && obj != null && obj.caption != null) {
+                    source = obj.caption.toString();
+                }
+                if (TextUtils.isEmpty(source)) {
+                    if (getParentActivity() != null) {
+                        android.widget.Toast.makeText(getParentActivity(), "В сообщении нет текста", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                    break;
+                }
+                if (getParentActivity() == null) {
+                    break;
+                }
+                new org.telegram.ui.Components.DevGramGenerateFromMessageBottomSheet(
+                        source, this, getParentActivity(), generationData -> {
+                    if (getParentActivity() != null) {
+                        android.widget.Toast.makeText(getParentActivity(), "Генерирую ответ…", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                    org.telegram.messenger.DevGramAiClient.generate(
+                            generationData.prompt, generationData.useHistory, (result, error) -> {
+                        if (error != null || TextUtils.isEmpty(result)) {
+                            if (getParentActivity() != null) {
+                                android.widget.Toast.makeText(getParentActivity(), error != null ? error.getMessage() : "Не удалось получить ответ", android.widget.Toast.LENGTH_LONG).show();
+                            }
+                            return;
+                        }
+                        if (chatActivityEnterView != null) {
+                            // «Вставлять ответ как цитату» (настройка AI Chat) — оборачиваем ответ в блок-цитату.
+                            if (MessagesController.getGlobalMainSettings().getBoolean("dg_aiInsertAsQuote", true)) {
+                                android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(result.trim());
+                                org.telegram.ui.Components.QuoteSpan.putQuoteToEditable(sb, 0, sb.length(), false);
+                                chatActivityEnterView.setFieldText(sb);
+                            } else {
+                                chatActivityEnterView.setFieldText(result.trim());
+                            }
+                            chatActivityEnterView.openKeyboard();
+                        }
+                    });
+                }).show();
+                break;
+            }
             case OPTION_RETRY: {
                 final MessageObject object = selectedObject;
                 final MessageObject.GroupedMessages group = selectedObjectGroup;
@@ -44105,6 +44323,13 @@ public class ChatActivity extends BaseFragment implements
         showDialog(sheet);
     }
 
+    private String getDevgramChatTheme() {
+        if (!MessagesController.getGlobalMainSettings().getBoolean("dg_customThemes", true)) {
+            return null;
+        }
+        return MessagesController.getGlobalMainSettings().getString("dg_chattheme_" + dialog_id, null);
+    }
+
     private void setChatThemeEmoticon(final TLRPC.ChatTheme theme) {
         if (themeDelegate == null || parentThemeDelegate != null) {
             return;
@@ -44112,6 +44337,15 @@ public class ChatActivity extends BaseFragment implements
         ThemeKey key = ThemeKey.of(theme);
         ChatThemeController chatThemeController = ChatThemeController.getInstance(currentAccount);
         chatThemeController.setDialogTheme(dialog_id, theme, false);
+
+        // A locally selected .attheme is intentionally stronger than Telegram's
+        // emoji chat theme. It is stored only for this dialog and must also be
+        // restored after reopening it.
+        String localTheme = getDevgramChatTheme();
+        if (!TextUtils.isEmpty(localTheme)) {
+            themeDelegate.devgramApplyLocalTheme(localTheme);
+            return;
+        }
 
         if (theme instanceof TLRPC.TL_chatThemeUniqueGift) {
             chatThemeController.putThemeIfNeeded(theme);
@@ -47131,6 +47365,64 @@ public class ChatActivity extends BaseFragment implements
             items.add("История изменений");
             options.add(OPTION_DEVGRAM_HISTORY);
             icons.add(R.drawable.msg_edit);
+        }
+
+        // DevGram: доп. пункты меню как у exteraGram — Повторить/Очистить/Детали (гейтятся мастер-группой «Меню сообщения»).
+        if (message != null && message.messageOwner != null) {
+            boolean canRepeat = message.getId() > 0 && !message.isSending() && !message.isSendError()
+                    && (message.getDocument() != null || (message.isMediaEmpty() && !TextUtils.isEmpty(message.messageOwner.message)));
+            if (canRepeat && !options.contains(OPTION_DEVGRAM_REPEAT)) {
+                items.add("Повторить");
+                options.add(OPTION_DEVGRAM_REPEAT);
+                icons.add(R.drawable.msg_retry);
+            }
+            if (message.mediaExists() && !options.contains(OPTION_DEVGRAM_CLEAR)) {
+                items.add("Очистить");
+                options.add(OPTION_DEVGRAM_CLEAR);
+                icons.add(R.drawable.msg_clearcache);
+            }
+            if (!options.contains(OPTION_DEVGRAM_DETAILS)) {
+                items.add("Детали");
+                options.add(OPTION_DEVGRAM_DETAILS);
+                icons.add(R.drawable.msg_info);
+            }
+            if (!TextUtils.isEmpty(message.messageOwner.message) && !options.contains(OPTION_DEVGRAM_GENERATE)) {
+                items.add("Сгенерировать ответ");
+                options.add(OPTION_DEVGRAM_GENERATE);
+                icons.add(R.drawable.msg_edit);
+            }
+        }
+        devgramFilterMessageMenu(icons, items, options);
+    }
+
+    // DevGram: мастер-группа «Меню сообщения» — прячем отключённые пункты контекстного меню (как exteraGram)
+    private void devgramFilterMessageMenu(ArrayList<Integer> icons, ArrayList<CharSequence> items, ArrayList<Integer> options) {
+        android.content.SharedPreferences p = MessagesController.getGlobalMainSettings();
+        for (int i = options.size() - 1; i >= 0; i--) {
+            int o = options.get(i);
+            boolean hide = false;
+            if (o == OPTION_DEVGRAM_COPY_PHOTO) {
+                hide = !p.getBoolean("dg_msgmenu_copyphoto", true);
+            } else if (o == OPTION_SAVE_TO_GALLERY || o == OPTION_SAVE_TO_GALLERY2 || o == OPTION_SAVE_TO_DOWNLOADS_OR_MUSIC) {
+                hide = !p.getBoolean("dg_msgmenu_save", true);
+            } else if (o == OPTION_DEVGRAM_HISTORY) {
+                hide = !p.getBoolean("dg_msgmenu_history", true);
+            } else if (o == OPTION_REPORT_CHAT || o == OPTION_REPORT_AD) {
+                hide = !p.getBoolean("dg_msgmenu_report", true);
+            } else if (o == OPTION_DEVGRAM_REPEAT) {
+                hide = !p.getBoolean("dg_msgmenu_repeat", true);
+            } else if (o == OPTION_DEVGRAM_CLEAR) {
+                hide = !p.getBoolean("dg_msgmenu_clear", true);
+            } else if (o == OPTION_DEVGRAM_DETAILS) {
+                hide = !p.getBoolean("dg_msgmenu_details", true);
+            } else if (o == OPTION_DEVGRAM_GENERATE) {
+                hide = !p.getBoolean("dg_msgmenu_generate", true);
+            }
+            if (hide) {
+                options.remove(i);
+                if (i < items.size()) items.remove(i);
+                if (i < icons.size()) icons.remove(i);
+            }
         }
     }
 

@@ -655,7 +655,7 @@ public class Emoji {
 
     public static CharSequence replaceEmoji(CharSequence cs, Paint.FontMetricsInt fontMetrics, boolean createNew, int[] emojiOnly, int alignment, float scale, int minusLimit) {
         if (SharedConfig.useSystemEmoji || cs == null || cs.length() == 0) {
-            return cs;
+            return DevGramZalgoFilter.filterSpannable(cs);
         }
         Spannable s;
         if (!createNew && cs instanceof Spannable) {
@@ -665,7 +665,7 @@ public class Emoji {
         }
         ArrayList<EmojiSpanRange> emojis = parseEmojis(s, emojiOnly);
         if (emojis.isEmpty()) {
-            return cs;
+            return DevGramZalgoFilter.filterSpannable(cs);
         }
 
         AnimatedEmojiSpan[] animatedEmojiSpans = s.getSpans(0, s.length(), AnimatedEmojiSpan.class);
@@ -716,7 +716,7 @@ public class Emoji {
                 break;
             }
         }
-        return s;
+        return DevGramZalgoFilter.filterSpannable(s);
     }
 
     public static CharSequence replaceWithRestrictedEmoji(CharSequence cs, TextView textView, Runnable update) {

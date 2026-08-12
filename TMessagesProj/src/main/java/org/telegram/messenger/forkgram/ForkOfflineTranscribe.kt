@@ -11,6 +11,7 @@ import java.util.function.Consumer
 object ForkOfflineTranscribe {
 
     const val KIND_AIDL = "aidl"
+    const val KIND_VOSK = "vosk" // DevGram: офлайн-распознавание на Vosk (встроенный движок)
 
     const val SUGGESTED_PACKAGE = "org.scrib.transcriber"
     const val SUGGESTED_FDROID_URL = "https://f-droid.org/packages/$SUGGESTED_PACKAGE/"
@@ -30,6 +31,18 @@ object ForkOfflineTranscribe {
 
     @Volatile
     private var cachedAt = 0L
+
+    @Volatile
+    private var voskTranscriber: OfflineTranscriber? = null
+
+    // DevGram: Vosk как встроенный провайдер — активен, когда в настройках выбран язык распознавания.
+    private fun voskProvider(): TranscriberProvider? {
+        return if (org.telegram.messenger.DevGramConfig.isVoskRecognitionEnabled()) {
+            TranscriberProvider(KIND_VOSK, "vosk", "Vosk · " + org.telegram.messenger.DevGramConfig.getRecognitionLanguage())
+        } else {
+            null
+        }
+    }
 
     @JvmStatic
     fun availableProviders(): List<TranscriberProvider> {
@@ -75,6 +88,7 @@ object ForkOfflineTranscribe {
 
     @JvmStatic
     fun selectedProvider(): TranscriberProvider? {
+        voskProvider()?.let { return it } // DevGram: Vosk приоритетнее внешних AIDL-провайдеров
         val id = selectedProviderId()
         if (id.isEmpty()) {
             return null
@@ -126,6 +140,9 @@ object ForkOfflineTranscribe {
     }
 
     private fun transcriberFor(provider: TranscriberProvider): OfflineTranscriber? {
+        if (provider.kind == KIND_VOSK) {
+            return voskTranscriber ?: VoskOfflineTranscriber().also { voskTranscriber = it }
+        }
         if (provider.kind != KIND_AIDL) {
             return null
         }

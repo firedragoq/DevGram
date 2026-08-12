@@ -13,6 +13,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
@@ -34,10 +35,10 @@ import java.util.ArrayList;
 
 public class DevGramBadgesActivity extends BaseFragment {
 
-    private static final int ID_ADD = 1;
     private static final int ID_LIST_BASE = 1000; // выданные значки: ID_LIST_BASE + индекс
 
     private UniversalRecyclerView listView;
+    private EditTextBoldCursor recipientInput;
     private ArrayList<Long> granted = new ArrayList<>(); // dialogId'ы
     private String query = ""; // фильтр поиска (по ID и юзернейму/имени)
 
@@ -60,21 +61,27 @@ public class DevGramBadgesActivity extends BaseFragment {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
 
+        root.addView(createGrantCard(context), LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, 12, 12, 6));
+
         // Поиск по выданным значкам (по ID и юзернейму/имени)
         android.widget.FrameLayout searchWrap = new android.widget.FrameLayout(context);
-        searchWrap.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(10),
+        searchWrap.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(21),
                 Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
         android.widget.ImageView searchIcon = new android.widget.ImageView(context);
         searchIcon.setImageResource(R.drawable.msg_search);
         searchIcon.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
         searchWrap.addView(searchIcon, LayoutHelper.createFrame(20, 20, Gravity.CENTER_VERTICAL | Gravity.LEFT, 14, 0, 0, 0));
-        android.widget.EditText search = new android.widget.EditText(context);
+        EditTextBoldCursor search = new EditTextBoldCursor(context);
         search.setHint("Поиск по ID или @юзернейму");
         search.setSingleLine(true);
         search.setBackground(null);
         search.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         search.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
         search.setHintTextColor(Theme.getColor(Theme.key_groupcreate_hintText, resourceProvider));
+        search.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
+        search.setCursorSize(AndroidUtilities.dp(20));
+        search.setCursorWidth(1.5f);
         search.setPadding(AndroidUtilities.dp(44), 0, AndroidUtilities.dp(14), 0);
         search.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
@@ -85,7 +92,7 @@ public class DevGramBadgesActivity extends BaseFragment {
             }
         });
         searchWrap.addView(search, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 42));
-        root.addView(searchWrap, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 42, 10, 10, 10, 6));
+        root.addView(searchWrap, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 42, 12, 4, 12, 6));
 
         listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, null);
         listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
@@ -93,6 +100,68 @@ public class DevGramBadgesActivity extends BaseFragment {
         actionBar.setAdaptiveBackground(listView);
 
         return fragmentView = root;
+    }
+
+    private View createGrantCard(Context context) {
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
+        card.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16),
+                Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
+
+        TextView title = new TextView(context);
+        title.setText("Выдать новый значок");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+        title.setTypeface(AndroidUtilities.bold());
+        title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
+        card.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        TextView subtitle = new TextView(context);
+        subtitle.setText("Введите ID пользователя или отрицательный ID чата");
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        subtitle.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
+        card.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 3, 0, 0));
+
+        LinearLayout inputRow = new LinearLayout(context);
+        inputRow.setGravity(Gravity.CENTER_VERTICAL);
+        recipientInput = makeInput(context, "Например, 7101191373 или -100…",
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        recipientInput.setSingleLine(true);
+        recipientInput.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_GO);
+        recipientInput.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO) {
+                openGrantFromInput();
+                return true;
+            }
+            return false;
+        });
+        inputRow.addView(recipientInput, LayoutHelper.createLinear(0, 48, 1f));
+
+        TextView next = new TextView(context);
+        next.setText("Далее");
+        next.setGravity(Gravity.CENTER);
+        next.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        next.setTypeface(AndroidUtilities.bold());
+        next.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider));
+        next.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(12),
+                Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider),
+                Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourceProvider)));
+        next.setOnClickListener(v -> openGrantFromInput());
+        inputRow.addView(next, LayoutHelper.createLinear(88, 44, 12, 0, 0, 0));
+        card.addView(inputRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 12, 0, 0));
+        return card;
+    }
+
+    private void openGrantFromInput() {
+        if (recipientInput == null) return;
+        long id = Utilities.parseLong(recipientInput.getText().toString());
+        if (id == 0) {
+            recipientInput.animate().translationX(AndroidUtilities.dp(5)).setDuration(70).withEndAction(() ->
+                    recipientInput.animate().translationX(0).setDuration(70).start()).start();
+            return;
+        }
+        AndroidUtilities.hideKeyboard(recipientInput);
+        presentFragment(new DevGramBadgeGrantActivity(id));
     }
 
     // Имя + @юзернейм по dialogId (для отображения и поиска). "" если не резолвится.
@@ -127,11 +196,16 @@ public class DevGramBadgesActivity extends BaseFragment {
         return t.length() > 34 ? t.substring(0, 34) + "…" : t;
     }
 
-    private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        items.add(UItem.asButton(ID_ADD, R.drawable.msg_contact_add, "Выдать значок по ID"));
-        items.add(UItem.asShadow("Введите ID, выберите значок (готовый или любой эмодзи/премиум-эмодзи) "
-                + "и подпись (готовую или свою). Значок появится сразу у всех, без пересборки."));
+    private static String emojiLabel(long emojiId) {
+        for (int i = 0; i < DevGramBadges.READY_EMOJI.length; i++) {
+            if (DevGramBadges.READY_EMOJI[i] == emojiId) {
+                return DevGramBadges.READY_EMOJI_LABELS[i];
+            }
+        }
+        return "Свой эмодзи";
+    }
 
+    private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         granted = DevGramBadges.listGranted();
         if (!granted.isEmpty()) {
             items.add(UItem.asHeader("Выдано вручную (" + granted.size() + ")"));
@@ -147,28 +221,43 @@ public class DevGramBadgesActivity extends BaseFragment {
                 }
                 DevGramBadges.Badge b = DevGramBadges.badgeOf(dialogId);
                 String title = name.isEmpty() ? ("ID " + shownId(dialogId)) : name;
-                String value = name.isEmpty() ? (b == null ? "" : shortText(b.text))
-                        : ("ID " + shownId(dialogId));
+                String value = b == null ? ("ID " + shownId(dialogId))
+                        : emojiLabel(b.emojiId) + "  ·  ID " + shownId(dialogId);
                 items.add(UItem.asButton(ID_LIST_BASE + i, title, value));
                 shown++;
             }
             if (shown == 0) {
                 items.add(UItem.asShadow("Ничего не найдено."));
             } else {
-                items.add(UItem.asShadow("Нажмите на строку, чтобы снять значок."));
+                items.add(UItem.asShadow("Нажмите на строку, чтобы изменить или снять значок."));
             }
+        } else if (query.isEmpty()) {
+            items.add(UItem.asShadow("Выданных значков пока нет."));
         }
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == ID_ADD) {
-            askId();
-        } else if (item.id >= ID_LIST_BASE) {
+        if (item.id >= ID_LIST_BASE) {
             int idx = item.id - ID_LIST_BASE;
             if (idx >= 0 && idx < granted.size()) {
-                showRevokeDialog(granted.get(idx));
+                showBadgeActions(granted.get(idx));
             }
         }
+    }
+
+    private void showBadgeActions(long dialogId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        String name = nameFor(dialogId);
+        builder.setTitle(name.isEmpty() ? "ID " + shownId(dialogId) : name);
+        builder.setItems(new CharSequence[]{"Изменить значок", "Снять значок"}, (dialog, which) -> {
+            if (which == 0) {
+                presentFragment(new DevGramBadgeGrantActivity(dialogId));
+            } else {
+                showRevokeDialog(dialogId);
+            }
+        });
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(builder.create());
     }
 
     // Ввод ID -> открываем ОТДЕЛЬНЫЙ экран выдачи (не диалог, иначе пикер эмодзи его закроет).

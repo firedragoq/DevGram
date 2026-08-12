@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="SatelliteDataSaving">Daten in Satellitennetzen sparen</string>
+    <string name="SatelliteDataSavingInfo">Pausiert das automatische Herunterladen von Medien und Stories, solange eine Satelliten- oder bandbreitenbeschränkte Verbindung besteht. Manuelle Downloads funktionieren weiterhin. Erfordert Android 15 oder neuer.</string>
+    <string name="ShareDeleteOriginals">Originalnachrichten löschen</string>
+    <string name="UnifiedPushDistributor">UnifiedPush-Distributoren</string>
+    <string name="UnifiedPushGateway">UnifiedPush-Gateway (PUT zu POST)</string>
+    <string name="UnifiedPushGatewayInfo">Standardmäßig wird die Push-Adresse direkt bei Telegram registriert, ganz ohne Gateway.\n\nFalls deine Einrichtung dennoch ein „PUT zu POST“-Gateway benötigt, trage es hier ein oder lasse das Feld für die direkte Zustellung leer:</string>
+    <string name="UnifiedPushGatewayNone">Nicht verwendet (direkte Zustellung)</string>
+    <string name="DisableUnifiedPush">UnifiedPush deaktivieren</string>
+    <string name="DisableUnifiedPushInfo">Benachrichtigungen kommen dann über die eigene Hintergrundverbindung der App</string>
     <!--FORK CLIENT-->
     <string name="ForkSectionAppearance">Erscheinungsbild</string>
     <string name="ForkSectionMedia">Fotos und Videos</string>

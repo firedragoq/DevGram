@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="SatelliteDataSaving">توفير البيانات في شبكات الأقمار الصناعية</string>
+    <string name="SatelliteDataSavingInfo">يوقف التنزيل التلقائي للوسائط والقصص مؤقتًا أثناء الاتصال بشبكة قمر صناعي أو شبكة محدودة النطاق الترددي. يظل التنزيل اليدوي متاحًا. يتطلب أندرويد 15 أو أحدث.</string>
+    <string name="ShareDeleteOriginals">حذف الرسائل الأصلية</string>
+    <string name="UnifiedPushDistributor">موزّعو UnifiedPush</string>
+    <string name="UnifiedPushGateway">بوابة UnifiedPush من PUT إلى POST</string>
+    <string name="UnifiedPushGatewayInfo">يُسجَّل عنوان الإشعارات افتراضيًا لدى تيليجرام مباشرةً دون أي بوابة.\n\nإذا كان إعدادك لا يزال يحتاج إلى بوابة «من PUT إلى POST»، فأدخلها هنا أو اترك الحقل فارغًا للتسليم المباشر:</string>
+    <string name="UnifiedPushGatewayNone">غير مستخدمة (تسليم مباشر)</string>
+    <string name="DisableUnifiedPush">تعطيل UnifiedPush</string>
+    <string name="DisableUnifiedPushInfo">ستصل الإشعارات عبر اتصال التطبيق الخلفي الخاص به</string>
     <!--FORK CLIENT-->
     <string name="ForkSectionAppearance">المظهر</string>
     <string name="ForkSectionMedia">الصور والفيديو</string>

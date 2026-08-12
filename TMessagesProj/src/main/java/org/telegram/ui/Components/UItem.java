@@ -265,6 +265,16 @@ public class UItem extends AdapterWithDiffUtils.Item {
         return i;
     }
 
+    // DevGram: кнопка с иконкой, заголовком и серым подзаголовком снизу (как asButtonWithSubtext у exteraGram).
+    public static UItem asButtonWithSubtext(int id, int iconResId, CharSequence text, CharSequence subtext) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TEXT, false);
+        i.id = id;
+        i.iconResId = iconResId;
+        i.text = text;
+        i.subtext = subtext;
+        return i;
+    }
+
     public static UItem asStickerButton(int id, CharSequence text, TLRPC.Document sticker) {
         UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TEXT, false);
         i.id = id;

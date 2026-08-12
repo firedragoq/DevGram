@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="SatelliteDataSaving">Risparmia dati sulle reti satellitari</string>
+    <string name="SatelliteDataSavingInfo">Sospende il download automatico di media e storie quando sei connesso a una rete satellitare o a banda limitata. I download manuali continuano a funzionare. Richiede Android 15 o successivo.</string>
+    <string name="ShareDeleteOriginals">Elimina i messaggi originali</string>
+    <string name="UnifiedPushDistributor">Distributori UnifiedPush</string>
+    <string name="UnifiedPushGateway">Gateway UnifiedPush da PUT a POST</string>
+    <string name="UnifiedPushGatewayInfo">Per impostazione predefinita l’indirizzo per le notifiche viene registrato direttamente su Telegram, senza gateway.\n\nSe la tua configurazione richiede comunque un gateway «da PUT a POST», inseriscilo qui oppure lascia il campo vuoto per la consegna diretta:</string>
+    <string name="UnifiedPushGatewayNone">Non usato (consegna diretta)</string>
+    <string name="DisableUnifiedPush">Disattiva UnifiedPush</string>
+    <string name="DisableUnifiedPushInfo">Le notifiche arriveranno tramite la connessione in background dell’app</string>
     <!--FORK CLIENT-->
     <string name="ForkSectionAppearance">Aspetto</string>
     <string name="ForkSectionMedia">Foto e video</string>

@@ -9865,6 +9865,14 @@ public class MessagesController extends BaseController implements NotificationCe
 
 
     public ArrayList<TLRPC.Dialog> getDialogs(int folderId) {
+        if (DevGramGeneralConfig.isHideArchiveFolder() && folderId == 0
+                && dialogs_dict.get(DialogObject.makeFolderDialogId(1)) != null) {
+            removeFolder(1);
+        } else if (!DevGramGeneralConfig.isHideArchiveFolder() && folderId == 0
+                && dialogs_dict.get(DialogObject.makeFolderDialogId(1)) == null
+                && (hasArchivedChats || getStoriesController().hasHiddenStories())) {
+            checkArchiveFolder();
+        }
         ArrayList<TLRPC.Dialog> dialogs = dialogsByFolder.get(folderId);
         if (dialogs == null) {
             return new ArrayList<>();
@@ -12327,6 +12335,13 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public void checkArchiveFolder() {
+        if (DevGramGeneralConfig.isHideArchiveFolder()) {
+            if (dialogs_dict.get(DialogObject.makeFolderDialogId(1)) != null) {
+                removeFolder(1);
+            }
+            getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, 0);
+            return;
+        }
         if (!hasArchivedChats && !getStoriesController().hasHiddenStories()) {
             removeFolder(1);
         } else {

@@ -2535,12 +2535,28 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
     }
 
     public void setRoundRadius(int[] value) {
-        final int corners = AndroidUtilities.avatarCornersType();
-        if (corners == AndroidUtilities.AVATAR_CORNERS_SQUARE) {
-            java.util.Arrays.fill(value, 0);
-        } else if (corners == AndroidUtilities.AVATAR_CORNERS_FORUM) {
-            for (int a = 0; a < value.length; a++) {
-                value[a] = Math.round(value[a] * 0.64f);
+        setRoundRadiusInternal(value, true);
+    }
+
+    // DevGram: не все ImageReceiver являются аватарами. Стикеры и медиа должны
+    // уметь применять собственную форму независимо от настройки углов аватаров.
+    public void setRoundRadiusDirect(int value) {
+        setRoundRadiusInternal(new int[]{value, value, value, value}, false);
+    }
+
+    public void setRoundRadiusDirect(int tl, int tr, int br, int bl) {
+        setRoundRadiusInternal(new int[]{tl, tr, br, bl}, false);
+    }
+
+    private void setRoundRadiusInternal(int[] value, boolean applyAvatarShape) {
+        if (applyAvatarShape) {
+            final int corners = AndroidUtilities.avatarCornersType();
+            if (corners == AndroidUtilities.AVATAR_CORNERS_SQUARE) {
+                java.util.Arrays.fill(value, 0);
+            } else if (corners == AndroidUtilities.AVATAR_CORNERS_FORUM) {
+                for (int a = 0; a < value.length; a++) {
+                    value[a] = Math.round(value[a] * 0.64f);
+                }
             }
         }
 

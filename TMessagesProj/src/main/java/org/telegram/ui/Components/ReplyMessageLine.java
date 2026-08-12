@@ -31,6 +31,13 @@ import org.telegram.ui.Cells.ChatMessageCell;
 import java.util.ArrayList;
 
 public class ReplyMessageLine {
+    private static boolean devgramReplyPref(String key, boolean def) {
+        return MessagesController.getGlobalMainSettings().getBoolean(key, def);
+    }
+
+    private static boolean devgramReplyElement(String key) {
+        return devgramReplyPref("dg_replyElements", true) && devgramReplyPref(key, true);
+    }
 
     private final RectF rectF = new RectF();
     private final Path clipPath = new Path();
@@ -185,8 +192,13 @@ public class ReplyMessageLine {
             color3 = p.colors.get(2) | 0xFF000000;
         }
         nameColor = accent_color | 0xFF000000;
-        backgroundColor = Theme.multAlpha(nameColor, 0.10f);
-        emojiDocumentId = p.background_emoji_id;
+        if (!devgramReplyElement("dg_replyColors")) {
+            hasColor2 = hasColor3 = false;
+            color1 = color2 = color3 = Theme.getColor(Theme.key_chat_inReplyLine, resourcesProvider);
+            nameColor = Theme.getColor(Theme.key_chat_inReplyNameText, resourcesProvider);
+        }
+        backgroundColor = devgramReplyElement("dg_replyBackground") ? Theme.multAlpha(nameColor, 0.10f) : Color.TRANSPARENT;
+        emojiDocumentId = devgramReplyElement("dg_replyEmoji") ? p.background_emoji_id : 0;
         stickerDocumentId = p.gift_emoji_id;
         if (emojiDocumentId != 0 && emoji == null && parentView != null) {
             emoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(parentView, false, dp(20), AnimatedEmojiDrawable.CACHE_TYPE_ALERT_PREVIEW_STATIC);
@@ -432,6 +444,27 @@ public class ReplyMessageLine {
         }
         if ((type == TYPE_REPLY || type == TYPE_LINK || type == TYPE_CONTACT) && messageObject != null && messageObject.overrideLinkEmoji != -1) {
             emojiDocumentId = messageObject.overrideLinkEmoji;
+        }
+        if (type == TYPE_REPLY) {
+            if (!devgramReplyElement("dg_replyColors")) {
+                hasColor2 = hasColor3 = false;
+                if (messageObject.isOutOwner()) {
+                    color1 = color2 = color3 = Theme.getColor(Theme.key_chat_outReplyLine, resourcesProvider);
+                    nameColor = Theme.getColor(Theme.key_chat_outReplyNameText, resourcesProvider);
+                } else if (messageObject.shouldDrawWithoutBackground()) {
+                    color1 = color2 = color3 = Color.WHITE;
+                    nameColor = Theme.getColor(Theme.key_chat_stickerReplyNameText, resourcesProvider);
+                } else {
+                    color1 = color2 = color3 = Theme.getColor(Theme.key_chat_inReplyLine, resourcesProvider);
+                    nameColor = Theme.getColor(Theme.key_chat_inReplyNameText, resourcesProvider);
+                }
+            }
+            if (!devgramReplyElement("dg_replyBackground")) {
+                backgroundColor = Color.TRANSPARENT;
+            }
+            if (!devgramReplyElement("dg_replyEmoji")) {
+                emojiDocumentId = 0;
+            }
         }
         if (emojiDocumentId != 0 && emoji == null && parentView != null) {
             emoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(parentView, false, dp(20), AnimatedEmojiDrawable.CACHE_TYPE_ALERT_PREVIEW_STATIC);

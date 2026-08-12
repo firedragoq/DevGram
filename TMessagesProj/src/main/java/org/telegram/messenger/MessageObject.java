@@ -702,8 +702,21 @@ public class MessageObject {
         if (isRepostPreview) {
             return false;
         }
-        if (MessagesController.getGlobalMainSettings().getBoolean("hideMessageReactions", false)) {
-            return false;
+        android.content.SharedPreferences devgramPrefs = MessagesController.getGlobalMainSettings();
+        if (devgramPrefs.getBoolean("dg_hideReactions", false)) {
+            long dialogId = getDialogId();
+            if (dialogId > 0 && devgramPrefs.getBoolean("dg_hideReactionsPrivate", false)) {
+                return false;
+            } else if (dialogId < 0) {
+                TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-dialogId);
+                boolean channel = chat != null && ChatObject.isChannel(chat) && !chat.megagroup;
+                if (channel && devgramPrefs.getBoolean("dg_hideReactionsChannels", false)) {
+                    return false;
+                }
+                if (!channel && devgramPrefs.getBoolean("dg_hideReactionsGroups", false)) {
+                    return false;
+                }
+            }
         }
         return true;
     }

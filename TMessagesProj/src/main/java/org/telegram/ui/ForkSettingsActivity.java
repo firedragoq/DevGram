@@ -11,6 +11,7 @@ import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.net.Uri;
+import android.os.Build;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.TypedValue;
@@ -108,10 +109,7 @@ public class ForkSettingsActivity extends BaseFragment {
     public static final int ID_SHOW_ARCHIVED_STICKERS = 45;
     public static final int ID_STICKER_SIZE = 46;
 
-    public static final int ID_INAPP_CAMERA = 50;
-    public static final int ID_SYSTEM_CAMERA = 51;
     public static final int ID_PHOTO_HAS_STICKER = 52;
-    public static final int ID_DISABLE_MOTION_PHOTO = 53;
     public static final int ID_DISABLE_FLIP_PHOTOS = 54;
     public static final int ID_REAR_VIDEO_MESSAGES = 55;
     public static final int ID_DISABLE_PLAY_VISIBLE_VIDEO_ON_VOLUME = 56;
@@ -129,12 +127,13 @@ public class ForkSettingsActivity extends BaseFragment {
     public static final int ID_DISABLE_PARAMETERS_FROM_BOT_LINKS = 72;
     public static final int ID_DISABLE_DEFAULT_IN_APP_BROWSER = 73;
 
-    public static final int ID_DISABLE_UNIFIED_PUSH = 80;
+    public static final int ID_UNIFIED_PUSH = 80;
     public static final int ID_UPDATE_CHECK_INTERVAL = 81;
     public static final int ID_DISABLE_TABLET_MODE = 82;
     public static final int ID_LOCK_PREMIUM = 83;
     public static final int ID_WEBSOCKET_TRANSPORT = 84;
     public static final int ID_WEBSOCKET_DOMAIN = 85;
+    public static final int ID_SATELLITE_DATA_SAVING = 86;
 
     public static final int ID_LASTFM_LOGIN = 90;
 
@@ -472,129 +471,37 @@ public class ForkSettingsActivity extends BaseFragment {
         items.add(UItem.asSettingsCell(ID_CUSTOM_TITLE, LocaleController.getString(R.string.EditAdminRank), prefs().getString("forkCustomTitle", "DevGram")));
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asHeader(LocaleController.getString(R.string.AvatarShape)));
-        items.add(searchable(UItem.asSlideView(
-            new String[]{
-                LocaleController.getString(R.string.AvatarShapeRound),
-                LocaleController.getString(R.string.AvatarShapeRounded),
-                LocaleController.getString(R.string.AvatarShapeSquare)
-            },
-            AndroidUtilities.avatarCornersType(),
-            index -> {
-                SharedPreferences.Editor editor = prefs().edit();
-                editor.putInt("avatarCorners", index);
-                editor.commit();
-            }).setId(ID_AVATAR_CORNERS), R.string.AvatarShape));
-        items.add(UItem.asShadow(LocaleController.getString(R.string.ForkRestartRequired)));
-
         items.add(UItem.asHeader(LocaleController.getString(R.string.ChatList)));
         items.add(UItem.asButtonCheck(ID_SYNC_PINS, LocaleController.getString(R.string.SyncPins), LocaleController.getString(R.string.SyncPinsInfo))
             .setChecked(pref("syncPins", true)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_UNMUTED_ON_TOP, LocaleController.getString(R.string.UnmutedOnTop), LocaleController.getString(R.string.UnmutedOnTopInfo))
             .setChecked(pref("unmutedOnTop", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_OPEN_ARCHIVE_ON_PULL, LocaleController.getString(R.string.OpenArchiveOnPull), LocaleController.getString(R.string.OpenArchiveOnPullInfo))
-            .setChecked(pref("openArchiveOnPull", true)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_HIDE_STORIES_IN_ARCHIVE, LocaleController.getString(R.string.HideStoriesInArchive), LocaleController.getString(R.string.HideStoriesInArchiveInfo))
             .setChecked(pref("hideStoriesInArchive", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_DISABLE_THUMBS_IN_DIALOG_LIST, LocaleController.getString(R.string.DisableThumbsInDialogList), LocaleController.getString(R.string.DisableThumbsInDialogListInfo))
-            .setChecked(pref("disableThumbsInDialogList", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_DISABLE_GLOBAL_SEARCH, LocaleController.getString(R.string.DisableGlobalSearch), LocaleController.getString(R.string.DisableGlobalSearchInfo))
             .setChecked(pref("disableGlobalSearch", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_HIDE_CONTACTS_IN_DIALOGS, LocaleController.getString(R.string.HideContactsInDialogs), LocaleController.getString(R.string.HideContactsInDialogsInfo))
             .setChecked(pref("hideContactsInDialogs", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_ENABLE_LAST_SEEN_DOTS, LocaleController.getString(R.string.EnableLastSeenDots), LocaleController.getString(R.string.EnableLastSeenDotsInfo))
             .setChecked(pref("enableLastSeenDots", true)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_HIDE_ALL_CHATS_TAB, LocaleController.getString(R.string.HideAllChatsTab), LocaleController.getString(R.string.HideAllChatsTabInfo))
-            .setChecked(pref("hideAllChatsTab", false)).setMultiline(true));
         items.add(UItem.asSettingsCell(ID_DEFAULT_FOLDER, LocaleController.getString(R.string.DefaultFolder), getDefaultFolderText()));
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asHeader(LocaleController.getString(R.string.FolderTabsStyle)));
-        items.add(searchable(UItem.asSlideView(
-            new String[]{
-                LocaleController.getString(R.string.FolderTabsStyleText),
-                LocaleController.getString(R.string.FolderTabsStyleIconText),
-                LocaleController.getString(R.string.FolderTabsStyleIcon)
-            },
-            FolderIcons.folderTabsStyle(),
-            index -> {
-                SharedPreferences.Editor editor = prefs().edit();
-                editor.putInt("folderTabsStyle", index);
-                editor.commit();
-                getNotificationCenter().postNotificationName(NotificationCenter.dialogFiltersUpdated);
-            }).setId(ID_FOLDER_TABS_STYLE), R.string.FolderTabsStyle));
-        items.add(UItem.asShadow(LocaleController.getString(R.string.FolderTabsStyleInfo)));
-
         items.add(UItem.asHeader(LocaleController.getString(R.string.FilterChats)));
-        items.add(UItem.asButtonCheck(ID_REPLACE_FORWARD, LocaleController.getString(R.string.ReplaceForward), LocaleController.getString(R.string.ReplaceForwardInfo))
-            .setChecked(pref("replaceForward", true)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_MENTION_BY_NAME, LocaleController.getString(R.string.MentionByName), LocaleController.getString(R.string.MentionByNameInfo))
-            .setChecked(pref("mentionByName", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_HIDE_SEND_AS, LocaleController.getString(R.string.HideSendAs), LocaleController.getString(R.string.HideSendAsInfo))
-            .setChecked(pref("hideSendAs", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_DISABLE_LINK_PREVIEW_BY_DEFAULT, LocaleController.getString(R.string.DisableLinkPreviewByDefault), LocaleController.getString(R.string.DisableLinkPreviewByDefaultInfo))
-            .setChecked(pref("disableLinkPreviewByDefault", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_DELETE_ALL_UNPINNED, LocaleController.getString(R.string.AddDeleteAllUnpinnedMessages), LocaleController.getString(R.string.AddDeleteAllUnpinnedMessagesInfo))
             .setChecked(pref("addItemToDeleteAllUnpinnedMessages", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_DISABLE_SLIDE_TO_NEXT_CHANNEL, LocaleController.getString(R.string.DisableSlideToNextChannel), LocaleController.getString(R.string.DisableSlideToNextChannelInfo))
-            .setChecked(pref("disableSlideToNextChannel", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_FORMAT_WITH_SECONDS, LocaleController.getString(R.string.FormatWithSeconds), LocaleController.getString(R.string.FormatWithSecondsInfo))
-            .setChecked(pref("formatWithSeconds", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_HIDE_AI_EDITOR, LocaleController.getString(R.string.HideAiEditor), LocaleController.getString(R.string.HideAiEditorInfo))
             .setChecked(pref("hideAiEditor", false)).setMultiline(true));
         items.add(UItem.asSettingsCell(ID_FORMATTING_MENU, LocaleController.getString(R.string.FormattingMenu), null));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(LocaleController.getString(R.string.Reactions)));
-        items.add(UItem.asButtonCheck(ID_DISABLE_QUICK_REACTION, LocaleController.getString(R.string.DisableQuickReaction), LocaleController.getString(R.string.DisableQuickReactionInfo))
-            .setChecked(pref("disableQuickReaction", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_HIDE_MESSAGE_REACTIONS, LocaleController.getString(R.string.HideMessageReactions), LocaleController.getString(R.string.HideMessageReactionsInfo))
-            .setChecked(pref("hideMessageReactions", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_HIDE_SAVED_MESSAGES_TAGS, LocaleController.getString(R.string.HideSavedMessagesTags), LocaleController.getString(R.string.HideSavedMessagesTagsInfo))
-            .setChecked(pref("hideSavedMessagesTags", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_DISABLE_LOCKED_ANIMATED_EMOJI, LocaleController.getString(R.string.DisableLockedAnimatedEmoji), LocaleController.getString(R.string.DisableLockedAnimatedEmojiInfo))
             .setChecked(pref("disableLockedAnimatedEmoji", false)).setMultiline(true));
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asHeader(LocaleController.getString(R.string.StickersName)));
-        items.add(UItem.asButtonCheck(ID_FULL_RECENT_STICKERS, LocaleController.getString(R.string.FullRecentStickers), LocaleController.getString(R.string.FullRecentStickersInfo))
-            .setChecked(pref("fullRecentStickers", true)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_SHOW_ARCHIVED_STICKERS, LocaleController.getString(R.string.ShowArchivedStickers), LocaleController.getString(R.string.ShowArchivedStickersInfo))
-            .setChecked(pref("showArchivedStickers", false)).setMultiline(true));
-        items.add(UItem.asShadow(null));
-
-        items.add(UItem.asHeader(LocaleController.getString(R.string.StickerSize)));
-        if (stickerSizeCell == null) {
-            stickerSizeCell = new StickerSizeCell(getContext());
-        }
-        items.add(searchable(UItem.asCustom(ID_STICKER_SIZE, stickerSizeCell), R.string.StickerSize));
-        items.add(UItem.asShadow(null));
-
-        items.add(UItem.asHeader(LocaleController.getString(R.string.ForkSectionMedia)));
-        items.add(UItem.asButtonCheck(ID_INAPP_CAMERA, LocaleController.getString(R.string.InAppCamera), LocaleController.getString(R.string.InAppCameraInfo))
-            .setChecked(pref("inappCamera", true)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_SYSTEM_CAMERA, LocaleController.getString(R.string.SystemCamera), LocaleController.getString(R.string.SystemCameraInfo))
-            .setChecked(pref("systemCamera", false))
-            .setEnabled(SharedConfig.inappCamera)
-            .setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_PHOTO_HAS_STICKER, LocaleController.getString(R.string.PhotoHasSticker), LocaleController.getString(R.string.PhotoHasStickerInfo))
-            .setChecked(pref("photoHasSticker", true)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_DISABLE_MOTION_PHOTO, LocaleController.getString(R.string.DisableMotionPhoto), LocaleController.getString(R.string.DisableMotionPhotoInfo))
-            .setChecked(pref("disableMotionPhoto", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_DISABLE_FLIP_PHOTOS, LocaleController.getString(R.string.DisableFlipPhotos), LocaleController.getString(R.string.DisableFlipPhotosInfo))
-            .setChecked(pref("disableFlipPhotos", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_REAR_VIDEO_MESSAGES, LocaleController.getString(R.string.RearVideoMessages), LocaleController.getString(R.string.RearVideoMessagesInfo))
-            .setChecked(pref("rearVideoMessages", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_DISABLE_PLAY_VISIBLE_VIDEO_ON_VOLUME, LocaleController.getString(R.string.DisablePlayVisibleVideoOnVolume), LocaleController.getString(R.string.DisablePlayVisibleVideoOnVolumeInfo))
-            .setChecked(pref("disablePlayVisibleVideoOnVolume", false)).setMultiline(true));
-        items.add(UItem.asButtonCheck(ID_DISABLE_RECENT_FILES_ATTACHMENT, LocaleController.getString(R.string.DisableRecentFilesAttachment), LocaleController.getString(R.string.DisableRecentFilesAttachmentInfo))
-            .setChecked(pref("disableRecentFilesAttachment", false)).setMultiline(true));
-        items.add(UItem.asShadow(null));
-
         items.add(UItem.asHeader(LocaleController.getString(R.string.ForkSectionVoice)));
         items.add(UItem.asSettingsCell(ID_VOICE_QUALITY, LocaleController.getString(R.string.VoiceMessageQuality), getVoiceQualityText()));
-        items.add(UItem.asButtonCheck(ID_DISABLE_AUTOPLAY_NEXT_VOICE, LocaleController.getString(R.string.DisableAutoplayNextVoice), LocaleController.getString(R.string.DisableAutoplayNextVoiceInfo))
-            .setChecked(pref("disableAutoplayNextVoice", false)).setMultiline(true));
         items.add(UItem.asSettingsCell(ID_OFFLINE_STT, LocaleController.getString(R.string.OfflineTranscription), getOfflineTranscriberText()));
         items.add(UItem.asCheck(ID_CLOUDFLARE_ENABLE_STT, LocaleController.getString(R.string.CloudflareEnableSTT))
             .setChecked(SharedConfig.cfEnableStt));
@@ -619,8 +526,11 @@ public class ForkSettingsActivity extends BaseFragment {
         if (pref("webSocketTransport", false)) {
             items.add(UItem.asSettingsCell(ID_WEBSOCKET_DOMAIN, LocaleController.getString(R.string.WebSocketDomain), getWebSocketDomainText()));
         }
-        items.add(UItem.asButtonCheck(ID_DISABLE_UNIFIED_PUSH, LocaleController.getString(R.string.DisableUnifiedPush), LocaleController.getString(R.string.DisableUnifiedPushInfo))
-            .setChecked(pref("disableUnifiedPush", false)).setMultiline(true));
+        items.add(UItem.asSettingsCell(ID_UNIFIED_PUSH, LocaleController.getString(R.string.UnifiedPush), null));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            items.add(UItem.asButtonCheck(ID_SATELLITE_DATA_SAVING, LocaleController.getString(R.string.SatelliteDataSaving), LocaleController.getString(R.string.SatelliteDataSavingInfo))
+                    .setChecked(pref("satelliteDataSaving", true)).setMultiline(true));
+        }
         items.add(UItem.asSettingsCell(ID_UPDATE_CHECK_INTERVAL, LocaleController.getString(R.string.UpdateCheckInterval), getUpdateIntervalText()));
         if (AndroidUtilities.isTabletInternal()) {
             items.add(UItem.asButtonCheck(ID_DISABLE_TABLET_MODE, LocaleController.getString(R.string.DisableTabletMode), LocaleController.getString(R.string.DisableTabletModeInfo))
@@ -689,83 +599,29 @@ public class ForkSettingsActivity extends BaseFragment {
         } else if (id == ID_UNMUTED_ON_TOP) {
             toggle("unmutedOnTop", item, view);
             MessagesController.getInstance(currentAccount).sortDialogs(null);
-        } else if (id == ID_OPEN_ARCHIVE_ON_PULL) {
-            toggle("openArchiveOnPull", item, view);
         } else if (id == ID_HIDE_STORIES_IN_ARCHIVE) {
             toggle("hideStoriesInArchive", item, view);
-        } else if (id == ID_DISABLE_THUMBS_IN_DIALOG_LIST) {
-            toggle("disableThumbsInDialogList", item, view);
         } else if (id == ID_DISABLE_GLOBAL_SEARCH) {
             toggle("disableGlobalSearch", item, view);
         } else if (id == ID_HIDE_CONTACTS_IN_DIALOGS) {
             toggle("hideContactsInDialogs", item, view);
         } else if (id == ID_ENABLE_LAST_SEEN_DOTS) {
             toggle("enableLastSeenDots", item, view);
-        } else if (id == ID_HIDE_ALL_CHATS_TAB) {
-            toggle("hideAllChatsTab", item, view);
-            getNotificationCenter().postNotificationName(NotificationCenter.dialogFiltersUpdated);
         } else if (id == ID_DEFAULT_FOLDER) {
             showDefaultFolderDialog();
 
-        } else if (id == ID_REPLACE_FORWARD) {
-            toggle("replaceForward", item, view);
-        } else if (id == ID_MENTION_BY_NAME) {
-            toggle("mentionByName", item, view);
-        } else if (id == ID_HIDE_SEND_AS) {
-            toggle("hideSendAs", item, view);
-        } else if (id == ID_DISABLE_LINK_PREVIEW_BY_DEFAULT) {
-            toggle("disableLinkPreviewByDefault", item, view);
         } else if (id == ID_DELETE_ALL_UNPINNED) {
             toggle("addItemToDeleteAllUnpinnedMessages", item, view);
-        } else if (id == ID_DISABLE_SLIDE_TO_NEXT_CHANNEL) {
-            toggle("disableSlideToNextChannel", item, view);
-        } else if (id == ID_FORMAT_WITH_SECONDS) {
-            toggle("formatWithSeconds", item, view);
         } else if (id == ID_HIDE_AI_EDITOR) {
             toggle("hideAiEditor", item, view);
         } else if (id == ID_FORMATTING_MENU) {
             presentFragment(new FormattingMenuActivity());
 
-        } else if (id == ID_DISABLE_QUICK_REACTION) {
-            toggle("disableQuickReaction", item, view);
-        } else if (id == ID_HIDE_MESSAGE_REACTIONS) {
-            toggle("hideMessageReactions", item, view);
-        } else if (id == ID_HIDE_SAVED_MESSAGES_TAGS) {
-            toggle("hideSavedMessagesTags", item, view);
         } else if (id == ID_DISABLE_LOCKED_ANIMATED_EMOJI) {
             toggle("disableLockedAnimatedEmoji", item, view);
-        } else if (id == ID_FULL_RECENT_STICKERS) {
-            toggle("fullRecentStickers", item, view);
-        } else if (id == ID_SHOW_ARCHIVED_STICKERS) {
-            if (toggle("showArchivedStickers", item, view)) {
-                MediaDataController.getInstance(currentAccount).loadArchivedStickerSets();
-            }
-
-        } else if (id == ID_INAPP_CAMERA) {
-            SharedConfig.toggleInappCamera();
-            setCellChecked(view, SharedConfig.inappCamera);
-            listView.adapter.update(true);
-        } else if (id == ID_SYSTEM_CAMERA) {
-            if (SharedConfig.inappCamera) {
-                toggle("systemCamera", item, view);
-            }
-        } else if (id == ID_PHOTO_HAS_STICKER) {
-            toggle("photoHasSticker", item, view);
-        } else if (id == ID_DISABLE_MOTION_PHOTO) {
-            toggle("disableMotionPhoto", item, view);
-        } else if (id == ID_DISABLE_FLIP_PHOTOS) {
-            toggle("disableFlipPhotos", item, view);
-        } else if (id == ID_REAR_VIDEO_MESSAGES) {
-            toggle("rearVideoMessages", item, view);
-        } else if (id == ID_DISABLE_PLAY_VISIBLE_VIDEO_ON_VOLUME) {
-            toggle("disablePlayVisibleVideoOnVolume", item, view);
-        } else if (id == ID_DISABLE_RECENT_FILES_ATTACHMENT) {
-            toggle("disableRecentFilesAttachment", item, view);
 
         } else if (id == ID_VOICE_QUALITY) {
             showVoiceQualityDialog();
-        } else if (id == ID_DISABLE_AUTOPLAY_NEXT_VOICE) {
-            toggle("disableAutoplayNextVoice", item, view);
         } else if (id == ID_OFFLINE_STT) {
             showOfflineTranscriberDialog();
         } else if (id == ID_CLOUDFLARE_ENABLE_STT) {
@@ -796,8 +652,10 @@ public class ForkSettingsActivity extends BaseFragment {
             listView.adapter.update(true);
         } else if (id == ID_WEBSOCKET_DOMAIN) {
             showWebSocketDomainDialog();
-        } else if (id == ID_DISABLE_UNIFIED_PUSH) {
-            toggle("disableUnifiedPush", item, view);
+        } else if (id == ID_UNIFIED_PUSH) {
+            presentFragment(new NotificationsSettingsActivity().highlightUnifiedPush());
+        } else if (id == ID_SATELLITE_DATA_SAVING) {
+            ApplicationLoader.setSatelliteDataSavingEnabled(toggle("satelliteDataSaving", item, view));
         } else if (id == ID_UPDATE_CHECK_INTERVAL) {
             showUpdateIntervalDialog();
         } else if (id == ID_DISABLE_TABLET_MODE) {

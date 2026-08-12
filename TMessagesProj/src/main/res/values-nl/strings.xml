@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="SatelliteDataSaving">Data besparen op satellietnetwerken</string>
+    <string name="SatelliteDataSavingInfo">Pauzeert het automatisch downloaden van media en verhalen zolang je verbonden bent met een satelliet- of bandbreedtebeperkt netwerk. Handmatige downloads blijven werken. Vereist Android 15 of nieuwer.</string>
+    <string name="ShareDeleteOriginals">Oorspronkelijke berichten verwijderen</string>
+    <string name="UnifiedPushDistributor">UnifiedPush-distributeurs</string>
+    <string name="UnifiedPushGateway">UnifiedPush-gateway (PUT naar POST)</string>
+    <string name="UnifiedPushGatewayInfo">Standaard wordt het pushadres rechtstreeks bij Telegram geregistreerd, zonder gateway.\n\nAls jouw opstelling toch een ‘PUT naar POST’-gateway nodig heeft, vul die hier in of laat het veld leeg voor directe bezorging:</string>
+    <string name="UnifiedPushGatewayNone">Niet gebruikt (directe bezorging)</string>
+    <string name="DisableUnifiedPush">UnifiedPush uitschakelen</string>
+    <string name="DisableUnifiedPushInfo">Meldingen komen dan via de eigen achtergrondverbinding van de app</string>
     <!--FORK CLIENT-->
     <string name="ForkSectionAppearance">Weergave</string>
     <string name="ForkSectionMedia">Foto\'s en video</string>

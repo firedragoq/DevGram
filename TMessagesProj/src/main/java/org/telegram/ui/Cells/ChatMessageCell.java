@@ -3630,7 +3630,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 }
                 resetPollButtonSelectors();
                 invalidate();
-            } else if (currentMessageObject.forceShowPollResults) {
+            } else if (pollResultsPreview) {
                 // make buttons is non clickable when preview results
                 resetPollButtonSelectors();
                 invalidate();
@@ -9849,7 +9849,22 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     availableTimeWidth = photoWidth - dp(14);
                     backgroundWidth = photoWidth + dp(12);
 
-                    photoImage.setRoundRadius(0);
+                    // DevGram: форма стикеров из раздела «Чаты» применяется и к самому
+                    // сообщению, а не только к схематичной карточке настройки.
+                    int stickerShape = MessagesController.getGlobalMainSettings().getInt("dg_stickerShape", 0);
+                    if (stickerShape == 1) {
+                        photoImage.setRoundRadiusDirect(dp(12));
+                    } else if (stickerShape == 2) {
+                        int radius = dp(SharedConfig.bubbleRadius);
+                        int nearRadius = dp(Math.min(5, SharedConfig.bubbleRadius));
+                        if (messageObject.isOutOwner()) {
+                            photoImage.setRoundRadiusDirect(radius, radius, nearRadius, radius);
+                        } else {
+                            photoImage.setRoundRadiusDirect(radius, radius, radius, nearRadius);
+                        }
+                    } else {
+                        photoImage.setRoundRadiusDirect(0);
+                    }
                     canChangeRadius = false;
                     if (!messageObject.isOutOwner() && MessageObject.isPremiumSticker(messageObject.getDocument())) {
                         flipImage = true;
@@ -9875,6 +9890,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                             photoImage.setImage(ImageLocation.getForDocument(messageObject.getDocument()), filter,
                                     ImageLocation.getForObject(currentPhotoObjectThumb, photoParentObject), "b1", thumb != null ? thumb : currentPhotoObjectThumbStripped,
                                     messageObject.getDocument().size, isWebpSticker ? "webp" : null, parentObject, 1);
+                        } else if (messageObject.useCustomPhoto) {
+                            // DevGram: отдельный кот для превью стикера. Общая theme_preview_image
+                            // остаётся фотографией и продолжает использоваться в превью фото.
+                            photoImage.setImageBitmap(new ClipRoundedDrawable(
+                                    getResources().getDrawable(R.drawable.devgram_sticker_cat_preview).mutate()));
                         } else {
                             photoImage.setImage(null, null, ImageLocation.getForObject(currentPhotoObjectThumb, photoParentObject), "b1", thumb, 0, null, messageObject, 0);
                         }
@@ -11418,6 +11438,22 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
     }
 
+    private boolean isPollResultsPreviewEnabled(MessageObject messageObject, TLRPC.TL_messageMediaPoll mediaPoll) {
+        if (messageObject == null || mediaPoll == null) {
+            return false;
+        }
+        if (messageObject.forceShowPollResults) {
+            return true;
+        }
+        TLRPC.PollResults results = mediaPoll.results;
+        if (!MessagesController.getGlobalMainSettings().getBoolean("dg_showPollResults", false)
+                || mediaPoll.poll == null || results == null || results.total_voters <= 0
+                || results.results == null || results.results.isEmpty() || mediaPoll.poll.closed) {
+            return false;
+        }
+        return !mediaPoll.poll.hide_results_until_close || mediaPoll.poll.creator;
+    }
+
     private void setMessageContentIfPoll(final MessageObject messageObject, boolean messageIdChanged) {
         if (timerParticles == null) {
             timerParticles = new TimerParticles();
@@ -11444,7 +11480,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             total_voters = media.results.total_voters;
             timerTransitionProgress = media.poll.close_date - ConnectionsManager.getInstance(currentAccount).getCurrentTime() < 60 ? 0.0f : 1.0f;
             pollClosed = media.poll.closed;
-            pollResultsPreview = messageObject.forceShowPollResults;
+            pollResultsPreview = isPollResultsPreviewEnabled(messageObject, media);
             pollHideResults = media.poll.hide_results_until_close;
             title = media.poll.question;
             if (pollClosed) {
@@ -14396,6 +14432,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         updateSeekBarWaveformWidth(canvas);
         forceNotDrawTime = currentMessagesGroup != null;
+        // DevGram: скрыть время на стикерах (как exteraGram)
+        if (org.telegram.messenger.DevGramConfig.hideStickerTime && currentMessageObject != null
+                && (currentMessageObject.type == MessageObject.TYPE_STICKER || currentMessageObject.type == MessageObject.TYPE_ANIMATED_STICKER)) {
+            forceNotDrawTime = true;
+        }
         photoImage.setPressed((isHighlightedAnimated || isHighlighted) && currentPosition != null ? 2 : 0);
         photoImage.setVisible(!PhotoViewer.isShowingImage(currentMessageObject) && !SecretMediaViewer.getInstance().isShowingImage(currentMessageObject) && !StoryViewer.isShowingImage(currentMessageObject), false);
         blurredPhotoImage.setVisible(fitPhotoImage || !PhotoViewer.isShowingImage(currentMessageObject) && !SecretMediaViewer.getInstance().isShowingImage(currentMessageObject) && !StoryViewer.isShowingImage(currentMessageObject), false);

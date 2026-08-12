@@ -121,7 +121,10 @@ public class FileUploadOperation {
             if (BuildVars.LOGS_ENABLED) {
                 FileLog.d("start upload on slow network = " + slowNetwork);
             }
-            for (int a = 0, count = (slowNetwork ? initialRequestsSlowNetworkCount : initialRequestsCount); a < count; a++) {
+            int count = slowNetwork ? initialRequestsSlowNetworkCount
+                    : DevGramGeneralConfig.isUploadSpeedBoost() ? 14 : initialRequestsCount;
+            for (int a = 0; a < count; a++) {
+                if (a != 0 && a >= maxRequestsCount) break;
                 startUploadRequest();
             }
         });
@@ -158,7 +161,10 @@ public class FileUploadOperation {
                 cachedResults.clear();
 
                 operationGuid++;
-                for (int a = 0, count = (slowNetwork ? initialRequestsSlowNetworkCount : initialRequestsCount); a < count; a++) {
+                int count = slowNetwork ? initialRequestsSlowNetworkCount
+                        : DevGramGeneralConfig.isUploadSpeedBoost() ? 14 : initialRequestsCount;
+                for (int a = 0; a < count; a++) {
+                    if (a != 0 && a >= maxRequestsCount) break;
                     startUploadRequest();
                 }
             }

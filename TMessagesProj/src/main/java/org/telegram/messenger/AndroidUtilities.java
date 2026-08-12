@@ -2891,7 +2891,9 @@ public class AndroidUtilities {
 
     public static String formapMapUrl(int account, double lat, double lon, int width, int height, boolean marker, int zoom, int provider) {
         int scale = Math.min(2, (int) Math.ceil(AndroidUtilities.density));
-        if (provider == -1) {
+        if (DevGramGeneralConfig.isUseYandexMaps()) {
+            provider = 1;
+        } else if (provider == -1) {
             provider = MessagesController.getInstance(account).mapProvider;
         }
         if (provider == 1 || provider == 3) {
@@ -6578,6 +6580,7 @@ public class AndroidUtilities {
     }
 
     public static void vibrateCursor(View view) {
+        if (!DevGramGeneralConfig.isInAppVibration()) return;
         try {
             if (view == null || view.getContext() == null) return;
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
@@ -6587,6 +6590,7 @@ public class AndroidUtilities {
     }
 
     public static void vibrate(View view) {
+        if (!DevGramGeneralConfig.isInAppVibration()) return;
         try {
             if (view == null || view.getContext() == null) return;
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;

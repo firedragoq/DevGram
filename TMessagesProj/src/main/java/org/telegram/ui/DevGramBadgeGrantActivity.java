@@ -14,22 +14,29 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.DevGramBadges;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserObject;
+import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.AnimatedEmojiDrawable;
+import org.telegram.ui.Components.AvatarDrawable;
+import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
 
@@ -41,10 +48,20 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
 
     private TextView emojiRow;
     private TextView textRow;
+    private BackupImageView badgePreview;
+    private TextView previewTitle;
+    private TextView previewText;
+    private final TextView[] emojiOptions = new TextView[DevGramBadges.READY_EMOJI.length + 1];
+    private final TextView[] textOptions = new TextView[DevGramBadges.READY_TEXTS.length + 1];
     private SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow pickerPopup;
 
     public DevGramBadgeGrantActivity(long dialogId) {
         this.dialogId = dialogId;
+        DevGramBadges.Badge current = DevGramBadges.badgeOf(dialogId);
+        if (current != null) {
+            selEmojiId = current.emojiId;
+            selText = current.text;
+        }
     }
 
     private static long shownId(long id) {
@@ -70,7 +87,7 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
     public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
-        actionBar.setTitle("Значок · ID " + shownId(dialogId));
+        actionBar.setTitle(DevGramBadges.badgeOf(dialogId) == null ? "Новый значок" : "Изменить значок");
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
@@ -80,54 +97,245 @@ public class DevGramBadgeGrantActivity extends BaseFragment {
             }
         });
 
+        FrameLayout root = new FrameLayout(context);
+        root.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
+
         ScrollView scroll = new ScrollView(context);
-        scroll.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
+        scroll.setClipToPadding(false);
+        scroll.setPadding(0, 0, 0, AndroidUtilities.dp(88));
 
         LinearLayout box = new LinearLayout(context);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
+        box.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(12), AndroidUtilities.dp(12), AndroidUtilities.dp(20));
 
-        emojiRow = row(context);
-        textRow = row(context);
-        box.addView(emojiRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-        box.addView(textRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 10f, 0f, 0f));
+        box.addView(createRecipientCard(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        TextView grantBtn = new TextView(context);
-        grantBtn.setText("Выдать значок");
-        grantBtn.setGravity(Gravity.CENTER);
-        grantBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        grantBtn.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider));
-        grantBtn.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(8),
-                Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider),
-                Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourceProvider)));
-        grantBtn.setPadding(0, AndroidUtilities.dp(14), 0, AndroidUtilities.dp(14));
-        grantBtn.setOnClickListener(v -> onGrant());
-        box.addView(grantBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 22f, 0f, 0f));
+        box.addView(header(context, "Значок"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 18, 4, 8));
+        box.addView(createEmojiChoices(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        box.addView(header(context, "Подпись"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 18, 4, 8));
+        box.addView(createTextChoices(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        box.addView(header(context, "Предпросмотр"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 18, 4, 8));
+        box.addView(createPreviewCard(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         scroll.addView(box, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        root.addView(scroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
-        emojiRow.setOnClickListener(v -> chooseEmoji());
-        textRow.setOnClickListener(v -> chooseText());
+        LinearLayout footer = new LinearLayout(context);
+        footer.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(10), AndroidUtilities.dp(12), AndroidUtilities.dp(12));
+        footer.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider));
+
+        TextView grantBtn = new TextView(context);
+        grantBtn.setText(DevGramBadges.badgeOf(dialogId) == null ? "Выдать значок" : "Сохранить изменения");
+        grantBtn.setGravity(Gravity.CENTER);
+        grantBtn.setTypeface(AndroidUtilities.bold());
+        grantBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        grantBtn.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider));
+        grantBtn.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(12),
+                Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider),
+                Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourceProvider)));
+        grantBtn.setOnClickListener(v -> onGrant());
+        footer.addView(grantBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 50));
+        root.addView(footer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
+
         refresh();
 
-        return fragmentView = scroll;
+        return fragmentView = root;
     }
 
-    private TextView row(Context ctx) {
+    private TextView header(Context context, String text) {
+        TextView view = new TextView(context);
+        view.setText(text);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        view.setTypeface(AndroidUtilities.bold());
+        view.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueHeader, resourceProvider));
+        return view;
+    }
+
+    private TextView choice(Context ctx, String text) {
         TextView tv = new TextView(ctx);
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        tv.setText(text);
+        tv.setGravity(Gravity.CENTER);
+        tv.setSingleLine(true);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         tv.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
-        tv.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
-        tv.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(10),
+        tv.setPadding(AndroidUtilities.dp(14), 0, AndroidUtilities.dp(14), 0);
+        tv.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(18),
                 Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider),
                 Theme.getColor(Theme.key_listSelector, resourceProvider)));
         tv.setClickable(true);
         return tv;
     }
 
+    private View createRecipientCard(Context context) {
+        LinearLayout card = new LinearLayout(context);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(14), AndroidUtilities.dp(14), AndroidUtilities.dp(14));
+        card.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16),
+                Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
+
+        TLObject peer = dialogId > 0 ? getMessagesController().getUser(dialogId) : getMessagesController().getChat(-dialogId);
+        String name;
+        String username = null;
+        if (peer instanceof TLRPC.User) {
+            name = UserObject.getUserName((TLRPC.User) peer);
+            username = UserObject.getPublicUsername((TLRPC.User) peer);
+        } else if (peer instanceof TLRPC.Chat) {
+            name = ((TLRPC.Chat) peer).title;
+            username = ChatObject.getPublicUsername((TLRPC.Chat) peer);
+        } else {
+            name = dialogId > 0 ? "Пользователь" : "Чат или канал";
+        }
+
+        BackupImageView avatar = new BackupImageView(context);
+        avatar.setRoundRadius(AndroidUtilities.dp(28));
+        AvatarDrawable avatarDrawable = new AvatarDrawable();
+        if (peer != null) {
+            avatarDrawable.setInfo(peer);
+            avatar.setForUserOrChat(peer, avatarDrawable);
+        } else {
+            avatarDrawable.setInfo(dialogId, name, null);
+            avatar.setImageDrawable(avatarDrawable);
+        }
+        card.addView(avatar, LayoutHelper.createLinear(56, 56));
+
+        LinearLayout texts = new LinearLayout(context);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        TextView title = new TextView(context);
+        title.setText(name);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+        title.setTypeface(AndroidUtilities.bold());
+        title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
+        texts.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        TextView sub = new TextView(context);
+        sub.setText((username == null || username.isEmpty() ? "" : "@" + username + "  ·  ")
+                + (dialogId > 0 ? "Пользователь" : "Чат") + "  ·  ID " + shownId(dialogId));
+        sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        sub.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
+        texts.addView(sub, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 3, 0, 0));
+        card.addView(texts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 12, 0, 0, 0));
+        return card;
+    }
+
+    private View createEmojiChoices(Context context) {
+        HorizontalScrollView scroll = new HorizontalScrollView(context);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(context);
+        row.setPadding(0, 0, AndroidUtilities.dp(4), 0);
+        for (int i = 0; i < DevGramBadges.READY_EMOJI.length; i++) {
+            final int index = i;
+            emojiOptions[i] = choice(context, DevGramBadges.READY_EMOJI_LABELS[i]);
+            emojiOptions[i].setOnClickListener(v -> {
+                selEmojiId = DevGramBadges.READY_EMOJI[index];
+                refresh();
+            });
+            row.addView(emojiOptions[i], LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 40, i == 0 ? 0 : 8, 0, 0, 0));
+        }
+        emojiRow = choice(context, "＋ Свой эмодзи");
+        emojiRow.setOnClickListener(v -> openEmojiPicker());
+        emojiOptions[DevGramBadges.READY_EMOJI.length] = emojiRow;
+        row.addView(emojiRow, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 40, 8, 0, 0, 0));
+        scroll.addView(row);
+        return scroll;
+    }
+
+    private View createTextChoices(Context context) {
+        HorizontalScrollView scroll = new HorizontalScrollView(context);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(context);
+        row.setPadding(0, 0, AndroidUtilities.dp(4), 0);
+        for (int i = 0; i < DevGramBadges.READY_TEXTS.length; i++) {
+            final int index = i;
+            textOptions[i] = choice(context, DevGramBadges.READY_TEXT_LABELS[i]);
+            textOptions[i].setOnClickListener(v -> {
+                selText = DevGramBadges.READY_TEXTS[index];
+                refresh();
+            });
+            row.addView(textOptions[i], LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 40, i == 0 ? 0 : 8, 0, 0, 0));
+        }
+        textRow = choice(context, "＋ Своя подпись");
+        textRow.setOnClickListener(v -> askCustomText());
+        textOptions[DevGramBadges.READY_TEXTS.length] = textRow;
+        row.addView(textRow, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 40, 8, 0, 0, 0));
+        scroll.addView(row);
+        return scroll;
+    }
+
+    private View createPreviewCard(Context context) {
+        LinearLayout card = new LinearLayout(context);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
+        card.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16),
+                Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
+        badgePreview = new BackupImageView(context);
+        badgePreview.setRoundRadius(AndroidUtilities.dp(22));
+        badgePreview.setBackground(Theme.createCircleDrawable(AndroidUtilities.dp(44),
+                Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourceProvider), 0.12f)));
+        card.addView(badgePreview, LayoutHelper.createLinear(44, 44));
+        LinearLayout texts = new LinearLayout(context);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        previewTitle = new TextView(context);
+        previewTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        previewTitle.setTypeface(AndroidUtilities.bold());
+        previewTitle.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
+        texts.addView(previewTitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        previewText = new TextView(context);
+        previewText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        previewText.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
+        texts.addView(previewText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 3, 0, 0));
+        card.addView(texts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 12, 0, 0, 0));
+        return card;
+    }
+
     private void refresh() {
-        emojiRow.setText("Значок:  " + emojiLabel(selEmojiId));
-        textRow.setText("Подпись:  " + shortText(selText));
+        int selectedBg = Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourceProvider), 0.14f);
+        int normalBg = Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider);
+        int selectedText = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourceProvider);
+        int normalText = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider);
+        boolean readyEmoji = false;
+        for (int i = 0; i < DevGramBadges.READY_EMOJI.length; i++) {
+            boolean selected = selEmojiId == DevGramBadges.READY_EMOJI[i];
+            readyEmoji |= selected;
+            updateChoice(emojiOptions[i], selected, selectedBg, normalBg, selectedText, normalText);
+        }
+        updateChoice(emojiOptions[DevGramBadges.READY_EMOJI.length], !readyEmoji,
+                selectedBg, normalBg, selectedText, normalText);
+        boolean readyText = false;
+        for (int i = 0; i < DevGramBadges.READY_TEXTS.length; i++) {
+            boolean selected = DevGramBadges.READY_TEXTS[i].equals(selText);
+            readyText |= selected;
+            updateChoice(textOptions[i], selected, selectedBg, normalBg, selectedText, normalText);
+        }
+        updateChoice(textOptions[DevGramBadges.READY_TEXTS.length], !readyText,
+                selectedBg, normalBg, selectedText, normalText);
+        if (badgePreview != null) {
+            badgePreview.setAnimatedEmojiDrawable(AnimatedEmojiDrawable.make(
+                    currentAccount, AnimatedEmojiDrawable.CACHE_TYPE_ALERT_PREVIEW, selEmojiId));
+        }
+        String name = peerDisplayName();
+        if (previewTitle != null) previewTitle.setText(name + "  ·  " + emojiLabel(selEmojiId));
+        if (previewText != null) previewText.setText(selText.replace("{name}", name));
+    }
+
+    private void updateChoice(TextView view, boolean selected, int selectedBg, int normalBg,
+                              int selectedText, int normalText) {
+        if (view == null) return;
+        view.setTypeface(selected ? AndroidUtilities.bold() : null);
+        view.setTextColor(selected ? selectedText : normalText);
+        view.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(18),
+                selected ? selectedBg : normalBg, Theme.getColor(Theme.key_listSelector, resourceProvider)));
+    }
+
+    private String peerDisplayName() {
+        if (dialogId > 0) {
+            TLRPC.User user = getMessagesController().getUser(dialogId);
+            if (user != null) return UserObject.getUserName(user);
+            return "Пользователь " + shownId(dialogId);
+        }
+        TLRPC.Chat chat = getMessagesController().getChat(-dialogId);
+        if (chat != null && chat.title != null) return chat.title;
+        return "Чат " + shownId(dialogId);
     }
 
     // Выбор значка: готовые ИЛИ пикер эмодзи (как в чате)

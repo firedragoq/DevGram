@@ -28,6 +28,8 @@ import android.graphics.drawable.BitmapDrawable;
 import android.os.Build;
 import android.view.View;
 
+import androidx.annotation.UiThread;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimatedFileDrawableStream;
 import org.telegram.messenger.DispatchQueue;
@@ -164,6 +166,12 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable, 
 
     private static ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(8, new ThreadPoolExecutor.DiscardPolicy());
 
+    // Forkgram 12.9.3: a broken decoder must not reschedule an empty frame in a tight loop forever.
+    private int consecutiveNoFrames;
+    private static final int NO_FRAME_BACKOFF_AFTER = 3;
+    private static final int NO_FRAME_GIVE_UP_AFTER = 120;
+    private final Runnable scheduleNextGetFrameRunnable = this::scheduleNextGetFrame;
+
     private Runnable uiRunnableNoFrame = new Runnable() {
         @Override
         public void run() {
@@ -173,10 +181,30 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable, 
                 pendingSeekToUI = -1;
                 invalidateAfter = 0;
             }
-            scheduleNextGetFrame();
+            scheduleNextGetFrameAfterNoFrame();
             invalidateInternal();
         }
     };
+
+    @UiThread
+    private void scheduleNextGetFrameAfterNoFrame() {
+        if (isLoadingStream()) {
+            consecutiveNoFrames = 0;
+            scheduleNextGetFrame();
+            return;
+        }
+        consecutiveNoFrames++;
+        if (consecutiveNoFrames > NO_FRAME_GIVE_UP_AFTER) {
+            return;
+        }
+        if (consecutiveNoFrames <= NO_FRAME_BACKOFF_AFTER) {
+            scheduleNextGetFrame();
+            return;
+        }
+        long delay = Math.min(1000L, 50L * (consecutiveNoFrames - NO_FRAME_BACKOFF_AFTER));
+        AndroidUtilities.cancelRunOnUIThread(scheduleNextGetFrameRunnable);
+        AndroidUtilities.runOnUIThread(scheduleNextGetFrameRunnable, delay);
+    }
 
     boolean generatingCache;
     Runnable cacheGenRunnable;
@@ -242,6 +270,7 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable, 
     private Runnable uiRunnable = new Runnable() {
         @Override
         public void run() {
+            consecutiveNoFrames = 0;
             chekDestroyDecoder();
             if (stream != null && pendingRemoveLoading) {
                 FileLoader.getInstance(currentAccount).removeLoadingVideo(stream.getDocument(), false, false);
@@ -660,6 +689,7 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable, 
             pendingSeekTo = ms;
             pendingSeekToUI = ms;
             scheduledForSeek = false;
+            consecutiveNoFrames = 0;
             if (mDecoder != null) {
                 mDecoder.prepareToSeek();
             }
@@ -774,6 +804,7 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable, 
             return;
         }
         isRunning = true;
+        consecutiveNoFrames = 0;
         scheduleNextGetFrame();
         AndroidUtilities.runOnUIThread(mStartTask);
     }

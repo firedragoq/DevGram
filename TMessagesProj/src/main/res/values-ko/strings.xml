@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="SatelliteDataSaving">위성 네트워크에서 데이터 절약</string>
+    <string name="SatelliteDataSavingInfo">위성 네트워크 또는 대역폭이 제한된 네트워크에 연결되어 있는 동안 미디어와 스토리 자동 다운로드를 일시 중지합니다. 수동 다운로드는 계속 사용할 수 있습니다. Android 15 이상이 필요합니다.</string>
+    <string name="ShareDeleteOriginals">원본 메시지 삭제</string>
+    <string name="UnifiedPushDistributor">UnifiedPush 배포자</string>
+    <string name="UnifiedPushGateway">UnifiedPush PUT→POST 게이트웨이</string>
+    <string name="UnifiedPushGatewayInfo">기본적으로 푸시 주소는 게이트웨이 없이 Telegram에 직접 등록됩니다.\n\n사용 중인 구성에 여전히 «PUT→POST» 게이트웨이가 필요하다면 여기에 입력하고, 직접 전달을 원하면 비워 두세요:</string>
+    <string name="UnifiedPushGatewayNone">사용 안 함 (직접 전달)</string>
+    <string name="DisableUnifiedPush">UnifiedPush 끄기</string>
+    <string name="DisableUnifiedPushInfo">알림은 앱 자체의 백그라운드 연결로 전달됩니다</string>
     <!--FORK CLIENT-->
     <string name="ForkSectionAppearance">모양</string>
     <string name="ForkSectionMedia">사진 및 동영상</string>

@@ -517,6 +517,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
         public Holder(View itemView) {
             super(itemView);
+            org.telegram.messenger.DevGramGeneralConfig.applyHapticFeedbackSetting(itemView);
         }
     }
 
@@ -2534,6 +2535,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
             parent = (ViewGroup) getParent();
             parent.addView(fastScroll);
         }
+        org.telegram.messenger.DevGramGeneralConfig.applyHapticFeedbackSetting(this);
     }
 
     @Override

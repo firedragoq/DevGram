@@ -879,10 +879,68 @@ public class ChatActivityEnterView extends FrameLayout implements
         @Override
         public void run() {
             if (delegate != null) {
-                delegate.needStartRecordVideo(0, true, 0, 0, 0, 0, 0);
+                // DevGram (как exteraGram): режим «Спросить» — показать выбор камеры кружка
+                // после инициализации камеры, до старта записи.
+                if (devgramIsRoundCameraAsk()) {
+                    devgramShowRoundCameraChooser();
+                } else {
+                    delegate.needStartRecordVideo(0, true, 0, 0, 0, 0, 0);
+                }
             }
         }
     };
+
+    // DevGram: камера кружков в режиме «Спросить» (dg_roundCameraMode == 2).
+    private boolean devgramRoundCameraChooserShowing;
+    private static boolean devgramIsRoundCameraAsk() {
+        return MessagesController.getGlobalMainSettings().getInt("dg_roundCameraMode", 0) == 2;
+    }
+
+    private void devgramShowRoundCameraChooser() {
+        if (parentActivity == null) {
+            return;
+        }
+        devgramRoundCameraChooserShowing = true;
+        AlertDialog.Builder b = new AlertDialog.Builder(parentActivity, resourcesProvider);
+        b.setTitle("Камера кружка");
+        b.setItems(new CharSequence[]{"Передняя", "Задняя"},
+                (d, which) -> devgramOpenRoundCamera(which == 0));
+        b.setOnDismissListener(d -> {
+            // Закрыли без выбора — запись так и не стартовала (needStartRecordVideo(0) отложен),
+            // InstantCameraView не показан. Просто снимаем «взведённое» состояние жеста.
+            if (!recordingAudioVideo) {
+                devgramRoundCameraChooserShowing = false;
+                CameraController.getInstance().cancelOnInitRunnable(onFinishInitCameraRunnable);
+            }
+        });
+        b.show();
+    }
+
+    private void devgramOpenRoundCamera(boolean front) {
+        devgramRoundCameraChooserShowing = false;
+        if (delegate == null) {
+            return;
+        }
+        // InstantCameraView читает rearVideoMessages в showCamera() — задаём выбранную сторону.
+        MessagesController.getGlobalMainSettings().edit().putBoolean("rearVideoMessages", !front).apply();
+        delegate.needStartRecordVideo(0, true, 0, 0, 0, 0, 0);
+        if (recordingAudioVideo) {
+            return;
+        }
+        recordingAudioVideo = true;
+        updateRecordInterface(RECORD_STATE_ENTER, true);
+        if (recordCircle != null) {
+            recordCircle.showWaves(false, false);
+            // Палец уже отпущен (жест «проглочен» гардом) — фиксируем запись hands-free,
+            // имитируя слайд-лок: две установки lockTranslation с разницей ≥ порога (dp57).
+            setSlideToCancelProgress(1f);
+            recordCircle.setLockTranslation(AndroidUtilities.dp(200));
+            recordCircle.setLockTranslation(AndroidUtilities.dp(120));
+        }
+        if (recordTimerView != null) {
+            recordTimerView.reset();
+        }
+    }
 
     private boolean recordAudioVideoRunnableStarted;
     private boolean calledRecordRunnable;
@@ -924,7 +982,9 @@ public class ChatActivityEnterView extends FrameLayout implements
                 } else {
                     onFinishInitCameraRunnable.run();
                 }
-                if (!recordingAudioVideo) {
+                // DevGram: в режиме «Спросить» интерфейс записи запускается уже после выбора камеры
+                // (в devgramOpenRoundCamera), а не здесь.
+                if (!devgramIsRoundCameraAsk() && !recordingAudioVideo) {
                     recordingAudioVideo = true;
                     updateRecordInterface(RECORD_STATE_ENTER, true);
                     if (recordCircle != null) {
@@ -2951,6 +3011,11 @@ public class ChatActivityEnterView extends FrameLayout implements
             public boolean onTouchEvent(MotionEvent motionEvent) {
                 if (isLiveComment) return false;
                 createRecordCircle();
+                // DevGram: пока открыт выбор камеры кружка («Спросить») — глотаем касания кнопки,
+                // чтобы отпускание пальца не завершило жест до выбора стороны.
+                if (devgramRoundCameraChooserShowing) {
+                    return true;
+                }
                 if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
                     if (recordCircle.isSendButtonVisible()) {
                         if (!hasRecordVideo || calledRecordRunnable) {

@@ -52,6 +52,7 @@ import com.google.common.base.Charsets;
 import org.json.JSONArray;
 import org.json.JSONTokener;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.DevGramTranslator;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.LanguageDetector;
 import org.telegram.messenger.LocaleController;
@@ -392,6 +393,26 @@ public class TranslateAlert2 extends BottomSheet implements NotificationCenter.N
                     MessageObject.addEntitiesToText(translated, text.entities, false, true, false, false);
                     translated = preprocessText(translated);
                     textView.setText(translated);
+                    adapter.updateMainView(textViewContainer);
+                } else if (firstTranslation) {
+                    dismiss();
+                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_ERROR, LocaleController.getString(R.string.TranslationFailedAlert2));
+                } else {
+                    BulletinFactory.of((FrameLayout) containerView, resourcesProvider).createErrorBulletin(LocaleController.getString(R.string.TranslationFailedAlert2)).show();
+                    headerView.toLanguageTextView.setText(languageName(toLanguage = prevToLanguage));
+                    adapter.updateMainView(textViewContainer);
+                }
+            });
+            return;
+        }
+
+        if (DevGramTranslator.usesExternalProvider()) {
+            DevGramTranslator.translate(textWithEntities.text, fromLanguage, lang, (translatedText, error) -> {
+                if (translatedText != null && translatedText.text != null) {
+                    firstTranslation = false;
+                    CharSequence translated = SpannableStringBuilder.valueOf(translatedText.text);
+                    MessageObject.addEntitiesToText(translated, translatedText.entities, false, true, false, false);
+                    textView.setText(preprocessText(translated));
                     adapter.updateMainView(textViewContainer);
                 } else if (firstTranslation) {
                     dismiss();

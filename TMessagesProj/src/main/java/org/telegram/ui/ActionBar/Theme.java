@@ -262,6 +262,7 @@ public class Theme {
         public float crossfadeProgress;
         public boolean isCrossfadeBackground;
         public boolean lastDrawWithShadow;
+        private boolean lastRemoveTailBg; // DevGram: последнее значение removeMessageTail для кэша фонового пузыря
         private Bitmap crosfadeFromBitmap;
         private Shader crosfadeFromBitmapShader;
 
@@ -484,6 +485,14 @@ public class Theme {
         }
 
         public Drawable getBackgroundDrawable() {
+            // DevGram: кэш фонового пузыря запекает хвост; при смене «Убрать хвост» сбрасываем кэш (иначе останется старый).
+            boolean removeTailNow = org.telegram.messenger.DevGramConfig.removeMessageTail;
+            if (lastRemoveTailBg != removeTailNow) {
+                lastRemoveTailBg = removeTailNow;
+                for (int i = 0; i < currentBackgroundDrawableRadius.length; i++) {
+                    java.util.Arrays.fill(currentBackgroundDrawableRadius[i], -1);
+                }
+            }
             int newRad;
             if (overrideRoundRadius != 0) {
                 newRad = overrideRoundRadius;

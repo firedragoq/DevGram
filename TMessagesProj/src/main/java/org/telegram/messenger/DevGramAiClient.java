@@ -1,5 +1,7 @@
 package org.telegram.messenger;
 
+import android.content.SharedPreferences;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -15,23 +17,110 @@ import java.nio.charset.StandardCharsets;
 public final class DevGramAiClient {
     public interface Callback { void done(String result, Throwable error); }
 
+    /** Потоковый колбэк: onDelta — кусочки ответа по мере генерации, onDone — финал/ошибка. */
+    public interface StreamCallback {
+        void onDelta(String delta);
+        void onDone(String full, Throwable error);
+    }
+
     private DevGramAiClient() {}
 
     public static boolean isConfigured() {
         return !MessagesController.getGlobalMainSettings().getString("dg_aiKey", "").trim().isEmpty();
     }
 
+    /** Одиночный запрос (без стрима) — редактор, пересказ, «Сгенерировать ответ». */
     public static void generate(String prompt, Callback callback) {
+        generate(prompt, false, callback);
+    }
+
+    /**
+     * Одиночный запрос с опциональной общей историей AI Chat — как у exteraGram.
+     * При успешной генерации новая пара user/assistant сохраняется в dg_aiHistory.
+     */
+    public static void generate(String prompt, boolean useHistory, Callback callback) {
+        JSONArray messages = new JSONArray();
+        try {
+            if (useHistory) {
+                String saved = MessagesController.getGlobalMainSettings().getString("dg_aiHistory", "");
+                if (!saved.isEmpty()) {
+                    JSONArray history = trimConversationHistory(new JSONArray(saved));
+                    for (int i = 0; i < history.length(); i++) {
+                        JSONObject message = history.optJSONObject(i);
+                        if (message != null) {
+                            messages.put(copyMessage(message));
+                        }
+                    }
+                }
+            }
+            messages.put(new JSONObject().put("role", "user").put("content", prompt));
+        } catch (Throwable ignore) {}
+        final JSONArray conversation = messages;
+        request(messages, false, new StreamCallback() {
+            @Override public void onDelta(String delta) {}
+            @Override public void onDone(String full, Throwable error) {
+                if (useHistory && error == null && full != null && !full.isEmpty()) {
+                    try {
+                        conversation.put(new JSONObject().put("role", "assistant").put("content", full));
+                        MessagesController.getGlobalMainSettings().edit()
+                                .putString("dg_aiHistory", trimConversationHistory(conversation).toString())
+                                .apply();
+                    } catch (Throwable ignore) {}
+                }
+                callback.done(full, error);
+            }
+        });
+    }
+
+    private static JSONObject copyMessage(JSONObject source) throws Exception {
+        return new JSONObject()
+                .put("role", source.optString("role"))
+                .put("content", source.optString("content"));
+    }
+
+    /** Same limits as exteraGram: at most 32 messages and roughly 24k characters. */
+    private static JSONArray trimConversationHistory(JSONArray source) {
+        JSONArray reversed = new JSONArray();
+        int characters = 0;
+        for (int i = source.length() - 1; i >= 0 && reversed.length() < 32; i--) {
+            JSONObject message = source.optJSONObject(i);
+            if (message == null) continue;
+            String role = message.optString("role", "");
+            String content = message.optString("content", "");
+            if (role.isEmpty() || content.isEmpty()) continue;
+            characters += content.length();
+            if (characters > 24000 && reversed.length() > 0) break;
+            try {
+                reversed.put(copyMessage(message));
+            } catch (Throwable ignore) {}
+        }
+
+        JSONArray result = new JSONArray();
+        for (int i = reversed.length() - 1; i >= 0; i--) {
+            JSONObject message = reversed.optJSONObject(i);
+            if (message != null) result.put(message);
+        }
+        while (result.length() > 0) {
+            JSONObject first = result.optJSONObject(0);
+            if (first == null || !"assistant".equals(first.optString("role"))) break;
+            result.remove(0);
+        }
+        return result;
+    }
+
+    /** Диалог с историей + опциональный стриминг — экран ИИ-чата. */
+    public static void generate(JSONArray conversation, boolean stream, StreamCallback callback) {
+        request(conversation, stream, callback);
+    }
+
+    /** Тестовый запрос с явными кредами (без сохранения в prefs) — для «Проверить и сохранить». */
+    public static void test(String endpoint, String model, String key, Callback callback) {
         new Thread(() -> {
             String result = null;
             Throwable error = null;
             HttpURLConnection connection = null;
             try {
-                String endpoint = MessagesController.getGlobalMainSettings().getString(
-                        "dg_aiEndpoint", "https://api.openai.com/v1/chat/completions");
-                String model = MessagesController.getGlobalMainSettings().getString("dg_aiModel", "gpt-4o-mini");
-                String key = MessagesController.getGlobalMainSettings().getString("dg_aiKey", "");
-                if (key.trim().isEmpty()) throw new IllegalStateException("Сначала укажите API-ключ");
+                if (key == null || key.trim().isEmpty()) throw new IllegalStateException("Не указан API-ключ");
                 connection = (HttpURLConnection) new URL(endpoint).openConnection();
                 connection.setConnectTimeout(20000);
                 connection.setReadTimeout(60000);
@@ -41,32 +130,152 @@ public final class DevGramAiClient {
                 connection.setDoOutput(true);
                 JSONObject body = new JSONObject();
                 body.put("model", model);
-                body.put("temperature", 0.7);
                 JSONArray messages = new JSONArray();
-                messages.put(new JSONObject().put("role", "user").put("content", prompt));
+                messages.put(new JSONObject().put("role", "user").put("content", "Say 'hi'."));
                 body.put("messages", messages);
                 try (OutputStream out = connection.getOutputStream()) {
                     out.write(body.toString().getBytes(StandardCharsets.UTF_8));
                 }
                 int code = connection.getResponseCode();
-                InputStream stream = code >= 200 && code < 300
-                        ? connection.getInputStream() : connection.getErrorStream();
-                StringBuilder response = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) response.append(line);
+                InputStream in = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
+                StringBuilder resp = new StringBuilder();
+                if (in != null) {
+                    try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                        String l;
+                        while ((l = r.readLine()) != null) resp.append(l);
+                    }
                 }
-                if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code + ": " + response);
-                result = new JSONObject(response.toString()).getJSONArray("choices")
+                if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code + ": " + resp);
+                result = new JSONObject(resp.toString()).getJSONArray("choices")
                         .getJSONObject(0).getJSONObject("message").getString("content");
             } catch (Throwable t) {
                 error = t;
             } finally {
                 if (connection != null) connection.disconnect();
             }
-            String finalResult = result;
-            Throwable finalError = error;
-            AndroidUtilities.runOnUIThread(() -> callback.done(finalResult, finalError));
+            final String fr = result;
+            final Throwable fe = error;
+            AndroidUtilities.runOnUIThread(() -> callback.done(fr, fe));
+        }, "DevGramAITest").start();
+    }
+
+    private static void request(JSONArray conversation, boolean stream, StreamCallback callback) {
+        new Thread(() -> {
+            String result = null;
+            Throwable error = null;
+            HttpURLConnection connection = null;
+            StringBuilder full = new StringBuilder();
+            try {
+                SharedPreferences prefs = MessagesController.getGlobalMainSettings();
+                String endpoint = prefs.getString("dg_aiEndpoint", "https://api.openai.com/v1/chat/completions");
+                String model = prefs.getString("dg_aiModel", "gpt-4o-mini");
+                String key = prefs.getString("dg_aiKey", "");
+                if (key.trim().isEmpty()) throw new IllegalStateException("Сначала укажите API-ключ");
+
+                connection = (HttpURLConnection) new URL(endpoint).openConnection();
+                connection.setConnectTimeout(20000);
+                connection.setReadTimeout(120000);
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("Authorization", "Bearer " + key);
+                connection.setDoOutput(true);
+
+                JSONObject body = new JSONObject();
+                body.put("model", model);
+                // Температура из настроек AI Chat (слайдер 0.0–2.0), дефолт 1.0.
+                body.put("temperature", prefs.getFloat("dg_aiTemperature", 1.0f));
+                if (stream) {
+                    body.put("stream", true);
+                }
+                // «Рассуждения» активного сервиса — параметр зависит от провайдера.
+                if (prefs.getBoolean("dg_aiReasoning", false)) {
+                    if ("OpenRouter".equals(prefs.getString("dg_aiProvider", ""))) {
+                        body.put("reasoning", new JSONObject().put("effort", "medium"));
+                    } else {
+                        body.put("reasoning_effort", "medium");
+                    }
+                }
+
+                JSONArray messages = new JSONArray();
+                // Роль (системный промпт) из настроек AI Chat.
+                String systemPrompt = prefs.getString("dg_aiSystemPrompt", "");
+                if (systemPrompt != null && !systemPrompt.trim().isEmpty()) {
+                    messages.put(new JSONObject().put("role", "system").put("content", systemPrompt));
+                }
+                for (int i = 0; i < conversation.length(); i++) {
+                    JSONObject m = conversation.optJSONObject(i);
+                    if (m != null) messages.put(m);
+                }
+                body.put("messages", messages);
+
+                try (OutputStream out = connection.getOutputStream()) {
+                    out.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                }
+                int code = connection.getResponseCode();
+                InputStream in = code >= 200 && code < 300
+                        ? connection.getInputStream() : connection.getErrorStream();
+
+                if (code < 200 || code >= 300) {
+                    StringBuilder err = new StringBuilder();
+                    if (in != null) {
+                        try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                            String l;
+                            while ((l = r.readLine()) != null) err.append(l);
+                        }
+                    }
+                    throw new IllegalStateException("HTTP " + code + ": " + err);
+                }
+
+                if (stream) {
+                    StringBuilder raw = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            raw.append(line).append('\n');
+                            if (!line.startsWith("data:")) continue;
+                            String data = line.substring(5).trim();
+                            if (data.isEmpty()) continue;
+                            if ("[DONE]".equals(data)) break;
+                            try {
+                                JSONObject delta = new JSONObject(data).getJSONArray("choices")
+                                        .getJSONObject(0).optJSONObject("delta");
+                                String piece = delta != null ? delta.optString("content", "") : "";
+                                if (!piece.isEmpty()) {
+                                    full.append(piece);
+                                    final String p = piece;
+                                    AndroidUtilities.runOnUIThread(() -> callback.onDelta(p));
+                                }
+                            } catch (Throwable ignore) {}
+                        }
+                    }
+                    // Фолбэк: сервер проигнорировал stream и вернул обычный JSON.
+                    if (full.length() == 0) {
+                        try {
+                            String content = new JSONObject(raw.toString().trim()).getJSONArray("choices")
+                                    .getJSONObject(0).getJSONObject("message").getString("content");
+                            full.append(content);
+                            final String c = content;
+                            AndroidUtilities.runOnUIThread(() -> callback.onDelta(c));
+                        } catch (Throwable ignore) {}
+                    }
+                    result = full.toString();
+                } else {
+                    StringBuilder response = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) response.append(line);
+                    }
+                    result = new JSONObject(response.toString()).getJSONArray("choices")
+                            .getJSONObject(0).getJSONObject("message").getString("content");
+                }
+            } catch (Throwable t) {
+                error = t;
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+            final String finalResult = result;
+            final Throwable finalError = error;
+            AndroidUtilities.runOnUIThread(() -> callback.onDone(finalResult, finalError));
         }, "DevGramAI").start();
     }
 }

@@ -128,3 +128,10 @@
 # Pine транзитивно тянет Google Tink, а тот ссылается на отсутствующий google-http-client
 -dontwarn com.google.api.client.http.**
 -dontwarn com.google.crypto.tink.**
+
+# DevGram: Vosk (офлайн распознавание голоса) + JNA. JNA ссылается на десктопный java.awt — игнорируем.
+-dontwarn java.awt.**
+-dontwarn com.sun.jna.**
+-keep class com.sun.jna.** { *; }
+-keep class * implements com.sun.jna.** { *; }
+-keep class org.vosk.** { *; }

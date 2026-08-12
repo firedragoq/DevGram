@@ -11,6 +11,8 @@ import android.view.View;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.DevGramConfig;
+import org.telegram.messenger.DevGramGeneralConfig;
+import org.telegram.messenger.DevGramTranslator;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -30,6 +32,21 @@ public class DevGramCategoryActivity extends BaseFragment {
     public static final int CATEGORY_SPY = 2;
     public static final int CATEGORY_APPEARANCE = 3;
     public static final int CATEGORY_CHATS = 4;
+    public static final int CATEGORY_AI = 5; // DevGram: отдельный экран «ИИ-чат» (как AiPreferencesActivity у exteraGram)
+
+    // DevGram: кнопки-переходы из «Чаты» (как asButtonWithSubtext AI/CHAT_SETTINGS у exteraGram)
+    private static final int ID_OPEN_AI = 150;
+    private static final int ID_OPEN_CHAT_SETTINGS = 151;
+    // DevGram: экран AI Chat (повтор AiPreferencesActivity exteraGram)
+    private static final int ID_AI_SERVICES = 152;
+    private static final int ID_AI_ROLES = 153;
+    private static final int ID_AI_HISTORY = 154;
+    private static final int ID_AI_STREAMING = 155;
+    private static final int ID_AI_RESP_ONLY = 156;
+    private static final int ID_AI_QUOTE = 157;
+    private static final int ID_AI_TEMPERATURE = 158;
+    private static final int ID_AI_CLEAR_HISTORY = 159;
+    private static final int MENU_OPEN_CHAT = 500; // пункт меню в шапке (не строка списка)
 
     // Режим призрака
     private static final int ID_GHOST_MASTER = 1;
@@ -49,6 +66,24 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_VPN = 17;
     private static final int ID_IOS_PROFILE = 18;
     private static final int ID_VPN_DIAG = 19;
+    private static final int ID_TRANSLATE_BUTTON = 160;
+    private static final int ID_TRANSLATE_CHAT = 161;
+    private static final int ID_TRANSLATION_PROVIDER = 162;
+    private static final int ID_TRANSLATION_FORMALITY = 163;
+    private static final int ID_TRANSLATION_TARGET = 164;
+    private static final int ID_DO_NOT_TRANSLATE = 165;
+    private static final int ID_RELATIVE_LAST_SEEN = 166;
+    private static final int ID_INAPP_VIBRATION = 167;
+    private static final int ID_FILTER_ZALGO = 168;
+    private static final int ID_YANDEX_MAPS = 169;
+    private static final int ID_DOWNLOAD_BOOST = 170;
+    private static final int ID_UPLOAD_BOOST = 171;
+    private static final int ID_CUSTOM_SAVE_PATH = 172;
+    private static final int ID_HIDE_PHONE = 173;
+    private static final int ID_SHOW_ID_DC = 174;
+    private static final int ID_HIDE_ARCHIVE = 175;
+    private static final int ID_ARCHIVE_ON_PULL = 176;
+    private static final int ID_DISABLE_UNARCHIVE_SWIPE = 177;
     // Внешний вид
     private static final int ID_NUMBER_ROUNDING = 20;
     private static final int ID_AVATAR_SHAPE = 21; // форма аватара (перенос из скрытых Fork-настроек)
@@ -59,6 +94,15 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_FORCE_SNOW = 31;
     private static final int ID_FOLDER_TABS_STYLE = 32;
     private static final int ID_STICKER_SIZE = 33;
+    private static final int ID_HIDE_STICKER_TIME = 130;
+    private static final int ID_RECOGNITION_LANG = 131;
+    private static final int ID_RECOGNITION_AI = 132;
+    private static final int ID_REMEMBER_LAST_CAMERA = 133;
+    private static final int ID_ZOOM_SLIDER = 134;
+    private static final int ID_STATIC_ZOOM = 135;
+    private static final int ID_PAUSE_MINIMIZE = 136;
+    private static final int ID_CAMERA_TYPE = 137;
+    private static final int ID_VIDEO_CAMERA = 138;
     private static final int ID_CENTER_TITLE = 34;
     // перенос рабочих настроек из скрытого Fork в наше меню
     private static final int ID_HIDE_ALL_CHATS = 35;
@@ -117,6 +161,9 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final String[] DIVIDER_STYLE_OPTIONS = {"Скрыть", "Линия", "Сегменты"};
     // Порядок значений совпадает с enum ExteraGram: GLARE, SOLID, HIDDEN.
     private static final String[] GLASS_OUTLINE_OPTIONS = {"Блики", "Сплошная", "Скрыта"};
+    private static final String[] TRANSLATION_PROVIDERS = {"Telegram", "Google", "Yandex", "DeepL"};
+    private static final String[] TRANSLATION_FORMALITIES = {"По умолчанию", "Неформально", "Формально"};
+    private static final String[] ID_DC_OPTIONS = {"Скрыть", "Telegram API", "Bot API"};
 
     // Показать меню выбора; пишет int-ключ, обновляет список
     private void showChoice(String title, String[] options, String key, int def) {
@@ -172,30 +219,32 @@ public class DevGramCategoryActivity extends BaseFragment {
     private org.telegram.ui.Components.DevGramChatListPreviewCell chatListPreview;
     private org.telegram.ui.Components.DevGramFoldersPreviewCell foldersPreview;
     private org.telegram.ui.Components.DevGramFabPreviewCell fabPreview;
-    private View messagesPreview;
-    private org.telegram.ui.Components.DevGramStickerSizePreviewCell stickerSizePreview;
-    private View doubleTapPreview;
+    private org.telegram.ui.Cells.ThemePreviewMessagesCell messagesPreview;
+    private org.telegram.ui.Cells.ThemePreviewMessagesCell stickerSizePreview;
+    private org.telegram.ui.Components.DevGramDoubleTapCell doubleTapPreview;
 
     // Реальное превью сообщений через ChatMessageCell (как у exteraGram) — базовый ThemePreviewMessagesCell.
     private View getMessagesPreview() {
         if (messagesPreview == null) {
-            messagesPreview = new org.telegram.ui.Cells.ThemePreviewMessagesCell(getContext(), getParentLayout(), 0);
+            messagesPreview = new org.telegram.ui.Cells.ThemePreviewMessagesCell(getContext(), getParentLayout(),
+                    org.telegram.ui.Cells.ThemePreviewMessagesCell.TYPE_DEVGRAM_MESSAGES);
         }
         return messagesPreview;
     }
 
+    // Реальное превью размера стикеров через ChatMessageCell (как у exteraGram) — тип TYPE_STICKER_SIZE.
     private View getStickerSizePreview() {
         if (stickerSizePreview == null) {
-            stickerSizePreview = new org.telegram.ui.Components.DevGramStickerSizePreviewCell(getContext());
+            stickerSizePreview = new org.telegram.ui.Cells.ThemePreviewMessagesCell(getContext(), getParentLayout(),
+                    org.telegram.ui.Cells.ThemePreviewMessagesCell.TYPE_STICKER_SIZE);
         }
         return stickerSizePreview;
     }
 
-    // Реальное превью двойного тапа через ChatMessageCell (базовый ThemePreviewMessagesCell)
+    // Превью двойного нажатия как у exteraGram — 2 схематичных пузыря + иконки действий (in/out).
     private View getDoubleTapPreview() {
         if (doubleTapPreview == null) {
-            doubleTapPreview = new org.telegram.ui.Cells.ThemePreviewMessagesCell(getContext(), getParentLayout(),
-                    org.telegram.ui.Cells.ThemePreviewMessagesCell.TYPE_REACTIONS_DOUBLE_TAP);
+            doubleTapPreview = new org.telegram.ui.Components.DevGramDoubleTapCell(getContext());
         }
         return doubleTapPreview;
     }
@@ -204,6 +253,11 @@ public class DevGramCategoryActivity extends BaseFragment {
     private View getStickerShapePreview() {
         if (stickerShapeCell == null) {
             stickerShapeCell = new org.telegram.ui.Components.DevGramStickerShapeCell(getContext());
+            stickerShapeCell.setOnPick(shape -> {
+                if (stickerSizePreview != null) {
+                    stickerSizePreview.reloadMessages();
+                }
+            });
         }
         return stickerShapeCell;
     }
@@ -255,17 +309,38 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_HIDE_SAVED_TAGS = 77;
     private static final int ID_FULL_RECENT_STICKERS = 78;
     private static final int ID_SHOW_ARCHIVED_STICKERS = 79;
-    private static final int ID_INAPP_CAMERA = 80;
-    private static final int ID_SYSTEM_CAMERA = 81;
     private static final int ID_ALWAYS_HD = 82;
     private static final int ID_REMOVE_MESSAGE_TAIL = 83;
     private static final int ID_REPLACE_EDITED = 84;
     private static final int ID_HIDE_SHARE_BUTTON = 85;
     private static final int ID_DOUBLE_TAP_REACTION = 86;
+    private static final int ID_DOUBLE_TAP_IN = 125;
+    private static final int ID_DOUBLE_TAP_OUT = 126;
+    private static final int ID_MSGMENU = 120;
+    private static final int ID_MSGMENU_COPYPHOTO = 121;
+    private static final int ID_MSGMENU_SAVE = 122;
+    private static final int ID_MSGMENU_HISTORY = 123;
+    private static final int ID_MSGMENU_REPORT = 124;
+    private static final int ID_MSGMENU_REPEAT = 127;
+    private static final int ID_MSGMENU_CLEAR = 128;
+    private static final int ID_MSGMENU_DETAILS = 129;
+
+    private static final String[] MSGMENU_KEYS = {"dg_msgmenu_copyphoto", "dg_msgmenu_save", "dg_msgmenu_repeat", "dg_msgmenu_clear", "dg_msgmenu_history", "dg_msgmenu_report", "dg_msgmenu_generate", "dg_msgmenu_details"};
+    private static int msgMenuCount() {
+        int c = 0;
+        for (String k : MSGMENU_KEYS) if (gPref(k, true)) c++;
+        return c;
+    }
+    private static int pauseMinCount() {
+        int c = 0;
+        if (gPref("dg_pauseVideoOnMinimize", false)) c++;
+        if (gPref("dg_pauseVoiceOnMinimize", false)) c++;
+        if (gPref("dg_pauseRoundOnMinimize", false)) c++;
+        return c;
+    }
     private static final int ID_AI_EDITOR = 87;
     private static final int ID_AI_SUMMARIES = 88;
     private static final int ID_PHOTO_HAS_STICKER = 89;
-    private static final int ID_DISABLE_MOTION_PHOTO = 90;
     private static final int ID_DISABLE_FLIP_PHOTOS = 91;
     private static final int ID_REAR_VIDEO_MESSAGES = 92;
     private static final int ID_DISABLE_VOLUME_AUTOPLAY = 93;
@@ -277,6 +352,24 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_DOUBLE_TAP_SEEK = 99;
     private static final int ID_AI_CHAT = 100;
     private static final int ID_AI_PROVIDER = 101;
+    private static final int ID_REPLY_ELEMENTS = 102;
+    private static final int ID_REPLY_COLORS = 103;
+    private static final int ID_REPLY_EMOJI = 104;
+    private static final int ID_REPLY_BACKGROUND = 105;
+    private static final int ID_HIDE_REACTIONS = 106;
+    private static final int ID_HIDE_REACTIONS_CHANNELS = 107;
+    private static final int ID_HIDE_REACTIONS_GROUPS = 108;
+    private static final int ID_HIDE_REACTIONS_PRIVATE = 109;
+    private static final int ID_QUICK_TRANSITIONS = 110;
+    private static final int ID_QUICK_TRANSITIONS_CHANNELS = 111;
+    private static final int ID_QUICK_TRANSITIONS_TOPICS = 112;
+    private static final int ID_SHOW_ONLINE_STATUS = 113;
+    private static final int ID_SHOW_POLL_RESULTS = 114;
+    private static final int ID_MSGMENU_GENERATE = 115;
+    private static final int ID_GROUP_MESSAGE_MENU = 116;
+    private static final int ID_HIDE_CAMERA_TILE = 117;
+    private static final int ID_PAUSE_VOICE_MINIMIZE = 118;
+    private static final int ID_PAUSE_ROUND_MINIMIZE = 119;
     private static final String[] DOUBLE_TAP_SEEK_OPTIONS = {"5 секунд", "10 секунд", "15 секунд", "30 секунд"};
 
     private final int category;
@@ -296,6 +389,8 @@ public class DevGramCategoryActivity extends BaseFragment {
                 return "Внешний вид";
             case CATEGORY_CHATS:
                 return "Чаты";
+            case CATEGORY_AI:
+                return "ИИ-чат";
             default:
                 return "Основные";
         }
@@ -306,11 +401,21 @@ public class DevGramCategoryActivity extends BaseFragment {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(titleFor(category));
+        // На экране AI Chat — иконка «открыть ИИ-чат» в шапке.
+        if (category == CATEGORY_AI) {
+            actionBar.createMenu().addItem(MENU_OPEN_CHAT, R.drawable.msg2_ask_question);
+        }
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 if (id == -1) {
                     finishFragment();
+                } else if (id == MENU_OPEN_CHAT) {
+                    if (org.telegram.messenger.DevGramAiClient.isConfigured()) {
+                        presentFragment(new DevGramAiChatActivity());
+                    } else {
+                        showAiProviderDialog(true);
+                    }
                 }
             }
         });
@@ -440,6 +545,15 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asShadow("Каждый чат будет отображаться с той темой, которая была "
                     + "выбрана специально для него."));
 
+            items.add(UItem.asHeader("Интерфейс DevGram"));
+            items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
+                    .setChecked(getUserConfig().showContactsTab));
+            items.add(UItem.asCheck(ID_IOS_PROFILE, "Профиль в стиле iOS")
+                    .setChecked(DevGramConfig.iosProfile));
+            items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
+                    .setChecked(DevGramConfig.hideEmojiCategories));
+            items.add(UItem.asShadow("Настройки навигации, профилей и панели выбора эмодзи."));
+
             // — Секции —
             items.add(UItem.asHeader("Секции"));
             items.add(UItem.asIntSlideView(1, 0, gInt("dg_sectionRadius", 20), 28,
@@ -464,56 +578,106 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asShadow("Меню сообщения и панель реакций становятся матовым стеклом. "
                     + "Стеклу нужно размытие — включите «Принудительное размытие»."));
         } else if (category == CATEGORY_CHATS) {
-            // Порядок основан на ChatsPreferencesActivity из ExteraGram. Уже имевшиеся
-            // функции DevGram не потеряны: они разнесены по подходящим секциям.
+            // Порядок и состав повторяют ChatsPreferencesActivity ExteraGram.
             items.add(UItem.asHeader("Стикеры"));
             items.add(UItem.asCustom(getStickerSizePreview()));
             items.add(UItem.asIntSlideView(1, 2, (int) DevGramConfig.getStickerSize(), 14,
                     val -> String.valueOf(val),
                     val -> {
                         DevGramConfig.setStickerSize(val);
-                        if (stickerSizePreview != null) stickerSizePreview.invalidate();
+                        if (stickerSizePreview != null) stickerSizePreview.reloadStickerSize();
                     }).setId(ID_STICKER_SIZE));
+            items.add(UItem.asCheck(ID_HIDE_STICKER_TIME, "Скрыть время на стикерах")
+                    .setChecked(DevGramConfig.hideStickerTime));
             items.add(UItem.asCheck(ID_FULL_RECENT_STICKERS, "Не ограничивать недавние стикеры")
                     .setChecked(gPref("fullRecentStickers", true)));
             items.add(UItem.asCheck(ID_SHOW_ARCHIVED_STICKERS, "Показывать архивные стикеры")
                     .setChecked(gPref("showArchivedStickers", false)));
-            items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
-                    .setChecked(DevGramConfig.hideEmojiCategories));
+            items.add(UItem.asCheck(ID_REPLY_ELEMENTS, "Оформление ответов  "
+                    + ((gPref("dg_replyColors", true) ? 1 : 0)
+                    + (gPref("dg_replyEmoji", true) ? 1 : 0)
+                    + (gPref("dg_replyBackground", true) ? 1 : 0)) + "/3")
+                    .setChecked(gPref("dg_replyElements", true)));
+            if (gPref("dg_replyElements", true)) {
+                items.add(UItem.asRoundCheckbox(ID_REPLY_COLORS, "Цвета отправителей")
+                        .setChecked(gPref("dg_replyColors", true)));
+                items.add(UItem.asRoundCheckbox(ID_REPLY_EMOJI, "Фоновый эмодзи")
+                        .setChecked(gPref("dg_replyEmoji", true)));
+                items.add(UItem.asRoundCheckbox(ID_REPLY_BACKGROUND, "Цветной фон ответа")
+                        .setChecked(gPref("dg_replyBackground", true)));
+            }
             items.add(UItem.asShadow(null));
 
             items.add(UItem.asHeader("Форма стикеров"));
             items.add(UItem.asCustom(getStickerShapePreview()));
             items.add(UItem.asShadow(null));
 
+            // Кнопки-переходы двухстрочным стилем (как asButtonWithSubtext AI/CHAT_SETTINGS у exteraGram):
+            // «AI Chat» — все функции ИИ вынесены на отдельный экран; «Настройки чатов» — стоковый экран Telegram.
+            items.add(UItem.asButtonWithSubtext(ID_OPEN_AI, R.drawable.msg2_ask_question, "AI Chat",
+                    "Сервисы, роли, история и генерация"));
+            items.add(UItem.asButtonWithSubtext(ID_OPEN_CHAT_SETTINGS, R.drawable.msg_discussion, "Настройки чатов",
+                    "Размер текста, обои и темы"));
+            items.add(UItem.asShadow(null));
+
+            items.add(UItem.asHeader("Стикеры и реакции"));
+            items.add(UItem.asCheck(ID_DISABLE_QUICK_REACTION, "Отключить быструю реакцию")
+                    .setChecked(gPref("disableQuickReaction", false)));
+            items.add(UItem.asCheck(ID_HIDE_SAVED_TAGS, "Скрыть теги в Избранном")
+                    .setChecked(gPref("hideSavedMessagesTags", false)));
+            items.add(UItem.asCheck(ID_HIDE_REACTIONS, "Скрывать реакции  "
+                    + ((gPref("dg_hideReactionsChannels", false) ? 1 : 0)
+                    + (gPref("dg_hideReactionsGroups", false) ? 1 : 0)
+                    + (gPref("dg_hideReactionsPrivate", false) ? 1 : 0)) + "/3")
+                    .setChecked(gPref("dg_hideReactions", false)));
+            if (gPref("dg_hideReactions", false)) {
+                items.add(UItem.asRoundCheckbox(ID_HIDE_REACTIONS_CHANNELS, "В каналах")
+                        .setChecked(gPref("dg_hideReactionsChannels", false)));
+                items.add(UItem.asRoundCheckbox(ID_HIDE_REACTIONS_GROUPS, "В группах")
+                        .setChecked(gPref("dg_hideReactionsGroups", false)));
+                items.add(UItem.asRoundCheckbox(ID_HIDE_REACTIONS_PRIVATE, "В личных чатах")
+                        .setChecked(gPref("dg_hideReactionsPrivate", false)));
+            }
+            items.add(UItem.asShadow("Настройка скрывает реакции только в выбранных типах чатов."));
+
             items.add(UItem.asHeader("Двойное нажатие"));
             items.add(UItem.asCustom(getDoubleTapPreview()));
+            items.add(UItem.asButton(ID_DOUBLE_TAP_IN, "Входящие сообщения",
+                    org.telegram.messenger.DevGramDoubleTapUtils.currentLabel(false)));
+            items.add(UItem.asButton(ID_DOUBLE_TAP_OUT, "Исходящие сообщения",
+                    org.telegram.messenger.DevGramDoubleTapUtils.currentLabel(true)));
             items.add(UItem.asButton(ID_DOUBLE_TAP_REACTION, "Реакция по двойному нажатию",
                     doubleTapReactionLabel()));
-            items.add(UItem.asShadow("Дважды нажми на превью — проиграется выбранная реакция."));
+            items.add(UItem.asShadow("Действие по двойному нажатию — отдельно для входящих и исходящих. Для действия «Реакции» выбери саму реакцию выше."));
 
-            items.add(UItem.asHeader("Поведение чата"));
-            items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
-                    .setChecked(DevGramConfig.disableMarkdown));
-            items.add(UItem.asCheck(ID_REPLACE_FORWARD, "Заменять пересылку")
-                    .setChecked(gPref("replaceForward", true)));
-            items.add(UItem.asCheck(ID_MENTION_BY_NAME, "Упоминать по имени")
-                    .setChecked(gPref("mentionByName", false)));
+            items.add(UItem.asHeader("Чаты"));
             items.add(UItem.asCheck(ID_HIDE_SEND_AS, "Скрыть кнопку «Отправить от имени»")
                     .setChecked(gPref("hideSendAs", false)));
-            items.add(UItem.asCheck(ID_DISABLE_LINK_PREVIEW, "Не создавать предпросмотр ссылок")
-                    .setChecked(gPref("disableLinkPreviewByDefault", false)));
             items.add(UItem.asCheck(ID_HIDE_KEYBOARD_ON_SCROLL, "Скрывать клавиатуру при прокрутке")
                     .setChecked(DevGramConfig.hideKeyboardOnScroll));
             items.add(UItem.asCheck(ID_DISABLE_GREETING, "Скрыть приветственный стикер")
                     .setChecked(DevGramConfig.disableGreetingSticker));
             items.add(UItem.asCheck(ID_COMMA_AFTER_MENTION, "Запятая после упоминания")
                     .setChecked(DevGramConfig.addCommaAfterMention));
-            items.add(UItem.asCheck(ID_DISABLE_NEXT_CHANNEL, "Отключить переход к следующему каналу")
-                    .setChecked(gPref("disableSlideToNextChannel", false)));
-            items.add(UItem.asCheck(ID_TIME_WITH_SECONDS, "Время с секундами")
-                    .setChecked(DevGramConfig.isFormatWithSeconds()));
-            items.add(UItem.asShadow("Настройки применяются к полю ввода и навигации внутри чатов."));
+            items.add(UItem.asCheck(ID_DISABLE_MARKDOWN, "Отключить Markdown")
+                    .setChecked(DevGramConfig.disableMarkdown));
+            items.add(UItem.asCheck(ID_REPLACE_FORWARD, "Заменять пересылку")
+                    .setChecked(gPref("replaceForward", true)));
+            items.add(UItem.asCheck(ID_MENTION_BY_NAME, "Упоминать по имени")
+                    .setChecked(gPref("mentionByName", false)));
+            items.add(UItem.asCheck(ID_DISABLE_LINK_PREVIEW, "Не создавать предпросмотр ссылок")
+                    .setChecked(gPref("disableLinkPreviewByDefault", false)));
+            items.add(UItem.asCheck(ID_QUICK_TRANSITIONS, "Быстрые переходы  "
+                    + ((gPref("dg_quickTransitionsChannels", true) ? 1 : 0)
+                    + (gPref("dg_quickTransitionsTopics", true) ? 1 : 0)) + "/2")
+                    .setChecked(gPref("dg_quickTransitions", true)));
+            if (gPref("dg_quickTransitions", true)) {
+                items.add(UItem.asRoundCheckbox(ID_QUICK_TRANSITIONS_CHANNELS, "Между каналами")
+                        .setChecked(gPref("dg_quickTransitionsChannels", true)));
+                items.add(UItem.asRoundCheckbox(ID_QUICK_TRANSITIONS_TOPICS, "Между темами")
+                        .setChecked(gPref("dg_quickTransitionsTopics", true)));
+            }
+            items.add(UItem.asShadow("Переход свайпом можно отдельно отключить для каналов и тем."));
 
             items.add(UItem.asHeader("Сообщения"));
             items.add(UItem.asCustom(getMessagesPreview()));
@@ -521,72 +685,215 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.removeMessageTail));
             items.add(UItem.asCheck(ID_REPLACE_EDITED, "Заменить «изменено» значком")
                     .setChecked(DevGramConfig.replaceEditedWithIcon));
+            items.add(UItem.asCheck(ID_SHOW_ONLINE_STATUS, "Показывать онлайн на аватарах")
+                    .setChecked(gPref("dg_showOnlineStatus", false)));
             items.add(UItem.asCheck(ID_HIDE_SHARE_BUTTON, "Скрыть кнопку «Поделиться»")
                     .setChecked(DevGramConfig.hideShareButton));
+            items.add(UItem.asCheck(ID_SHOW_POLL_RESULTS, "Показывать результаты опроса до голоса")
+                    .setChecked(gPref("dg_showPollResults", false)));
+            // Мастер-группа «Меню сообщения» (как у exteraGram): галочки прячут пункты контекстного меню
+            items.add(UItem.asCheck(ID_MSGMENU, "Меню сообщения  " + msgMenuCount() + "/8")
+                    .setChecked(gPref("dg_msgmenu", true)));
+            if (gPref("dg_msgmenu", true)) {
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_COPYPHOTO, "Копировать фото")
+                        .setChecked(gPref("dg_msgmenu_copyphoto", true)));
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_SAVE, "Сохранить")
+                        .setChecked(gPref("dg_msgmenu_save", true)));
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_REPEAT, "Повторить")
+                        .setChecked(gPref("dg_msgmenu_repeat", true)));
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_CLEAR, "Очистить")
+                        .setChecked(gPref("dg_msgmenu_clear", true)));
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_HISTORY, "История сообщений")
+                        .setChecked(gPref("dg_msgmenu_history", true)));
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_REPORT, "Пожаловаться")
+                        .setChecked(gPref("dg_msgmenu_report", true)));
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_GENERATE, "Сгенерировать ответ")
+                        .setChecked(gPref("dg_msgmenu_generate", true)));
+                items.add(UItem.asRoundCheckbox(ID_MSGMENU_DETAILS, "Детали")
+                        .setChecked(gPref("dg_msgmenu_details", true)));
+            }
+            items.add(UItem.asCheck(ID_GROUP_MESSAGE_MENU, "Группировать меню сообщения")
+                    .setChecked(gPref("dg_groupMessageMenu", true)));
             items.add(UItem.asShadow("Изменения сразу отображаются на превью выше."));
 
-            items.add(UItem.asHeader("Реакции"));
-            items.add(UItem.asCheck(ID_DISABLE_QUICK_REACTION, "Отключить быструю реакцию")
-                    .setChecked(gPref("disableQuickReaction", false)));
-            items.add(UItem.asCheck(ID_HIDE_MESSAGE_REACTIONS, "Скрыть реакции под сообщениями")
-                    .setChecked(gPref("hideMessageReactions", false)));
-            items.add(UItem.asCheck(ID_HIDE_SAVED_TAGS, "Скрыть теги в Избранном")
-                    .setChecked(gPref("hideSavedMessagesTags", false)));
-            items.add(UItem.asShadow(null));
-
-            items.add(UItem.asHeader("Функции ИИ"));
-            items.add(UItem.asButton(ID_AI_CHAT, "ИИ-чат",
-                    org.telegram.messenger.DevGramAiClient.isConfigured() ? "Готов" : "Нужен API-ключ"));
-            items.add(UItem.asButton(ID_AI_PROVIDER, "Провайдер ИИ",
-                    gPrefString("dg_aiModel", "gpt-4o-mini")));
-            items.add(UItem.asCheck(ID_AI_EDITOR, "Редактор текста с ИИ")
-                    .setChecked(!gPref("hideAiEditor", false)));
-            items.add(UItem.asCheck(ID_AI_SUMMARIES, "Краткие пересказы сообщений")
-                    .setChecked(!gPref("dg_hideAiSummaries", false)));
-            items.add(UItem.asShadow("Редактор доступен в поле ввода и подписях, пересказ — у длинных сообщений."));
-
-            items.add(UItem.asHeader("Медиа"));
-            items.add(UItem.asCheck(ID_INAPP_CAMERA, "Камера внутри приложения")
-                    .setChecked(org.telegram.messenger.SharedConfig.inappCamera));
-            items.add(UItem.asCheck(ID_SYSTEM_CAMERA, "Использовать системную камеру")
-                    .setChecked(gPref("systemCamera", false))
-                    .setEnabled(org.telegram.messenger.SharedConfig.inappCamera));
-            items.add(UItem.asCheck(ID_ALWAYS_HD, "Всегда отправлять фото в HD")
-                    .setChecked(org.telegram.messenger.SharedConfig.photoHighQualityDefault));
-            items.add(UItem.asCheck(ID_PHOTO_HAS_STICKER, "Помечать фото со стикерами")
-                    .setChecked(gPref("photoHasSticker", true)));
-            items.add(UItem.asCheck(ID_DISABLE_MOTION_PHOTO, "Отключить Motion Photo")
-                    .setChecked(gPref("disableMotionPhoto", false)));
-            items.add(UItem.asCheck(ID_DISABLE_FLIP_PHOTOS, "Не отражать фотографии")
-                    .setChecked(gPref("disableFlipPhotos", false)));
-            items.add(UItem.asCheck(ID_REAR_VIDEO_MESSAGES, "Кружки с задней камеры")
-                    .setChecked(gPref("rearVideoMessages", false)));
-            items.add(UItem.asCheck(ID_DISABLE_VOLUME_AUTOPLAY, "Не запускать видео кнопкой громкости")
-                    .setChecked(gPref("disablePlayVisibleVideoOnVolume", false)));
-            items.add(UItem.asCheck(ID_DISABLE_RECENT_FILES, "Скрыть недавние файлы во вложениях")
-                    .setChecked(gPref("disableRecentFilesAttachment", false)));
-            items.add(UItem.asCheck(ID_PREFER_ORIGINAL_QUALITY, "Предпочитать исходное качество видео")
-                    .setChecked(gPref("dg_preferOriginalQuality", false)));
-            items.add(UItem.asButton(ID_DOUBLE_TAP_SEEK, "Перемотка двойным нажатием",
-                    DOUBLE_TAP_SEEK_OPTIONS[Math.max(0, Math.min(3, gInt("dg_doubleTapSeek", 1)))]));
-            items.add(UItem.asCheck(ID_SWIPE_TO_PIP, "Смахивание в картинку-в-картинке")
-                    .setChecked(gPref("dg_swipeToPip", true)));
-            items.add(UItem.asCheck(ID_PAUSE_VIDEO_MINIMIZE, "Ставить видео на паузу при сворачивании")
-                    .setChecked(gPref("dg_pauseVideoOnMinimize", false)));
-            items.add(UItem.asShadow(null));
+            items.add(UItem.asHeader("Распознавание голоса"));
+            items.add(UItem.asButton(ID_RECOGNITION_LANG, "Язык распознавания", recognitionLangLabel()));
+            items.add(UItem.asCheck(ID_RECOGNITION_AI, "Обрабатывать результат ИИ")
+                    .setChecked(DevGramConfig.isRecognitionAiPostProcessing()));
+            items.add(UItem.asShadow("Офлайн-распознавание голосовых через Vosk — прямо на телефоне, без интернета "
+                    + "(нужно скачать модель языка ~40–50 МБ). Работает по кнопке транскрипции у голосовых."));
 
             items.add(UItem.asHeader("Голосовые сообщения"));
             items.add(UItem.asCheck(ID_DISABLE_AUTOPLAY_VOICE, "Не включать следующее голосовое автоматически")
                     .setChecked(gPref("disableAutoplayNextVoice", false)));
             items.add(UItem.asShadow(null));
 
-            items.add(UItem.asHeader("Отображение"));
-            items.add(UItem.asCheck(ID_NUMBER_ROUNDING, "Отключить округление чисел")
-                    .setChecked(DevGramConfig.disableNumberRounding));
+            // Разбивка как у exteraGram: Камера / Фото / Видео.
+            items.add(UItem.asHeader("Камера"));
+            items.add(UItem.asButton(ID_CAMERA_TYPE, "Тип камеры", cameraTypeLabel()));
+            items.add(UItem.asButton(ID_VIDEO_CAMERA, "Камера кружков", videoCameraLabel()));
+            items.add(UItem.asCheck(ID_REMEMBER_LAST_CAMERA, "Запоминать последнюю камеру")
+                    .setChecked(DevGramConfig.isRememberLastCamera()));
+            items.add(UItem.asCheck(ID_ZOOM_SLIDER, "Слайдер зума")
+                    .setChecked(DevGramConfig.isZoomSlider()));
+            items.add(UItem.asCheck(ID_STATIC_ZOOM, "Статичный зум")
+                    .setChecked(DevGramConfig.isStaticZoom()));
+            items.add(UItem.asShadow("«Запоминать» — кружки открываются той камерой, которой снимали в прошлый раз. "
+                    + "«Слайдер зума» — ползунок зума в камере кружков. «Статичный зум» — не сбрасывать зум после жеста."));
+
+            items.add(UItem.asHeader("Фото"));
+            items.add(UItem.asCheck(ID_ALWAYS_HD, "Всегда отправлять фото в HD")
+                    .setChecked(org.telegram.messenger.SharedConfig.photoHighQualityDefault));
+            items.add(UItem.asCheck(ID_HIDE_CAMERA_TILE, "Скрыть плитку камеры")
+                    .setChecked(gPref("dg_hideCameraTile", false)));
+            items.add(UItem.asCheck(ID_PHOTO_HAS_STICKER, "Помечать фото со стикерами")
+                    .setChecked(gPref("photoHasSticker", true)));
+            items.add(UItem.asCheck(ID_DISABLE_FLIP_PHOTOS, "Не отражать фотографии")
+                    .setChecked(gPref("disableFlipPhotos", false)));
             items.add(UItem.asShadow(null));
+
+            items.add(UItem.asHeader("Вложения"));
+            items.add(UItem.asCheck(ID_DISABLE_RECENT_FILES, "Скрыть недавние файлы во вложениях")
+                    .setChecked(gPref("disableRecentFilesAttachment", false)));
+            items.add(UItem.asShadow(null));
+
+            items.add(UItem.asHeader("Видео"));
+            items.add(UItem.asCheck(ID_PREFER_ORIGINAL_QUALITY, "Предпочитать исходное качество видео")
+                    .setChecked(gPref("dg_preferOriginalQuality", false)));
+            items.add(UItem.asButton(ID_DOUBLE_TAP_SEEK, "Перемотка двойным нажатием",
+                    DOUBLE_TAP_SEEK_OPTIONS[Math.max(0, Math.min(3, gInt("dg_doubleTapSeek", 1)))]));
+            items.add(UItem.asCheck(ID_SWIPE_TO_PIP, "Смахивание в картинку-в-картинке")
+                    .setChecked(gPref("dg_swipeToPip", true)));
+            items.add(UItem.asCheck(ID_DISABLE_VOLUME_AUTOPLAY, "Включать звук кнопками громкости")
+                    .setChecked(!gPref("disablePlayVisibleVideoOnVolume", false)));
+            // Мастер-группа «Пауза при сворачивании» (как у exteraGram): тумблер + галочки типов
+            items.add(UItem.asCheck(ID_PAUSE_MINIMIZE, "Пауза при сворачивании  " + pauseMinCount() + "/3")
+                    .setChecked(gPref("dg_pauseOnMinimize", false)));
+            if (gPref("dg_pauseOnMinimize", false)) {
+                items.add(UItem.asRoundCheckbox(ID_PAUSE_VIDEO_MINIMIZE, "Видео")
+                        .setChecked(gPref("dg_pauseVideoOnMinimize", false)));
+                items.add(UItem.asRoundCheckbox(ID_PAUSE_VOICE_MINIMIZE, "Голосовые")
+                        .setChecked(gPref("dg_pauseVoiceOnMinimize", false)));
+                items.add(UItem.asRoundCheckbox(ID_PAUSE_ROUND_MINIMIZE, "Кружки")
+                        .setChecked(gPref("dg_pauseRoundOnMinimize", false)));
+            }
+            items.add(UItem.asShadow("Проигрываемое медиа встаёт на паузу, когда сворачиваешь приложение."));
+        } else if (category == CATEGORY_AI) {
+            // Экран «AI Chat» — повтор AiPreferencesActivity exteraGram.
+            items.add(UItem.asTopView("AI Chat", "Генерируйте текст по сообщениям или перед отправкой.",
+                    "RestrictedEmoji", "🤖"));
+            items.add(UItem.asShadow(null));
+
+            items.add(UItem.asHeader("Основные"));
+            items.add(UItem.asButton(ID_AI_SERVICES, R.drawable.msg_language, "Сервисы", aiServicesLabel()));
+            items.add(UItem.asButton(ID_AI_ROLES, R.drawable.msg_openprofile, "Роли", aiRoleLabel()));
+            items.add(UItem.asCheck(ID_AI_HISTORY, "История сообщений")
+                    .setChecked(gPref("dg_aiSaveHistory", true)));
+            if (gPref("dg_aiSaveHistory", true)) {
+                items.add(UItem.asButton(ID_AI_CLEAR_HISTORY, R.drawable.msg_delete, "Очистить историю").red());
+            }
+            items.add(UItem.asShadow("История диалога позволяет ИИ понимать предыдущие запросы и "
+                    + "учитывать их при генерации новых ответов."));
+
+            items.add(UItem.asHeader("Генерация"));
+            UItem streaming = UItem.asCheck(ID_AI_STREAMING, "Потоковая передача ответа")
+                    .setChecked(gPref("dg_aiStreaming", true)).setMultiline(true);
+            streaming.subtext = "Обеспечивает более плавное и быстрое отображение ответов.";
+            items.add(streaming);
+            items.add(UItem.asCheck(ID_AI_RESP_ONLY, "Показывать только ответ")
+                    .setChecked(gPref("dg_aiShowResponseOnly", false)));
+            items.add(UItem.asCheck(ID_AI_QUOTE, "Вставлять ответ как цитату")
+                    .setChecked(gPref("dg_aiInsertAsQuote", true)));
+            items.add(UItem.asShadow(null));
+
+            items.add(UItem.asHeader("Температура"));
+            items.add(UItem.asIntSlideView(1, 0, aiTempInit(), 20,
+                    val -> String.format(java.util.Locale.US, "%.1f", val / 10f),
+                    val -> org.telegram.messenger.MessagesController.getGlobalMainSettings()
+                            .edit().putFloat("dg_aiTemperature", val / 10f).apply()).setId(ID_AI_TEMPERATURE));
+            items.add(UItem.asShadow("Температура управляет случайностью ответа: чем выше значение, "
+                    + "тем креативнее ответ; чем ниже — тем точнее."));
         } else {
-            items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
-                    .setChecked(getUserConfig().showContactsTab));
+            long uid = getUserConfig().getClientUserId();
+            long myBadge = org.telegram.messenger.DevGramBadges.emojiIdOf(uid);
+            boolean hasArrow = org.telegram.messenger.DevGramBadges.isTeam(uid)
+                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_SUPPORTER
+                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_OFFICIAL;
+            if (hasArrow) {
+                items.add(UItem.asHeader("Прокси DevGram"));
+                items.add(UItem.asCheck(ID_VPN, "Прокси")
+                        .setChecked(org.telegram.messenger.DevGramProxy.isEnabled()));
+                items.add(UItem.asShadow("Быстрое включение защищённого подключения DevGram."));
+            }
+
+            items.add(UItem.asHeader("Перевод сообщений"));
+            items.add(UItem.asCheck(ID_TRANSLATE_BUTTON, "Показывать кнопку «Перевести»")
+                    .setChecked(getMessagesController().getTranslateController().isContextTranslateEnabled()));
+            items.add(UItem.asCheck(ID_TRANSLATE_CHAT, "Показывать перевод всего чата")
+                    .setChecked(getMessagesController().getTranslateController().isChatTranslateEnabled()));
+            int provider = DevGramGeneralConfig.getTranslationProvider();
+            items.add(UItem.asButton(ID_TRANSLATION_PROVIDER, "Сервис перевода", TRANSLATION_PROVIDERS[provider]));
+            if (provider == 3) {
+                items.add(UItem.asButton(ID_TRANSLATION_FORMALITY, "Стиль перевода",
+                        TRANSLATION_FORMALITIES[DevGramGeneralConfig.getTranslationFormality()]));
+            }
+            items.add(UItem.asButton(ID_TRANSLATION_TARGET, "Язык перевода", translationTargetLabel()));
+            items.add(UItem.asButton(ID_DO_NOT_TRANSLATE, "Не переводить", doNotTranslateLabel()));
+            items.add(UItem.asShadow("Настройки применяются к переводу отдельных сообщений и целых чатов."));
+
+            items.add(UItem.asHeader("Основные"));
+            items.add(UItem.asButtonCheck(ID_NUMBER_ROUNDING, "Отключить округление чисел", "1,23K → 1 234")
+                    .setChecked(DevGramConfig.disableNumberRounding));
+            items.add(UItem.asButtonCheck(ID_TIME_WITH_SECONDS, "Время с секундами", "12:34 → 12:34:56")
+                    .setChecked(DevGramConfig.isFormatWithSeconds()));
+            items.add(UItem.asCheck(ID_INAPP_VIBRATION, "Вибрация внутри приложения")
+                    .setChecked(DevGramGeneralConfig.isInAppVibration()));
+            items.add(UItem.asCheck(ID_FILTER_ZALGO, "Фильтровать Zalgo-текст")
+                    .setChecked(DevGramGeneralConfig.isFilterZalgo()));
+            items.add(UItem.asShadow("Избыточные комбинируемые символы будут скрыты, чтобы текст не ломал интерфейс."));
+
+            if ((getMessagesController().availableMapProviders & 4) != 0) {
+                items.add(UItem.asHeader("Карты"));
+                items.add(UItem.asCheck(ID_YANDEX_MAPS, "Использовать Яндекс Карты")
+                        .setChecked(DevGramGeneralConfig.isUseYandexMaps()));
+                items.add(UItem.asShadow("Для статических карт и предпросмотра геопозиций будет использоваться Яндекс."));
+            }
+
+            items.add(UItem.asHeader("Ускорение загрузки"));
+            items.add(UItem.asSlideView(new String[]{"Выкл.", "Быстро", "Ультра"},
+                    DevGramGeneralConfig.getDownloadSpeedBoost(), DevGramGeneralConfig::setDownloadSpeedBoost)
+                    .setId(ID_DOWNLOAD_BOOST));
+            items.add(UItem.asCheck(ID_UPLOAD_BOOST, "Ускорять отправку файлов")
+                    .setChecked(DevGramGeneralConfig.isUploadSpeedBoost()));
+            items.add(UItem.asShadow("Увеличивает размер частей и число параллельных сетевых запросов."));
+
+            items.add(UItem.asHeader("Хранилище"));
+            items.add(UItem.asButton(ID_CUSTOM_SAVE_PATH, "Папка сохранения", customSavePathLabel()));
+            items.add(UItem.asShadow("Подпапка внутри Изображений, Видео, Загрузок и Музыки. Пустое значение сохраняет прямо в системные папки."));
+
+            items.add(UItem.asHeader("Профиль"));
+            int fiveMinutesAgo = org.telegram.tgnet.ConnectionsManager.getInstance(currentAccount).getCurrentTime() - 300;
+            items.add(UItem.asButtonCheck(ID_RELATIVE_LAST_SEEN, "Относительное время последнего посещения",
+                    org.telegram.messenger.LocaleController.formatDateOnline(fiveMinutesAgo, null))
+                    .setChecked(DevGramGeneralConfig.isRelativeLastSeen()));
+            items.add(UItem.asCheck(ID_HIDE_PHONE, "Скрывать мой номер телефона")
+                    .setChecked(DevGramGeneralConfig.isHidePhoneNumber()));
+            items.add(UItem.asButton(ID_SHOW_ID_DC, "Показывать ID и датацентр",
+                    ID_DC_OPTIONS[DevGramGeneralConfig.getShowIdAndDc()]));
+            items.add(UItem.asShadow("ID отображается в профиле; датацентр определяется по фотографии профиля."));
+
+            items.add(UItem.asHeader("Архивированные чаты"));
+            items.add(UItem.asCheck(ID_HIDE_ARCHIVE, "Скрыть папку «Архив»")
+                    .setChecked(DevGramGeneralConfig.isHideArchiveFolder()));
+            if (!DevGramGeneralConfig.isHideArchiveFolder()) {
+                items.add(UItem.asCheck(ID_ARCHIVE_ON_PULL, "Открывать архив свайпом вниз")
+                        .setChecked(DevGramGeneralConfig.isArchiveOnPull()));
+            }
+            items.add(UItem.asCheck(ID_DISABLE_UNARCHIVE_SWIPE, "Отключить разархивацию свайпом")
+                    .setChecked(DevGramGeneralConfig.isDisableUnarchiveSwipe()));
+            items.add(UItem.asShadow("Защищает чаты в архиве от случайного возврата в основной список."));
+
+            items.add(UItem.asHeader("DevGram"));
             items.add(UItem.asCheck(ID_DISABLE_ADS, "Скрывать рекламу")
                     .setChecked(DevGramConfig.disableAds));
             items.add(UItem.asCheck(ID_LOCAL_PREMIUM, "Локальный премиум")
@@ -595,24 +902,6 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(DevGramConfig.streaksEnabled));
             items.add(UItem.asShadow("🔥N рядом с именем — сколько дней подряд вы общаетесь в личке "
                     + "(показывается от 3 дней). Выключишь — огоньки пропадут у всех."));
-
-            items.add(UItem.asCheck(ID_IOS_PROFILE, "Профиль в стиле iOS")
-                    .setChecked(DevGramConfig.iosProfile));
-            items.add(UItem.asShadow("Аватар и имя по центру, круглые стеклянные кнопки действий и "
-                    + "скруглённые полупрозрачные карточки — как на iOS. Применяется ко всем профилям. "
-                    + "Открой профиль заново, чтобы применить."));
-
-            // Прокси доступен обладателям значка: команда (✅), поддержавшие (✈️), официальные
-            long uid = getUserConfig().getClientUserId();
-            long myBadge = org.telegram.messenger.DevGramBadges.emojiIdOf(uid);
-            boolean hasArrow = org.telegram.messenger.DevGramBadges.isTeam(uid)
-                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_SUPPORTER
-                    || myBadge == org.telegram.messenger.DevGramBadges.EMOJI_OFFICIAL;
-            if (hasArrow) {
-                items.add(UItem.asCheck(ID_VPN, "Прокси")
-                        .setChecked(org.telegram.messenger.DevGramProxy.isEnabled()));
-                items.add(UItem.asShadow(null));
-            }
         }
     }
 
@@ -651,8 +940,77 @@ public class DevGramCategoryActivity extends BaseFragment {
         } else if (item.id == ID_SHOW_CONTACTS) {
             getUserConfig().setShowContactsTab(!getUserConfig().showContactsTab);
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+        } else if (item.id == ID_TRANSLATE_BUTTON) {
+            org.telegram.messenger.TranslateController controller = getMessagesController().getTranslateController();
+            controller.setContextTranslateEnabled(!controller.isContextTranslateEnabled());
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateSearchSettings);
+            rebuildAllScreens();
+            return;
+        } else if (item.id == ID_TRANSLATE_CHAT) {
+            if (!getUserConfig().isPremium() && !getMessagesController().getTranslateController().isChatTranslateEnabled()) {
+                showDialog(new org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet(this, 13, false));
+                return;
+            }
+            org.telegram.messenger.TranslateController controller = getMessagesController().getTranslateController();
+            controller.setChatTranslateEnabled(!controller.isChatTranslateEnabled());
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateSearchSettings);
+            rebuildAllScreens();
+            return;
+        } else if (item.id == ID_TRANSLATION_PROVIDER) {
+            showChoice("Сервис перевода", TRANSLATION_PROVIDERS, "dg_translationProvider", 0);
+            return;
+        } else if (item.id == ID_TRANSLATION_FORMALITY) {
+            showChoice("Стиль перевода", TRANSLATION_FORMALITIES, "dg_translationFormality", 0);
+            return;
+        } else if (item.id == ID_TRANSLATION_TARGET) {
+            showTranslationTargetPicker();
+            return;
+        } else if (item.id == ID_DO_NOT_TRANSLATE) {
+            presentFragment(new org.telegram.ui.RestrictedLanguagesSelectActivity());
+            return;
         } else if (item.id == ID_NUMBER_ROUNDING) {
             DevGramConfig.setDisableNumberRounding(!DevGramConfig.disableNumberRounding);
+            rebuildAllScreens();
+            return;
+        } else if (item.id == ID_RELATIVE_LAST_SEEN) {
+            DevGramGeneralConfig.setRelativeLastSeen(!DevGramGeneralConfig.isRelativeLastSeen());
+            rebuildAllScreens();
+            return;
+        } else if (item.id == ID_INAPP_VIBRATION) {
+            DevGramGeneralConfig.setInAppVibration(!DevGramGeneralConfig.isInAppVibration());
+            rebuildAllScreens();
+            return;
+        } else if (item.id == ID_FILTER_ZALGO) {
+            DevGramGeneralConfig.setFilterZalgo(!DevGramGeneralConfig.isFilterZalgo());
+            rebuildAllScreens();
+            return;
+        } else if (item.id == ID_YANDEX_MAPS) {
+            DevGramGeneralConfig.setUseYandexMaps(!DevGramGeneralConfig.isUseYandexMaps());
+            for (int account = 0; account < org.telegram.messenger.UserConfig.MAX_ACCOUNT_COUNT; account++) {
+                org.telegram.messenger.MessagesController mc = org.telegram.messenger.MessagesController.getInstance(account);
+                mc.mapProvider = DevGramGeneralConfig.isUseYandexMaps()
+                        ? 1 : org.telegram.messenger.MessagesController.getMainSettings(account).getInt("mapProvider", 2);
+            }
+        } else if (item.id == ID_UPLOAD_BOOST) {
+            DevGramGeneralConfig.setUploadSpeedBoost(!DevGramGeneralConfig.isUploadSpeedBoost());
+        } else if (item.id == ID_CUSTOM_SAVE_PATH) {
+            showCustomSavePathDialog();
+            return;
+        } else if (item.id == ID_HIDE_PHONE) {
+            DevGramGeneralConfig.setHidePhoneNumber(!DevGramGeneralConfig.isHidePhoneNumber());
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.mainUserInfoChanged);
+            rebuildAllScreens();
+            return;
+        } else if (item.id == ID_SHOW_ID_DC) {
+            showChoice("Показывать ID и датацентр", ID_DC_OPTIONS, "dg_showIdAndDc", 1);
+            return;
+        } else if (item.id == ID_HIDE_ARCHIVE) {
+            DevGramGeneralConfig.setHideArchiveFolder(!DevGramGeneralConfig.isHideArchiveFolder());
+            getMessagesController().checkArchiveFolder();
+        } else if (item.id == ID_ARCHIVE_ON_PULL) {
+            DevGramGeneralConfig.setArchiveOnPull(!DevGramGeneralConfig.isArchiveOnPull());
+        } else if (item.id == ID_DISABLE_UNARCHIVE_SWIPE) {
+            DevGramGeneralConfig.setDisableUnarchiveSwipe(!DevGramGeneralConfig.isDisableUnarchiveSwipe());
         } else if (item.id == ID_SQUARE_FAB) {
             DevGramConfig.setSquareFab(!DevGramConfig.squareFab);
         } else if (item.id == ID_GLASS_MENU) {
@@ -751,6 +1109,9 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setAddCommaAfterMention(!DevGramConfig.addCommaAfterMention);
         } else if (item.id == ID_TIME_WITH_SECONDS) {
             DevGramConfig.setFormatWithSeconds(!DevGramConfig.isFormatWithSeconds());
+            org.telegram.messenger.LocaleController.getInstance().recreateFormatters();
+            rebuildAllScreens();
+            return;
         } else if (item.id == ID_REPLACE_FORWARD) {
             gToggle("replaceForward", true);
         } else if (item.id == ID_MENTION_BY_NAME) {
@@ -761,24 +1122,46 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("disableLinkPreviewByDefault", false);
         } else if (item.id == ID_DISABLE_NEXT_CHANNEL) {
             gToggle("disableSlideToNextChannel", false);
+        } else if (item.id == ID_REPLY_ELEMENTS) {
+            gToggle("dg_replyElements", true);
+        } else if (item.id == ID_REPLY_COLORS) {
+            gToggle("dg_replyColors", true);
+            if (messagesPreview != null) messagesPreview.reloadMessages();
+        } else if (item.id == ID_REPLY_EMOJI) {
+            gToggle("dg_replyEmoji", true);
+            if (messagesPreview != null) messagesPreview.reloadMessages();
+        } else if (item.id == ID_REPLY_BACKGROUND) {
+            gToggle("dg_replyBackground", true);
+            if (messagesPreview != null) messagesPreview.reloadMessages();
+        } else if (item.id == ID_HIDE_REACTIONS) {
+            gToggle("dg_hideReactions", false);
+        } else if (item.id == ID_HIDE_REACTIONS_CHANNELS) {
+            gToggle("dg_hideReactionsChannels", false);
+        } else if (item.id == ID_HIDE_REACTIONS_GROUPS) {
+            gToggle("dg_hideReactionsGroups", false);
+        } else if (item.id == ID_HIDE_REACTIONS_PRIVATE) {
+            gToggle("dg_hideReactionsPrivate", false);
+        } else if (item.id == ID_QUICK_TRANSITIONS) {
+            gToggle("dg_quickTransitions", true);
+        } else if (item.id == ID_QUICK_TRANSITIONS_CHANNELS) {
+            gToggle("dg_quickTransitionsChannels", true);
+        } else if (item.id == ID_QUICK_TRANSITIONS_TOPICS) {
+            gToggle("dg_quickTransitionsTopics", true);
         } else if (item.id == ID_DISABLE_QUICK_REACTION) {
             gToggle("disableQuickReaction", false);
         } else if (item.id == ID_HIDE_MESSAGE_REACTIONS) {
             gToggle("hideMessageReactions", false);
         } else if (item.id == ID_HIDE_SAVED_TAGS) {
             gToggle("hideSavedMessagesTags", false);
+        } else if (item.id == ID_HIDE_STICKER_TIME) {
+            DevGramConfig.setHideStickerTime(!DevGramConfig.hideStickerTime);
+            if (stickerSizePreview != null) stickerSizePreview.reloadStickerSize();
         } else if (item.id == ID_FULL_RECENT_STICKERS) {
             gToggle("fullRecentStickers", true);
         } else if (item.id == ID_SHOW_ARCHIVED_STICKERS) {
             gToggle("showArchivedStickers", false);
             if (gPref("showArchivedStickers", false)) {
                 org.telegram.messenger.MediaDataController.getInstance(currentAccount).loadArchivedStickerSets();
-            }
-        } else if (item.id == ID_INAPP_CAMERA) {
-            org.telegram.messenger.SharedConfig.toggleInappCamera();
-        } else if (item.id == ID_SYSTEM_CAMERA) {
-            if (org.telegram.messenger.SharedConfig.inappCamera) {
-                gToggle("systemCamera", false);
             }
         } else if (item.id == ID_ALWAYS_HD) {
             org.telegram.messenger.SharedConfig.photoHighQualityDefault =
@@ -788,13 +1171,50 @@ public class DevGramCategoryActivity extends BaseFragment {
                             org.telegram.messenger.SharedConfig.photoHighQualityDefault).apply();
         } else if (item.id == ID_REMOVE_MESSAGE_TAIL) {
             DevGramConfig.setRemoveMessageTail(!DevGramConfig.removeMessageTail);
-            if (messagesPreview != null) messagesPreview.invalidate();
+            if (messagesPreview != null) messagesPreview.reloadMessages();
         } else if (item.id == ID_REPLACE_EDITED) {
             DevGramConfig.setReplaceEditedWithIcon(!DevGramConfig.replaceEditedWithIcon);
-            if (messagesPreview != null) messagesPreview.invalidate();
+            if (messagesPreview != null) messagesPreview.reloadMessages();
+        } else if (item.id == ID_MSGMENU) {
+            gToggle("dg_msgmenu", true);
+        } else if (item.id == ID_MSGMENU_COPYPHOTO) {
+            gToggle("dg_msgmenu_copyphoto", true);
+        } else if (item.id == ID_MSGMENU_SAVE) {
+            gToggle("dg_msgmenu_save", true);
+        } else if (item.id == ID_MSGMENU_REPEAT) {
+            gToggle("dg_msgmenu_repeat", true);
+        } else if (item.id == ID_MSGMENU_CLEAR) {
+            gToggle("dg_msgmenu_clear", true);
+        } else if (item.id == ID_MSGMENU_HISTORY) {
+            gToggle("dg_msgmenu_history", true);
+        } else if (item.id == ID_MSGMENU_REPORT) {
+            gToggle("dg_msgmenu_report", true);
+        } else if (item.id == ID_MSGMENU_GENERATE) {
+            gToggle("dg_msgmenu_generate", true);
+        } else if (item.id == ID_MSGMENU_DETAILS) {
+            gToggle("dg_msgmenu_details", true);
+        } else if (item.id == ID_GROUP_MESSAGE_MENU) {
+            gToggle("dg_groupMessageMenu", true);
+        } else if (item.id == ID_RECOGNITION_LANG) {
+            showRecognitionLanguagePicker();
+            return;
+        } else if (item.id == ID_RECOGNITION_AI) {
+            DevGramConfig.setRecognitionAiPostProcessing(!DevGramConfig.isRecognitionAiPostProcessing());
+        } else if (item.id == ID_SHOW_ONLINE_STATUS) {
+            gToggle("dg_showOnlineStatus", false);
+            if (messagesPreview != null) messagesPreview.reloadMessages();
+        } else if (item.id == ID_SHOW_POLL_RESULTS) {
+            gToggle("dg_showPollResults", false);
+            if (messagesPreview != null) messagesPreview.reloadMessages();
         } else if (item.id == ID_HIDE_SHARE_BUTTON) {
             DevGramConfig.setHideShareButton(!DevGramConfig.hideShareButton);
-            if (messagesPreview != null) messagesPreview.invalidate();
+            if (messagesPreview != null) messagesPreview.reloadMessages();
+        } else if (item.id == ID_DOUBLE_TAP_IN) {
+            showDoubleTapPicker(false);
+            return;
+        } else if (item.id == ID_DOUBLE_TAP_OUT) {
+            showDoubleTapPicker(true);
+            return;
         } else if (item.id == ID_DOUBLE_TAP_REACTION) {
             presentFragment(new org.telegram.ui.ReactionsDoubleTapManageActivity());
             return;
@@ -812,16 +1232,54 @@ public class DevGramCategoryActivity extends BaseFragment {
         } else if (item.id == ID_AI_PROVIDER) {
             showAiProviderDialog(false);
             return;
+        } else if (item.id == ID_OPEN_AI) {
+            presentFragment(new DevGramCategoryActivity(CATEGORY_AI));
+            return;
+        } else if (item.id == ID_OPEN_CHAT_SETTINGS) {
+            presentFragment(new org.telegram.ui.ThemeActivity(org.telegram.ui.ThemeActivity.THEME_TYPE_BASIC));
+            return;
+        } else if (item.id == ID_AI_SERVICES) {
+            presentFragment(new DevGramAiServicesActivity());
+            return;
+        } else if (item.id == ID_AI_ROLES) {
+            presentFragment(new DevGramAiRolesActivity());
+            return;
+        } else if (item.id == ID_AI_HISTORY) {
+            gToggle("dg_aiSaveHistory", true);
+        } else if (item.id == ID_AI_STREAMING) {
+            gToggle("dg_aiStreaming", true);
+        } else if (item.id == ID_AI_RESP_ONLY) {
+            gToggle("dg_aiShowResponseOnly", false);
+        } else if (item.id == ID_AI_QUOTE) {
+            gToggle("dg_aiInsertAsQuote", true);
+        } else if (item.id == ID_AI_CLEAR_HISTORY) {
+            org.telegram.messenger.MessagesController.getGlobalMainSettings().edit().remove("dg_aiHistory").apply();
+            if (getParentActivity() != null) {
+                android.widget.Toast.makeText(getParentActivity(), "История очищена", android.widget.Toast.LENGTH_SHORT).show();
+            }
+            return;
         } else if (item.id == ID_PHOTO_HAS_STICKER) {
             gToggle("photoHasSticker", true);
-        } else if (item.id == ID_DISABLE_MOTION_PHOTO) {
-            gToggle("disableMotionPhoto", false);
         } else if (item.id == ID_DISABLE_FLIP_PHOTOS) {
             gToggle("disableFlipPhotos", false);
         } else if (item.id == ID_REAR_VIDEO_MESSAGES) {
             gToggle("rearVideoMessages", false);
+        } else if (item.id == ID_CAMERA_TYPE) {
+            showCameraTypePicker();
+            return;
+        } else if (item.id == ID_VIDEO_CAMERA) {
+            showVideoCameraPicker();
+            return;
+        } else if (item.id == ID_REMEMBER_LAST_CAMERA) {
+            DevGramConfig.setRememberLastCamera(!DevGramConfig.isRememberLastCamera());
+        } else if (item.id == ID_ZOOM_SLIDER) {
+            DevGramConfig.setZoomSlider(!DevGramConfig.isZoomSlider());
+        } else if (item.id == ID_STATIC_ZOOM) {
+            DevGramConfig.setStaticZoom(!DevGramConfig.isStaticZoom());
         } else if (item.id == ID_DISABLE_VOLUME_AUTOPLAY) {
             gToggle("disablePlayVisibleVideoOnVolume", false);
+        } else if (item.id == ID_HIDE_CAMERA_TILE) {
+            gToggle("dg_hideCameraTile", false);
         } else if (item.id == ID_DISABLE_RECENT_FILES) {
             gToggle("disableRecentFilesAttachment", false);
         } else if (item.id == ID_DISABLE_AUTOPLAY_VOICE) {
@@ -830,8 +1288,14 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("dg_preferOriginalQuality", false);
         } else if (item.id == ID_SWIPE_TO_PIP) {
             gToggle("dg_swipeToPip", true);
+        } else if (item.id == ID_PAUSE_MINIMIZE) {
+            gToggle("dg_pauseOnMinimize", false);
         } else if (item.id == ID_PAUSE_VIDEO_MINIMIZE) {
             gToggle("dg_pauseVideoOnMinimize", false);
+        } else if (item.id == ID_PAUSE_VOICE_MINIMIZE) {
+            gToggle("dg_pauseVoiceOnMinimize", false);
+        } else if (item.id == ID_PAUSE_ROUND_MINIMIZE) {
+            gToggle("dg_pauseRoundOnMinimize", false);
         } else if (item.id == ID_DOUBLE_TAP_SEEK) {
             showChoice("Перемотка двойным нажатием", DOUBLE_TAP_SEEK_OPTIONS,
                     "dg_doubleTapSeek", 1);
@@ -842,10 +1306,117 @@ public class DevGramCategoryActivity extends BaseFragment {
         refreshList();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Обновляем значения строк (Сервисы/Роли/…) при возврате с подэкранов.
+        refreshList();
+    }
+
     private void refreshList() {
         if (listView != null && listView.adapter != null) {
             listView.adapter.update(true);
         }
+    }
+
+    private void rebuildAllScreens() {
+        refreshList();
+        if (parentLayout != null) {
+            org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> parentLayout.rebuildFragments(0), 120);
+        }
+    }
+
+    private static String translationTargetLabel() {
+        String code = org.telegram.ui.Components.TranslateAlert2.getToLanguage();
+        String name = org.telegram.ui.Components.TranslateAlert2.languageName(code);
+        return name == null || name.isEmpty() ? code : org.telegram.ui.Components.TranslateAlert2.capitalFirst(name);
+    }
+
+    private static String doNotTranslateLabel() {
+        java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+        for (String code : org.telegram.ui.RestrictedLanguagesSelectActivity.getRestrictedLanguages()) {
+            String name = org.telegram.ui.Components.TranslateAlert2.languageName(code);
+            if (name != null && !name.isEmpty()) {
+                labels.add(org.telegram.ui.Components.TranslateAlert2.capitalFirst(name));
+            }
+        }
+        java.util.Collections.sort(labels, String.CASE_INSENSITIVE_ORDER);
+        return android.text.TextUtils.join(", ", labels);
+    }
+
+    private void showTranslationTargetPicker() {
+        java.util.ArrayList<org.telegram.messenger.TranslateController.Language> languages =
+                new java.util.ArrayList<>(org.telegram.messenger.TranslateController.getLanguages());
+        languages.removeIf(language -> language == null || android.text.TextUtils.isEmpty(language.code)
+                || !DevGramTranslator.isTargetSupported(language.code));
+        CharSequence[] labels = new CharSequence[languages.size()];
+        for (int i = 0; i < languages.size(); i++) {
+            org.telegram.messenger.TranslateController.Language language = languages.get(i);
+            labels[i] = language.displayName + (android.text.TextUtils.isEmpty(language.ownDisplayName)
+                    ? "" : " — " + language.ownDisplayName);
+        }
+        org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle("Язык перевода");
+        b.setItems(labels, (dialog, which) -> {
+            org.telegram.ui.Components.TranslateAlert2.setToLanguage(languages.get(which).code);
+            refreshList();
+        });
+        b.setNegativeButton("Отмена", null);
+        showDialog(b.create());
+    }
+
+    private static String customSavePathLabel() {
+        String path = DevGramGeneralConfig.getCustomSavePath();
+        return android.text.TextUtils.isEmpty(path) ? "Системная папка" : path;
+    }
+
+    private org.telegram.ui.Components.EditTextBoldCursor createThemedDialogInput(String hint) {
+        org.telegram.ui.Components.EditTextBoldCursor input =
+                new org.telegram.ui.Components.EditTextBoldCursor(getParentActivity());
+        input.setBackground(null);
+        input.setLineColors(
+                Theme.getColor(Theme.key_dialogInputField),
+                Theme.getColor(Theme.key_dialogInputFieldActivated),
+                Theme.getColor(Theme.key_text_RedBold));
+        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 16);
+        input.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+        input.setHintTextColor(Theme.getColor(Theme.key_dialogTextHint));
+        input.setCursorColor(Theme.getColor(Theme.key_dialogTextBlack));
+        input.setCursorSize(org.telegram.messenger.AndroidUtilities.dp(20));
+        input.setCursorWidth(1.5f);
+        input.setHint(hint);
+        input.setSingleLine(true);
+        return input;
+    }
+
+    private void showCustomSavePathDialog() {
+        if (getParentActivity() == null) return;
+        final org.telegram.ui.Components.EditTextBoldCursor input = createThemedDialogInput("DevGram");
+        input.setText(DevGramGeneralConfig.getCustomSavePath());
+        int pad = org.telegram.messenger.AndroidUtilities.dp(20);
+        android.widget.FrameLayout box = new android.widget.FrameLayout(getParentActivity());
+        box.setPadding(pad, 0, pad, 0);
+        box.addView(input, org.telegram.ui.Components.LayoutHelper.createFrame(
+                org.telegram.ui.Components.LayoutHelper.MATCH_PARENT,
+                org.telegram.ui.Components.LayoutHelper.WRAP_CONTENT));
+        org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle("Папка сохранения");
+        b.setView(box);
+        b.setPositiveButton("Сохранить", (dialog, which) -> {
+            String value = input.getText() == null ? "" : input.getText().toString().trim();
+            if (!value.isEmpty() && !value.matches("^(?!\\.{1,2}$)[A-Za-zА-Яа-яЁё0-9._ -]{1,255}$")) {
+                android.widget.Toast.makeText(getParentActivity(), "Недопустимое имя папки", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            DevGramGeneralConfig.setCustomSavePath(value);
+            refreshList();
+        });
+        b.setNegativeButton("Отмена", null);
+        showDialog(b.create());
+        input.requestFocus();
+        input.setSelection(input.length());
     }
 
     private static String gPrefString(String key, String def) {
@@ -858,19 +1429,13 @@ public class DevGramCategoryActivity extends BaseFragment {
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
         int pad = org.telegram.messenger.AndroidUtilities.dp(20);
         box.setPadding(pad, 0, pad, 0);
-        android.widget.EditText endpoint = new android.widget.EditText(getParentActivity());
-        endpoint.setHint("Endpoint");
-        endpoint.setSingleLine(true);
+        org.telegram.ui.Components.EditTextBoldCursor endpoint = createThemedDialogInput("Endpoint");
         endpoint.setText(gPrefString("dg_aiEndpoint", "https://api.openai.com/v1/chat/completions"));
         box.addView(endpoint, new android.widget.LinearLayout.LayoutParams(-1, -2));
-        android.widget.EditText model = new android.widget.EditText(getParentActivity());
-        model.setHint("Модель");
-        model.setSingleLine(true);
+        org.telegram.ui.Components.EditTextBoldCursor model = createThemedDialogInput("Модель");
         model.setText(gPrefString("dg_aiModel", "gpt-4o-mini"));
         box.addView(model, new android.widget.LinearLayout.LayoutParams(-1, -2));
-        android.widget.EditText key = new android.widget.EditText(getParentActivity());
-        key.setHint("API-ключ");
-        key.setSingleLine(true);
+        org.telegram.ui.Components.EditTextBoldCursor key = createThemedDialogInput("API-ключ");
         key.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
         key.setText(gPrefString("dg_aiKey", ""));
         box.addView(key, new android.widget.LinearLayout.LayoutParams(-1, -2));
@@ -921,5 +1486,244 @@ public class DevGramCategoryActivity extends BaseFragment {
                 showDialog(b.create());
             });
         }, "DevGramProxyDiag").start();
+    }
+
+    // Пикер действия двойного нажатия (отдельно для входящих/исходящих), с иконками действий.
+    // Селектор «Тип камеры» (Camera 1 / Camera 2) — бэкенд API камеры через SharedConfig.useCamera2Force.
+    private static String cameraTypeLabel() {
+        if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_useCameraX", false)) {
+            return "Camera X";
+        }
+        return org.telegram.messenger.SharedConfig.isUsingCamera2(org.telegram.messenger.UserConfig.selectedAccount)
+                ? "Camera 2" : "Camera 1";
+    }
+
+    private void showCameraTypePicker() {
+        CharSequence[] items = {"Camera 1", "Camera 2", "Camera X"};
+        org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle("Тип камеры");
+        b.setItems(items, (d, which) -> {
+            android.content.SharedPreferences p = org.telegram.messenger.MessagesController.getGlobalMainSettings();
+            if (which == 2) {
+                p.edit().putBoolean("dg_useCameraX", true).apply();
+            } else {
+                p.edit().putBoolean("dg_useCameraX", false).apply();
+                org.telegram.messenger.SharedConfig.setUseCamera2Force(which == 1);
+            }
+            refreshList();
+        });
+        b.setNegativeButton("Отмена", null);
+        showDialog(b.create());
+    }
+
+    // Селектор «Камера кружков» (Передняя / Задняя) — pref rearVideoMessages.
+    // === AI Chat (повтор AiPreferencesActivity exteraGram) ===
+    private static String aiServicesLabel() {
+        if (!org.telegram.messenger.DevGramAiClient.isConfigured()) {
+            return "Нет";
+        }
+        String model = gPrefString("dg_aiModel", "gpt-4o-mini");
+        return model == null || model.isEmpty() ? "OpenAI" : model;
+    }
+
+    private static String aiRoleLabel() {
+        return gPrefString("dg_aiRole", "Assistant");
+    }
+
+    private static int aiTempInit() {
+        int v = Math.round(org.telegram.messenger.MessagesController.getGlobalMainSettings()
+                .getFloat("dg_aiTemperature", 1.0f) * 10);
+        return Math.max(0, Math.min(20, v));
+    }
+
+    private void showAiRolePicker() {
+        final String[] roles = {"Assistant", "Переводчик", "Программист", "Редактор", "Собеседник"};
+        final String[] prompts = {
+                "",
+                "Ты профессиональный переводчик. Переводи текст пользователя, сохраняя смысл и тон. Отвечай только переводом.",
+                "Ты опытный программист. Помогай с кодом, давай точные и краткие ответы с примерами.",
+                "Ты редактор. Улучшай текст пользователя: грамотность, ясность, стиль. Отвечай только исправленным текстом.",
+                "Ты дружелюбный собеседник. Отвечай живо, по делу и с эмпатией."
+        };
+        org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle("Роли");
+        b.setItems(roles, (d, which) -> {
+            org.telegram.messenger.MessagesController.getGlobalMainSettings().edit()
+                    .putString("dg_aiRole", roles[which])
+                    .putString("dg_aiSystemPrompt", prompts[which])
+                    .apply();
+            refreshList();
+        });
+        b.setNegativeButton("Отмена", null);
+        showDialog(b.create());
+    }
+
+    // Камера кружков: тристейт как у exteraGram — 0 Передняя / 1 Задняя / 2 Спросить.
+    private static String videoCameraLabel() {
+        switch (gInt("dg_roundCameraMode", 0)) {
+            case 1: return "Задняя";
+            case 2: return "Спросить";
+            default: return "Передняя";
+        }
+    }
+
+    private void showVideoCameraPicker() {
+        CharSequence[] items = {"Передняя", "Задняя", "Спросить"};
+        org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle("Камера кружков");
+        b.setItems(items, (d, which) -> {
+            android.content.SharedPreferences.Editor e =
+                    org.telegram.messenger.MessagesController.getGlobalMainSettings().edit();
+            e.putInt("dg_roundCameraMode", which);
+            // Для Передняя/Задняя синхронизируем штатный флаг — его читает InstantCameraView.
+            if (which == 0) e.putBoolean("rearVideoMessages", false);
+            else if (which == 1) e.putBoolean("rearVideoMessages", true);
+            e.apply();
+            refreshList();
+        });
+        b.setNegativeButton("Отмена", null);
+        showDialog(b.create());
+    }
+
+    // Метка текущего языка распознавания для строки настроек.
+    private static String recognitionLangLabel() {
+        String lang = DevGramConfig.getRecognitionLanguage();
+        if ("none".equals(lang)) {
+            return "Отключено";
+        }
+        boolean downloaded = org.telegram.messenger.DevGramVoiceRecognizer.getInstance().isDownloaded(lang);
+        return recognitionLangName(lang) + (downloaded ? "" : " · не скачано");
+    }
+
+    private static String recognitionLangName(String code) {
+        switch (code) {
+            case "en": return "Английский";
+            case "ru": return "Русский";
+            case "de": return "Немецкий";
+            case "es": return "Испанский";
+            case "fr": return "Французский";
+            case "it": return "Итальянский";
+            case "pt": return "Португальский";
+            case "nl": return "Нидерландский";
+            case "pl": return "Польский";
+            case "uk": return "Украинский";
+            case "tr": return "Турецкий";
+            case "cs": return "Чешский";
+            case "ca": return "Каталанский";
+            case "eo": return "Эсперанто";
+            case "fa": return "Персидский";
+            case "hi": return "Хинди";
+            case "ja": return "Японский";
+            case "ko": return "Корейский";
+            case "uz": return "Узбекский";
+            default: return code;
+        }
+    }
+
+    // Пикер языка Vosk: «Отключено» + список языков (скачано / размер). При выборе — скачиваем модель.
+    private void showRecognitionLanguagePicker() {
+        java.util.List<org.telegram.messenger.DevGramVoiceRecognizer.RecognitionModel> models =
+                org.telegram.messenger.DevGramVoiceRecognizer.getInstance().listAvailableModels();
+        final java.util.List<String> codes = new java.util.ArrayList<>();
+        final java.util.List<CharSequence> labels = new java.util.ArrayList<>();
+        codes.add("none");
+        labels.add("Отключено");
+        for (org.telegram.messenger.DevGramVoiceRecognizer.RecognitionModel m : models) {
+            codes.add(m.language);
+            boolean dl = org.telegram.messenger.DevGramVoiceRecognizer.getInstance().isDownloaded(m.language);
+            labels.add(recognitionLangName(m.language) + (dl ? "  ✓" : "  · " + (m.size / 1024 / 1024) + " МБ"));
+        }
+        org.telegram.ui.ActionBar.AlertDialog.Builder builder =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        builder.setTitle("Язык распознавания");
+        builder.setItems(labels.toArray(new CharSequence[0]), (dialog, which) -> {
+            String code = codes.get(which);
+            DevGramConfig.setRecognitionLanguage(code);
+            org.telegram.messenger.forkgram.ForkOfflineTranscribe.invalidate();
+            refreshList();
+            if (!"none".equals(code)
+                    && !org.telegram.messenger.DevGramVoiceRecognizer.getInstance().isDownloaded(code)) {
+                downloadRecognitionModel(code);
+            }
+        });
+        builder.setNegativeButton("Отмена", null);
+        showDialog(builder.create());
+    }
+
+    private void downloadRecognitionModel(final String code) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        final org.telegram.ui.ActionBar.AlertDialog progress =
+                new org.telegram.ui.ActionBar.AlertDialog(getParentActivity(), org.telegram.ui.ActionBar.AlertDialog.ALERT_TYPE_SPINNER);
+        progress.setCanCancel(false);
+        progress.setMessage("Скачивание модели: " + recognitionLangName(code) + "…");
+        progress.show();
+        new Thread(() -> org.telegram.messenger.DevGramVoiceRecognizer.getInstance().downloadModel(code,
+                new org.telegram.messenger.DevGramVoiceRecognizer.DownloadCallback() {
+                    @Override
+                    public void onProgress(float p) {
+                        org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> {
+                            try {
+                                progress.setMessage("Скачивание модели: " + recognitionLangName(code)
+                                        + "  " + Math.round(p * 100) + "%");
+                            } catch (Throwable ignore) {
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> {
+                            try {
+                                progress.dismiss();
+                            } catch (Throwable ignore) {
+                            }
+                            refreshList();
+                            if (getParentActivity() != null) {
+                                android.widget.Toast.makeText(getParentActivity(),
+                                        "Модель готова: " + recognitionLangName(code), android.widget.Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> {
+                            try {
+                                progress.dismiss();
+                            } catch (Throwable ignore) {
+                            }
+                            if (getParentActivity() != null) {
+                                android.widget.Toast.makeText(getParentActivity(),
+                                        "Ошибка загрузки модели", android.widget.Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }
+                }), "DevGramVoskDownload").start();
+    }
+
+    private void showDoubleTapPicker(boolean out) {
+        CharSequence[] labels = org.telegram.messenger.DevGramDoubleTapUtils.labels(out);
+        int[] icons = org.telegram.messenger.DevGramDoubleTapUtils.icons(out);
+        org.telegram.ui.ActionBar.AlertDialog.Builder builder =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        builder.setTitle(out ? "Исходящие сообщения" : "Входящие сообщения");
+        builder.setItems(labels, icons, (dialog, which) -> {
+            if (out) {
+                DevGramConfig.setDoubleTapActionOut(which);
+            } else {
+                DevGramConfig.setDoubleTapActionIn(which);
+            }
+            if (doubleTapPreview != null) {
+                doubleTapPreview.updateIcons(out ? 1 : 0, true);
+            }
+            refreshList();
+        });
+        builder.setNegativeButton("Отмена", null);
+        showDialog(builder.create());
     }
 }
