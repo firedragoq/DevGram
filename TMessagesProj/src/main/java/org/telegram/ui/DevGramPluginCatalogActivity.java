@@ -55,6 +55,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private String query = "";
     private String activeFilter = "";
     private LinearLayout chipRow;
+    private TextView catalogSummary;
     private TextView emptyView;
     private org.telegram.ui.ActionBar.ActionBarMenuItem moderationItem;
 
@@ -110,7 +111,22 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         searchWrap.addView(search, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 42));
         container.addView(searchWrap, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 42, 12, 12, 12, 8));
 
-        // --- чипы фильтров ---
+        // --- категории каталога ---
+        LinearLayout categoryHeader = new LinearLayout(context);
+        categoryHeader.setOrientation(LinearLayout.HORIZONTAL);
+        categoryHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView categoryTitle = new TextView(context);
+        categoryTitle.setText("Категории");
+        categoryTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        categoryTitle.setTypeface(AndroidUtilities.bold());
+        categoryTitle.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
+        categoryHeader.addView(categoryTitle, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+        catalogSummary = new TextView(context);
+        catalogSummary.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        catalogSummary.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourceProvider));
+        categoryHeader.addView(catalogSummary, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+        container.addView(categoryHeader, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 16, 3, 16, 8));
+
         HorizontalScrollView chipScroll = new HorizontalScrollView(context);
         chipScroll.setHorizontalScrollBarEnabled(false);
         chipScroll.setClipToPadding(false);
@@ -157,34 +173,49 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             final String f = name;
             boolean on = activeFilter.equals(f);
             TextView chip = new TextView(getContext());
-            chip.setText(name.isEmpty() ? "Все" : name);
+            int count = countForFilter(f);
+            chip.setText((name.isEmpty() ? "Все" : name) + "  " + count);
             chip.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
             chip.setTypeface(on ? AndroidUtilities.bold() : Typeface.DEFAULT);
             chip.setGravity(Gravity.CENTER);
-            chip.setPadding(AndroidUtilities.dp(15), AndroidUtilities.dp(8), AndroidUtilities.dp(15), AndroidUtilities.dp(8));
+            chip.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(10), AndroidUtilities.dp(16), AndroidUtilities.dp(10));
             chip.setTextColor(on ? Theme.getColor(Theme.key_featuredStickers_buttonText, resourceProvider)
                     : Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider));
-            chip.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(17),
+            chip.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(20),
                     on ? Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider)
-                            : Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
+                            : Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider),
+                    Theme.getColor(Theme.key_listSelector, resourceProvider)));
             chip.setOnClickListener(v -> { activeFilter = f; rebuildChips(); applyFilter(); });
             if (team && !f.isEmpty()) {
-                chip.setOnLongClickListener(v -> { confirmRemoveFilter(f); return true; });
+                chip.setOnLongClickListener(v -> { showFilterActions(f); return true; });
             }
             chipRow.addView(chip, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 8, 0));
         }
         if (team) {
             TextView add = new TextView(getContext());
-            add.setText("＋");
-            add.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+            add.setText("＋  Категория");
+            add.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            add.setTypeface(AndroidUtilities.bold());
             add.setGravity(Gravity.CENTER);
-            add.setPadding(AndroidUtilities.dp(15), AndroidUtilities.dp(8), AndroidUtilities.dp(15), AndroidUtilities.dp(8));
+            add.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(10), AndroidUtilities.dp(16), AndroidUtilities.dp(10));
             add.setTextColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourceProvider));
             add.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(17),
                     Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)));
             add.setOnClickListener(v -> addFilterDialog());
             chipRow.addView(add, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 8, 0));
         }
+        if (catalogSummary != null) {
+            catalogSummary.setText(shown.size() + " из " + all.size());
+        }
+    }
+
+    private int countForFilter(String filter) {
+        if (filter == null || filter.isEmpty()) return all.size();
+        int count = 0;
+        for (DevGramPlugins.CatalogEntry entry : all) {
+            if (filter.equals(entry.filter)) count++;
+        }
+        return count;
     }
 
     // ---------- данные ----------
@@ -222,6 +253,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             if (matches(e)) shown.add(e);
         }
         if (adapter != null) adapter.notifyDataSetChanged();
+        if (catalogSummary != null) catalogSummary.setText(shown.size() + " из " + all.size());
         if (emptyView != null) {
             if (loading) {
                 emptyView.setText("Загрузка каталога…");
@@ -406,11 +438,18 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             String name = et.getText().toString().trim();
             if (name.isEmpty()) return;
             ensureAdmin(() -> {
-                if (DevGramPlugins.addFilter(name)) {
-                    if (!filters.contains(name)) filters.add(name);
-                    rebuildChips();
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Фильтр добавлен").show();
-                }
+                ArrayList<String> updated = new ArrayList<>(filters);
+                if (!updated.contains(name)) updated.add(name);
+                DevGramPlugins.saveFilters(updated, ok -> {
+                    if (ok) {
+                        filters.clear();
+                        filters.addAll(updated);
+                        rebuildChips();
+                        BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Фильтр добавлен").show();
+                    } else {
+                        BulletinFactory.of(this).createErrorBulletin("Не удалось сохранить фильтр в каталоге").show();
+                    }
+                });
             });
         });
         b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
@@ -424,14 +463,71 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         b.setTitle("Удалить фильтр");
         b.setMessage("Убрать фильтр «" + name + "»? Плагины не удалятся, только категория.");
         b.setPositiveButton("Удалить", (d, w) -> ensureAdmin(() -> {
-            DevGramPlugins.removeFilter(name);
-            filters.remove(name);
-            if (activeFilter.equals(name)) activeFilter = "";
-            rebuildChips();
-            applyFilter();
+            ArrayList<String> updated = new ArrayList<>(filters);
+            updated.remove(name);
+            DevGramPlugins.saveFilters(updated, ok -> {
+                if (ok) {
+                    filters.clear();
+                    filters.addAll(updated);
+                    if (activeFilter.equals(name)) activeFilter = "";
+                    rebuildChips();
+                    applyFilter();
+                    BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Категория удалена").show();
+                } else {
+                    BulletinFactory.of(this).createErrorBulletin("Не удалось удалить категорию").show();
+                }
+            });
         }));
         b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
         showDialog(b.create());
+    }
+
+    private void showFilterActions(String name) {
+        int index = filters.indexOf(name);
+        if (index < 0) return;
+        ArrayList<CharSequence> actions = new ArrayList<>();
+        ArrayList<Integer> ids = new ArrayList<>();
+        if (index > 0) {
+            actions.add("Переместить левее");
+            ids.add(-1);
+        }
+        if (index < filters.size() - 1) {
+            actions.add("Переместить правее");
+            ids.add(1);
+        }
+        actions.add("Удалить категорию");
+        ids.add(0);
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(name);
+        builder.setMessage("Управление категорией каталога");
+        builder.setItems(actions.toArray(new CharSequence[0]), (dialog, which) -> {
+            int action = ids.get(which);
+            if (action == 0) {
+                confirmRemoveFilter(name);
+            } else {
+                moveFilter(name, action);
+            }
+        });
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(builder.create());
+    }
+
+    private void moveFilter(String name, int direction) {
+        int from = filters.indexOf(name);
+        int to = from + direction;
+        if (from < 0 || to < 0 || to >= filters.size()) return;
+        ArrayList<String> reordered = new ArrayList<>(filters);
+        java.util.Collections.swap(reordered, from, to);
+        ensureAdmin(() -> DevGramPlugins.saveFilters(reordered, ok -> {
+            if (ok) {
+                filters.clear();
+                filters.addAll(reordered);
+                rebuildChips();
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Порядок категорий сохранён").show();
+            } else {
+                BulletinFactory.of(this).createErrorBulletin("Не удалось изменить порядок категорий").show();
+            }
+        }));
     }
 
     private void openChannel(String channel) {

@@ -37,7 +37,7 @@ public class DevGramPluginSystemActivity extends BaseFragment {
     private static final int ID_VERIFIED = 21;
 
     private static final String DOCS_URL = "https://docs.devgram.space";
-    private static final String VERIFIED_URL = "https://t.me/DevGramPlugins";
+    private static final String VERIFIED_URL = "https://t.me/addlist/IUMDGoyECehlN2Fi";
 
     @Override
     public View createView(Context context) {
@@ -81,7 +81,7 @@ public class DevGramPluginSystemActivity extends BaseFragment {
 
         items.add(UItem.asHeader("Ссылки"));
         items.add(UItem.asButton(ID_DOCS, R.drawable.msg_info, "Документация"));
-        items.add(UItem.asButton(ID_VERIFIED, R.drawable.devgram_plugins, "Проверенные плагины", "@DevGramPlugins"));
+        items.add(UItem.asButton(ID_VERIFIED, R.drawable.devgram_plugins, "Проверенные плагины", "Папка Telegram"));
         items.add(UItem.asShadow(null));
     }
 
