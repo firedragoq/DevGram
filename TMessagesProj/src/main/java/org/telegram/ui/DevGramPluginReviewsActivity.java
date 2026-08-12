@@ -108,9 +108,7 @@ public class DevGramPluginReviewsActivity extends BaseFragment {
                 .setMessage("Жалоба будет отправлена команде DevGram на проверку.")
                 .setItems(new CharSequence[]{"Спам или реклама", "Оскорбления и травля", "Ложная информация", "Другая причина"}, (d, which) -> {
                     if (which == 3) {
-                        android.widget.EditText input = new android.widget.EditText(context);
-                        input.setHint("Опишите причину");
-                        input.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourceProvider));
+                        android.widget.EditText input = DevGramPluginReportsActivity.themedInput(context, "Что именно нарушает этот отзыв?");
                         new org.telegram.ui.ActionBar.AlertDialog.Builder(context).setTitle("Другая причина").setView(input)
                                 .setPositiveButton("Отправить", (dd, ww) -> sendReport(uid, input.getText().toString())).setNegativeButton("Отмена", null).show();
                     } else sendReport(uid, which == 0 ? "Спам или реклама" : which == 1 ? "Оскорбления и травля" : "Ложная информация");

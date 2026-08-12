@@ -251,6 +251,7 @@ public class DevGramPluginInstallSheet {
                     Theme.getColor(Theme.key_featuredStickers_addButton),
                     Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
             pubBtn.setText("📚 Опубликовать в каталог");
+            final TextView[] rejectionRef = new TextView[1];
             final String fId = id, fName = name, fVer = ver, fAuthor = author, fDesc = desc, fIcon = iconUrl, fSource = source;
             final long fChannelId = sourceDialogId;
             pubBtn.setOnClickListener(v -> {
@@ -263,9 +264,10 @@ public class DevGramPluginInstallSheet {
                 ce.icon = fIcon;
                 ce.source = fSource;
                 ce.channel = channelName(fragment, fChannelId);
-                choosePublishFilter(fragment, ce);
+                choosePublishFilter(fragment, ce, () -> applyPendingState(pubBtn, rejectionRef[0]));
             });
             TextView rejectionInfo = new TextView(context);
+            rejectionRef[0] = rejectionInfo;
             rejectionInfo.setVisibility(View.GONE);
             rejectionInfo.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             rejectionInfo.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
@@ -314,7 +316,7 @@ public class DevGramPluginInstallSheet {
                             ce.id = fId; ce.name = fName; ce.version = fVer; ce.author = fAuthor;
                             ce.desc = fDesc; ce.icon = fIcon; ce.source = fSource;
                             ce.channel = channelName(fragment, fChannelId);
-                            choosePublishFilter(fragment, ce);
+                            choosePublishFilter(fragment, ce, () -> applyPendingState(pubBtnRef, rejectionInfo));
                         });
                     });
                 } else if (status != 0) {
@@ -348,7 +350,8 @@ public class DevGramPluginInstallSheet {
 
     // Публикация в каталог: сначала выбор фильтра (категории), затем запись. Заблокированные плагины
     // (удалённые командой) публиковать нельзя.
-    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce) {
+    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce) { choosePublishFilter(fragment, ce, null); }
+    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce, Runnable onSubmitted) {
         if (DevGramPlugins.isBlocked(ce.source)) {
             org.telegram.ui.Components.BulletinFactory.of(fragment)
                     .createErrorBulletin("Этот плагин удалён командой — публиковать нельзя").show();
@@ -427,6 +430,7 @@ public class DevGramPluginInstallSheet {
                             : (r == -2 ? DevGramPlugins.validateCatalogEntry(ce) : "Не удалось опубликовать"));
                     org.telegram.ui.Components.BulletinFactory.of(fragment)
                             .createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
+                    if (r == 1 && onSubmitted != null) onSubmitted.run();
                 });
                 root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 8));
             }
@@ -439,6 +443,16 @@ public class DevGramPluginInstallSheet {
             sheetRef[0] = builder.create();
             sheetRef[0].show();
         });
+    }
+
+    private static void applyPendingState(TextView button, TextView rejectionInfo) {
+        if (button == null) return;
+        if (rejectionInfo != null) rejectionInfo.setVisibility(View.GONE);
+        button.setVisibility(View.VISIBLE);
+        button.setText("⏳ Плагин находится на модерации");
+        button.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        button.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(14), Theme.getColor(Theme.key_windowBackgroundGray)));
+        button.setOnClickListener(null);
     }
 
     // Имя канала-источника (@username или заголовок) по dialogId (у канала он отрицательный).
