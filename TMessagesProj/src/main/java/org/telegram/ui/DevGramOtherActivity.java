@@ -79,7 +79,7 @@ public class DevGramOtherActivity extends BaseFragment {
 
         // Поддержка — реквизиты; серая подпись снизу кликабельна и открывает лист «Поддержать DevGram».
         items.add(UItem.asHeader("Поддержка"));
-        boolean dark = !Theme.isCurrentThemeDay();
+        boolean dark = resourceProvider != null ? resourceProvider.isDark() : Theme.isCurrentThemeDark();
         items.add(bankButton(ctx, ID_SUPPORT_TON, dark ? R.drawable.devgram_ton_dark : R.drawable.devgram_ton_light,
                 "Tonkeeper", null));
         items.add(bankButton(ctx, ID_SUPPORT_VTB, dark ? R.drawable.devgram_bank_vtb_dark : R.drawable.devgram_bank_vtb,
@@ -170,7 +170,17 @@ public class DevGramOtherActivity extends BaseFragment {
 
     private UItem bankButton(Context context, int id, int icon, CharSequence text, CharSequence value) {
         android.graphics.drawable.Drawable drawable = context != null ? context.getDrawable(icon) : null;
-        return value == null ? UItem.asButton(id, drawable, text) : UItem.asButton(id, drawable, text, value);
+        UItem item = value == null ? UItem.asButton(id, drawable, text) : UItem.asButton(id, drawable, text, value);
+        return item.onBind(view -> {
+            if (view instanceof org.telegram.ui.Cells.TextCell) {
+                org.telegram.ui.Cells.TextCell cell = (org.telegram.ui.Cells.TextCell) view;
+                // UniversalAdapter вызывает setColors после установки Drawable; очищаем его фильтр последними.
+                cell.getImageView().setColorFilter(null);
+                cell.getImageView().setTag(null);
+                // Как в CherryGram: дополнительный воздух между карточкой и названием.
+                cell.setOffsetFromImage(66);
+            }
+        });
     }
 
     private void copyCard(String bank, String card) {
