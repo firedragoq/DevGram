@@ -1819,6 +1819,9 @@ public class DevGramPlugins {
     public static void fetchCatalog(final CatalogCallback cb) {
         fetchEntries("plugins_catalog", cb);
     }
+    public static void fetchCatalogEntry(String pluginId, CatalogCallback cb) {
+        final String key=safeKey(pluginId==null?"":pluginId);Utilities.globalQueue.postRunnable(()->{java.util.ArrayList<CatalogEntry> out=new java.util.ArrayList<>();try{String raw=readNode(RTDB+"/plugins_catalog/"+key+".json");if(raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){org.json.JSONObject o=new org.json.JSONObject(raw);CatalogEntry e=new CatalogEntry();e.id=o.optString("id",key);e.name=o.optString("name",e.id);e.author=o.optString("author","");e.version=o.optString("version","");e.desc=o.optString("desc","");e.icon=o.optString("icon","");e.channel=o.optString("channel","");e.source=o.optString("source","");e.filter=o.optString("filter","");e.rating=o.optDouble("rating",0);e.reviews=o.optInt("reviews",0);e.submitterId=o.optLong("submitterId",0);e.submittedAt=o.optLong("submittedAt",0);e.updatedAt=o.optLong("updatedAt",0);e.visible=o.optBoolean("visible",true);out.add(e);}}catch(Throwable ex){FileLog.e(ex);}AndroidUtilities.runOnUIThread(()->cb.onResult(out));});
+    }
 
     // Забрать заявки на модерацию.
     public static void fetchPending(final CatalogCallback cb) {
