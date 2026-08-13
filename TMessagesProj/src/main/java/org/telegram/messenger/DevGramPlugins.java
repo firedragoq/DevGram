@@ -1642,21 +1642,63 @@ public class DevGramPlugins {
 
     public static void reportReview(String pluginId, long reviewUserId, String reason, BoolCallback cb) {
         try {
+            String ownerUid = firebaseAnonUid();
+            String token = firebaseAnonToken();
+            if (ownerUid == null || ownerUid.isEmpty() || token == null || token.isEmpty()) {
+                cb.onResult(false);
+                return;
+            }
             org.json.JSONObject o = new org.json.JSONObject();
             o.put("pluginId", pluginId);
             o.put("reviewUserId", reviewUserId);
             o.put("reporterId", myId());
             o.put("reason", reason == null ? "" : reason.trim());
             o.put("date", System.currentTimeMillis());
-            o.put("ownerUid", firebaseAnonUid());
+            o.put("ownerUid", ownerUid);
             String key = safeKey(pluginId) + "_" + reviewUserId + "_" + myId();
+            org.json.JSONObject receipt = new org.json.JSONObject();
+            receipt.put("ownerUid", ownerUid);
+            receipt.put("reporterId", myId());
+            receipt.put("reviewUserId", reviewUserId);
+            receipt.put("date", System.currentTimeMillis());
+            org.json.JSONObject update = new org.json.JSONObject();
+            update.put("plugin_review_reports/" + key, o);
+            update.put("plugin_review_report_receipts/" + safeKey(pluginId) + "/" + reviewUserId + "/" + ownerUid, receipt);
             Utilities.globalQueue.postRunnable(() -> {
-                boolean ok = httpVerified("PUT", RTDB + "/plugin_review_reports/" + key + ".json", o.toString());
+                boolean ok = httpVerified("PATCH", RTDB + "/.json?auth=" + token, update.toString());
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
             });
         } catch (Throwable e) {
             cb.onResult(false);
         }
+    }
+
+    public static void hasReportedReview(String pluginId, long reviewUserId, BoolCallback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean reported = false;
+            java.net.HttpURLConnection c = null;
+            try {
+                String uid = firebaseAnonUid();
+                String token = firebaseAnonToken();
+                if (uid != null && !uid.isEmpty() && token != null && !token.isEmpty()) {
+                    String url = RTDB + "/plugin_review_report_receipts/" + safeKey(pluginId) + "/" + reviewUserId
+                            + "/" + uid + ".json?auth=" + java.net.URLEncoder.encode(token, "UTF-8");
+                    c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                    c.setConnectTimeout(12000);
+                    c.setReadTimeout(15000);
+                    if (c.getResponseCode() == 200) {
+                        String raw = readHttp(c.getInputStream()).trim();
+                        reported = !raw.isEmpty() && !"null".equals(raw);
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            final boolean result = reported;
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
     }
 
     public static void reportPlugin(String pluginId, String reason, BoolCallback cb) {

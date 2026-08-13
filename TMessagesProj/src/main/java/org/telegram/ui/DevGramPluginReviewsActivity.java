@@ -83,12 +83,21 @@ public class DevGramPluginReviewsActivity extends BaseFragment {
     private void showActions(Context context, DevGramPlugins.Review review, View card) {
         boolean own = review.userId == DevGramPlugins.myId();
         boolean developer = DevGramBadges.hasDeveloperFeatures(DevGramPlugins.myId());
+        if (!own) {
+            DevGramPlugins.hasReportedReview(entry.id, review.userId, reported -> showActionsResolved(context, review, card, developer, reported));
+            return;
+        }
+        showActionsResolved(context, review, card, developer, false);
+    }
+
+    private void showActionsResolved(Context context, DevGramPlugins.Review review, View card, boolean developer, boolean reported) {
+        boolean own = review.userId == DevGramPlugins.myId();
         LinearLayout root = new LinearLayout(context); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(20));
         root.addView(label(context, own ? "Ваш отзыв" : "Действия с отзывом", 20, true,
                 Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourceProvider)), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 12));
         BottomSheet[] ref = new BottomSheet[1];
-        if (!own) addAction(root, context, "Пожаловаться", "Сообщить команде DevGram о нарушении", false, () -> { ref[0].dismiss(); showReportReasonMenu(context, review.userId); });
+        if (!own) addAction(root, context, reported ? "Вы уже подавали жалобу" : "Пожаловаться", reported ? "Повторная жалоба на этот отзыв недоступна" : "Сообщить команде DevGram о нарушении", false, () -> { ref[0].dismiss(); if(reported)BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,"Вы уже подавали жалобу").show();else showReportReasonMenu(context, review.userId); });
         if (own || developer) addAction(root, context, "Удалить отзыв", own ? "Отзыв исчезнет из карточки плагина" : "Удаление доступно команде DevGram", true, () -> {
             if (own) DevGramPlugins.deleteOwnReview(entry.id, ok -> afterDelete(ok, card));
             else DevGramPlugins.deleteReviewAsDeveloper(entry.id, review.userId, ok -> afterDelete(ok, card));
@@ -118,7 +127,7 @@ public class DevGramPluginReviewsActivity extends BaseFragment {
     private void sendReport(long uid, String reason) {
         reason = reason == null ? "" : reason.trim();
         if (reason.isEmpty()) { BulletinFactory.of(this).createErrorBulletin("Укажите причину жалобы").show(); return; }
-        DevGramPlugins.reportReview(entry.id, uid, reason, ok -> BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, ok ? "Жалоба отправлена" : "Не удалось отправить жалобу").show());
+        DevGramPlugins.reportReview(entry.id, uid, reason, ok -> {if(!ok)DevGramPlugins.hasReportedReview(entry.id,uid,reported->{if(reported)BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,"Вы уже подавали жалобу").show();});BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, ok ? "Жалоба отправлена" : "Не удалось отправить жалобу").show();});
     }
 
     private void addAction(LinearLayout root, Context context, String title, String subtitle, boolean danger, Runnable click) {

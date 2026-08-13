@@ -47,7 +47,7 @@ public class DevGramSettingsActivity extends BaseFragment {
     private static final int ID_LINK_SITE = 13;
 
     private static final String LINK_CHANNEL = "https://t.me/devgramnews";
-    private static final String LINK_CHAT = "https://t.me/devgram_chat";
+    private static final String LINK_CHAT = "https://t.me/DevGramForum";
     private static final String LINK_DOCS = "https://docs.devgram.space";
     private static final String LINK_SITE = "https://devgram.space";
 
@@ -132,10 +132,10 @@ public class DevGramSettingsActivity extends BaseFragment {
         items.add(UItem.asButton(ID_OTHER, R.drawable.msg_settings, "Другое"));
         items.add(UItem.asShadow(null));
 
-        // Ссылки на официальный канал и чат
+        // Ссылки на официальный канал и форум
         items.add(UItem.asHeader("Ссылки"));
         items.add(UItem.asButton(ID_LINK_CHANNEL, R.drawable.devgram_channel, "Канал", "@DevGramNews"));
-        items.add(UItem.asButton(ID_LINK_CHAT, R.drawable.devgram_chat, "Чат", "@DevGram_chat"));
+        items.add(UItem.asButton(ID_LINK_CHAT, R.drawable.devgram_chat, "Форум", "@DevGramForum"));
         items.add(UItem.asButton(ID_LINK_DOCS, R.drawable.msg_info, "Документация", "docs.devgram.space"));
         items.add(UItem.asButton(ID_LINK_SITE, R.drawable.msg_language, "Сайт", "devgram.space"));
         items.add(UItem.asShadow(null));
