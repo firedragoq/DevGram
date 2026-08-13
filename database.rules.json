@@ -71,6 +71,17 @@
         ".validate": "newData.hasChildren(['pluginId','reviewUserId','reporterId','ownerUid','reason','date']) && newData.child('ownerUid').val() === auth.uid && newData.child('reason').isString() && newData.child('reason').val().length <= 500 && newData.child('date').isNumber() && newData.child('date').val() <= now"
       }
     },
+    "plugin_review_report_receipts": {
+      "$pluginId": {
+        "$reviewUserId": {
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.child('ownerUid').val() === auth.uid",
+            ".validate": "newData.hasChildren(['ownerUid','reporterId','reviewUserId','date']) && newData.child('ownerUid').val() === auth.uid && newData.child('reporterId').isNumber() && newData.child('reviewUserId').isNumber() && newData.child('date').isNumber() && newData.child('date').val() <= now"
+          }
+        }
+      }
+    },
     "plugin_reports": {
       ".read": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
       "$reportId": {
