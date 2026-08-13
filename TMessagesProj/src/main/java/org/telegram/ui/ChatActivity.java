@@ -16149,6 +16149,14 @@ public class ChatActivity extends BaseFragment implements
         if (messageObject == null || messageObject.isOut() || !messageObject.isSecretMedia() || messageObject.messageOwner.ttl != 0x7FFFFFFF) {
             return null;
         }
+        // DevGram (порт поведения AyuGram): в режиме призрака статусы прочтения не уходят,
+        // поэтому сервер НЕ уничтожает медиа «на один просмотр». Значит и локально его затирать
+        // нельзя — иначе просмотр = безвозвратная потеря. При выключенных read-пакетах просто
+        // оставляем медиа как есть (без forceExpired и без doDeleteShowOnceTask) — его можно
+        // пересмотреть. Завязано на sendReadPackets, как и вся ghost-логика.
+        if (!DevGramConfig.sendReadPackets) {
+            return null;
+        }
         final long taskId = getMessagesController().createDeleteShowOnceTask(dialog_id, messageObject.getId());
         messageObject.forceExpired = true;
         if (messageObject.isOutOwner() || !messageObject.isRoundOnce() && !messageObject.isVoiceOnce()) {
