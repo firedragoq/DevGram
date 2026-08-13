@@ -913,10 +913,11 @@ public class ApplicationLoader extends Application {
     }
 
     public void onResume() {
-
+        DevGramPluginNotifications.setActive(true);
     }
 
     public boolean onPause() {
+        DevGramPluginNotifications.setActive(false);
         return false;
     }
 

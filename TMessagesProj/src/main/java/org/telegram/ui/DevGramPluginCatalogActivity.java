@@ -250,7 +250,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             filters.addAll(f);
             rebuildChips();
         });
-        DevGramPlugins.fetchCatalog(entries -> {
+        DevGramPlugins.fetchCatalogFast(entries -> {
             if (!isLoadActive(generation)) return;
             all.clear();
             all.addAll(entries);
@@ -258,6 +258,12 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
             applyFilter();
             // Фильтры и каталог загружаются параллельно. Категории могли отрисоваться раньше,
             // когда список all был ещё пустым, поэтому обновляем их счётчики после каталога.
+            rebuildChips();
+        }, entries -> {
+            if (!isLoadActive(generation)) return;
+            all.clear();
+            all.addAll(entries);
+            applyFilter();
             rebuildChips();
         });
         // показать вход в модерацию только модераторам (по их Telegram-ID)
