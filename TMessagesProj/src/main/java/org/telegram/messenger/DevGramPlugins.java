@@ -1661,18 +1661,59 @@ public class DevGramPlugins {
 
     public static void reportPlugin(String pluginId, String reason, BoolCallback cb) {
         try {
+            String ownerUid = firebaseAnonUid();
+            String token = firebaseAnonToken();
+            if (ownerUid == null || ownerUid.isEmpty() || token == null || token.isEmpty()) {
+                cb.onResult(false);
+                return;
+            }
             org.json.JSONObject o = new org.json.JSONObject();
             o.put("pluginId", pluginId == null ? "" : pluginId);
             o.put("reporterId", myId());
             o.put("reason", reason == null ? "" : reason.trim());
             o.put("date", System.currentTimeMillis());
-            o.put("ownerUid", firebaseAnonUid());
+            o.put("ownerUid", ownerUid);
             String key = safeKey(pluginId == null ? "" : pluginId) + "_" + myId();
+            org.json.JSONObject receipt = new org.json.JSONObject();
+            receipt.put("ownerUid", ownerUid);
+            receipt.put("reporterId", myId());
+            receipt.put("date", System.currentTimeMillis());
+            org.json.JSONObject update = new org.json.JSONObject();
+            update.put("plugin_reports/" + key, o);
+            update.put("plugin_report_receipts/" + safeKey(pluginId == null ? "" : pluginId) + "/" + ownerUid, receipt);
             Utilities.globalQueue.postRunnable(() -> {
-                boolean ok = httpVerified("PUT", RTDB + "/plugin_reports/" + key + ".json", o.toString());
+                boolean ok = httpVerified("PATCH", RTDB + "/.json?auth=" + token, update.toString());
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
             });
         } catch (Throwable e) { cb.onResult(false); }
+    }
+
+    public static void hasReportedPlugin(String pluginId, BoolCallback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean reported = false;
+            java.net.HttpURLConnection c = null;
+            try {
+                String uid = firebaseAnonUid();
+                String token = firebaseAnonToken();
+                if (uid != null && !uid.isEmpty() && token != null && !token.isEmpty()) {
+                    String url = RTDB + "/plugin_report_receipts/" + safeKey(pluginId == null ? "" : pluginId)
+                            + "/" + uid + ".json?auth=" + java.net.URLEncoder.encode(token, "UTF-8");
+                    c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                    c.setConnectTimeout(15000);
+                    c.setReadTimeout(15000);
+                    if (c.getResponseCode() == 200) {
+                        String raw = readHttp(c.getInputStream()).trim();
+                        reported = !raw.isEmpty() && !"null".equals(raw);
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            final boolean result = reported;
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(result));
+        });
     }
 
     private static void appendPluginHistory(String pluginId, String action, String details, long actorId, String actorName) {
@@ -1817,7 +1858,51 @@ public class DevGramPlugins {
 
     // Забрать опубликованный каталог.
     public static void fetchCatalog(final CatalogCallback cb) {
-        fetchEntries("plugins_catalog", cb);
+        fetchEntries("plugins_catalog", entries -> refreshCatalogReviewStats(entries, cb));
+    }
+
+    public static void fetchCatalogFast(final CatalogCallback initial, final CatalogCallback statsUpdated) {
+        fetchEntries("plugins_catalog", entries -> {
+            initial.onResult(entries);
+            refreshCatalogReviewStats(entries, statsUpdated);
+        });
+    }
+
+    private static void refreshCatalogReviewStats(java.util.ArrayList<CatalogEntry> entries, CatalogCallback cb) {
+        Utilities.globalQueue.postRunnable(() -> {
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_reviews.json").openConnection();
+                c.setConnectTimeout(12000);
+                c.setReadTimeout(18000);
+                if (c.getResponseCode() == 200) {
+                    String raw = readHttp(c.getInputStream());
+                    org.json.JSONObject allReviews = raw.isEmpty() || "null".equals(raw) ? null : new org.json.JSONObject(raw);
+                    for (CatalogEntry entry : entries) {
+                        int count = 0;
+                        double sum = 0;
+                        org.json.JSONObject pluginReviews = allReviews == null ? null : allReviews.optJSONObject(safeKey(entry.id));
+                        if (pluginReviews != null) {
+                            for (java.util.Iterator<String> it = pluginReviews.keys(); it.hasNext();) {
+                                org.json.JSONObject review = pluginReviews.optJSONObject(it.next());
+                                if (review == null) continue;
+                                int value = review.optInt("rating", 0);
+                                if (value < 1 || value > 5) continue;
+                                sum += value;
+                                count++;
+                            }
+                        }
+                        entry.reviews = count;
+                        entry.rating = count == 0 ? 0 : sum / count;
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            AndroidUtilities.runOnUIThread(() -> cb.onResult(entries));
+        });
     }
     public static void fetchCatalogEntry(String pluginId, CatalogCallback cb) {
         final String key=safeKey(pluginId==null?"":pluginId);Utilities.globalQueue.postRunnable(()->{java.util.ArrayList<CatalogEntry> out=new java.util.ArrayList<>();try{String raw=readNode(RTDB+"/plugins_catalog/"+key+".json");if(raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){org.json.JSONObject o=new org.json.JSONObject(raw);CatalogEntry e=new CatalogEntry();e.id=o.optString("id",key);e.name=o.optString("name",e.id);e.author=o.optString("author","");e.version=o.optString("version","");e.desc=o.optString("desc","");e.icon=o.optString("icon","");e.channel=o.optString("channel","");e.source=o.optString("source","");e.filter=o.optString("filter","");e.rating=o.optDouble("rating",0);e.reviews=o.optInt("reviews",0);e.submitterId=o.optLong("submitterId",0);e.submittedAt=o.optLong("submittedAt",0);e.updatedAt=o.optLong("updatedAt",0);e.visible=o.optBoolean("visible",true);out.add(e);}}catch(Throwable ex){FileLog.e(ex);}AndroidUtilities.runOnUIThread(()->cb.onResult(out));});

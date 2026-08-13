@@ -78,6 +78,15 @@
         ".validate": "newData.hasChildren(['pluginId','reporterId','ownerUid','reason','date']) && newData.child('ownerUid').val() === auth.uid && newData.child('reason').isString() && newData.child('reason').val().length <= 500 && newData.child('date').isNumber() && newData.child('date').val() <= now"
       }
     },
+    "plugin_report_receipts": {
+      "$pluginId": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())",
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.child('ownerUid').val() === auth.uid",
+          ".validate": "newData.hasChildren(['ownerUid','reporterId','date']) && newData.child('ownerUid').val() === auth.uid && newData.child('reporterId').isNumber() && newData.child('date').isNumber() && newData.child('date').val() <= now"
+        }
+      }
+    },
     "plugin_history": {
       ".read": true,
       ".write": "auth != null && (auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2' || root.child('moderators').child(auth.uid).exists())"
