@@ -368,7 +368,7 @@ public class DevGramModerationActivity extends BaseFragment {
     }
 
     private LinearLayout moderatorRow(Context ctx, DevGramPlugins.Moderator m) { LinearLayout row=new LinearLayout(ctx);row.setOrientation(LinearLayout.VERTICAL);row.setPadding(AndroidUtilities.dp(15),AndroidUtilities.dp(12),AndroidUtilities.dp(15),AndroidUtilities.dp(12));row.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(15),Theme.getColor(Theme.key_windowBackgroundGray,resourceProvider),Theme.getColor(Theme.key_listSelector,resourceProvider)));TextView n=new TextView(ctx);n.setText(m.email==null||m.email.isEmpty()?m.uid:m.email);n.setTextSize(15);n.setTypeface(AndroidUtilities.bold());n.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText,resourceProvider));row.addView(n);TextView s=new TextView(ctx);s.setText((m.tg==0?"Telegram ID не указан":"Telegram ID: "+m.tg)+"  •  нажмите для управления");s.setTextSize(12);s.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText,resourceProvider));row.addView(s,LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,LayoutHelper.WRAP_CONTENT,0,3,0,0));return row; }
-    private void confirmRemoveModerator(DevGramPlugins.Moderator m, BottomSheet sheet){new AlertDialog.Builder(getParentActivity()).setTitle("Убрать модератора?").setMessage("Доступ к панели и жалобам будет отозван.").setPositiveButton("Убрать",(d,w)->{DevGramPlugins.removeModerator(m.uid);if(sheet!=null)sheet.dismiss();BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,"Доступ убран").show();}).setNegativeButton("Отмена",null).show();}
+    private void confirmRemoveModerator(DevGramPlugins.Moderator m, BottomSheet sheet){new AlertDialog.Builder(getParentActivity()).setTitle("Убрать модератора?").setMessage("Доступ к панели и жалобам будет отозван.").setPositiveButton("Убрать",(d,w)->DevGramPlugins.removeModerator(m.uid,(ok,err)->{BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,ok?"Доступ убран":"Ошибка: "+err).show();if(ok){if(sheet!=null)sheet.dismiss();DevGramPlugins.fetchModerators(list->{if(list!=null)showModerators(list);});}})).setNegativeButton("Отмена",null).show();}
 
     private void addModeratorDialog() {
         Context ctx = getParentActivity();
@@ -402,9 +402,13 @@ public class DevGramModerationActivity extends BaseFragment {
                 Toast.makeText(getParentActivity(), "Введите Telegram ID модератора", Toast.LENGTH_LONG).show();
                 return;
             }
-            DevGramPlugins.addModerator(email, pass, tg, (ok, err) ->
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,
-                            ok ? "Модератор добавлен. Логин: " + email : ("Ошибка: " + err)).show());
+            DevGramPlugins.addModerator(email, pass, tg, (ok, err) -> {
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,
+                        ok ? "Модератор добавлен. Логин: " + email : ("Ошибка: " + err)).show();
+                if (ok) {
+                    DevGramPlugins.fetchModerators(list -> showModerators(list));
+                }
+            });
         });
         b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
         showDialog(b.create());
