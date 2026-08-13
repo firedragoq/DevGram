@@ -1958,6 +1958,15 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 //                    }
 
                     if (data != null) {
+                        String devGramSection = getDevGramSettingsSection(data);
+                        if (devGramSection != null) {
+                            if (progress != null) {
+                                progress.end();
+                            }
+                            openDevGramSettingsSection(devGramSection);
+                            intent.setAction(null);
+                            return true;
+                        }
                         String username = null;
                         String referrer = null;
                         String login = null;
@@ -3426,6 +3435,54 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
         intent.setAction(null);
         return pushOpened;
+    }
+
+    private String getDevGramSettingsSection(Uri uri) {
+        if (uri == null) return null;
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        String path = uri.getPath();
+        boolean web = ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+                && host != null && (host.equalsIgnoreCase("t.me") || host.equalsIgnoreCase("telegram.me") || host.equalsIgnoreCase("telegram.dog"))
+                && path != null && path.equalsIgnoreCase("/DevGramSettings");
+        boolean tg = "tg".equalsIgnoreCase(scheme)
+                && "resolve".equalsIgnoreCase(host)
+                && "DevGramSettings".equalsIgnoreCase(uri.getQueryParameter("domain"));
+        if (!web && !tg) return null;
+        String section = uri.getQueryParameter("s");
+        return TextUtils.isEmpty(section) ? "main" : section.trim().toLowerCase(java.util.Locale.US);
+    }
+
+    private void openDevGramSettingsSection(String section) {
+        switch (section) {
+            case "plugins":
+                presentFragment(new DevGramPluginsActivity());
+                break;
+            case "catalog":
+                presentFragment(new DevGramPluginCatalogActivity());
+                break;
+            case "fonts":
+            case "appearance":
+                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_APPEARANCE));
+                break;
+            case "ghost":
+                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GHOST));
+                break;
+            case "chats":
+                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_CHATS));
+                break;
+            case "general":
+                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GENERAL));
+                break;
+            case "support":
+                DevGramOtherActivity other = new DevGramOtherActivity();
+                presentFragment(other);
+                AndroidUtilities.runOnUIThread(() -> DevGramSupportSheet.show(other), 350L);
+                break;
+            default:
+                presentFragment(new DevGramSettingsActivity());
+                break;
+        }
     }
 
     public void openEmailSettings(TL_account.Password currentPassword) {
