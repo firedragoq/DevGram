@@ -2272,10 +2272,19 @@ public class DevGramPlugins {
             final java.util.Set<Long> tgs = new java.util.HashSet<>();
             java.net.HttpURLConnection c = null;
             try {
-                c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/moderators.json").openConnection();
+                String token = DevGramBadges.getAdminToken();
+                if (token == null || token.isEmpty()) {
+                    if (cb != null) {
+                        AndroidUtilities.runOnUIThread(() -> cb.onResult(null));
+                    }
+                    return;
+                }
+                String url = RTDB + "/moderators.json?auth=" + java.net.URLEncoder.encode(token, "UTF-8");
+                c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
                 c.setConnectTimeout(15000);
                 c.setReadTimeout(15000);
-                if (c.getResponseCode() == 200) {
+                int code = c.getResponseCode();
+                if (code == 200) {
                     java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
                     StringBuilder sb = new StringBuilder();
                     String line;
@@ -2300,9 +2309,15 @@ public class DevGramPlugins {
                             if (tg != 0) tgs.add(tg);
                         }
                     }
+                    moderatorUids = uids;
+                    moderatorTgIds = tgs;
+                } else {
+                    FileLog.e("DevGram moderators fetch failed: HTTP " + code);
+                    if (cb != null) {
+                        AndroidUtilities.runOnUIThread(() -> cb.onResult(null));
+                    }
+                    return;
                 }
-                moderatorUids = uids;
-                moderatorTgIds = tgs;
             } catch (Throwable e) {
                 FileLog.e(e);
             } finally {
@@ -2349,12 +2364,19 @@ public class DevGramPlugins {
             final String em = email;
             final long tg = tgId;
             Utilities.globalQueue.postRunnable(() -> {
+                boolean saved = false;
                 try {
                     org.json.JSONObject o = new org.json.JSONObject();
                     o.put("email", em);
                     o.put("tg", tg);
-                    httpVerified("PUT", RTDB + "/moderators/" + uid + ".json?auth=" + token, o.toString());
-                } catch (Throwable ignore) {
+                    saved = httpVerified("PUT", RTDB + "/moderators/" + uid + ".json?auth=" + token, o.toString());
+                } catch (Throwable e) {
+                    FileLog.e(e);
+                }
+                if (!saved) {
+                    AndroidUtilities.runOnUIThread(() -> cb.onResult(false,
+                            "аккаунт создан, но право модератора не сохранилось. Войдите главным администратором и повторите"));
+                    return;
                 }
                 java.util.Set<String> setU = new java.util.HashSet<>(moderatorUids);
                 setU.add(uid);
@@ -2364,7 +2386,7 @@ public class DevGramPlugins {
                     setT.add(tg);
                     moderatorTgIds = setT;
                 }
-                AndroidUtilities.runOnUIThread(() -> cb.onResult(true, null));
+                fetchModerators(list -> cb.onResult(true, null));
             });
         });
     }
@@ -2414,17 +2436,22 @@ public class DevGramPlugins {
         });
     }
 
-    public static boolean removeModerator(String uid) {
+    public static void removeModerator(String uid, DevGramBadges.Callback cb) {
         String token = DevGramBadges.getAdminToken();
         if (token == null || uid == null || uid.isEmpty()) {
-            return false;
+            if (cb != null) cb.onResult(false, "нужен вход главного администратора");
+            return;
         }
-        Utilities.globalQueue.postRunnable(() ->
-                httpVerified("DELETE", RTDB + "/moderators/" + uid + ".json?auth=" + token, null));
-        java.util.Set<String> set = new java.util.HashSet<>(moderatorUids);
-        set.remove(uid);
-        moderatorUids = set;
-        return true;
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean removed = httpVerified("DELETE", RTDB + "/moderators/" + uid + ".json?auth=" + token, null);
+            if (!removed) {
+                if (cb != null) AndroidUtilities.runOnUIThread(() -> cb.onResult(false, "Firebase не удалил право модератора"));
+                return;
+            }
+            fetchModerators(list -> {
+                if (cb != null) cb.onResult(list != null, list != null ? null : "не удалось обновить список модераторов");
+            });
+        });
     }
 
     // ---- блок-лист (запрещённые к публикации файлы) ----
