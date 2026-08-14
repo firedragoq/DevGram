@@ -266,21 +266,38 @@ public class DevGramStreaks {
                     return; // не JSON (ошибка/доступ) — кэш не трогаем
                 }
             }
-            // obj == null означает пустой узел (все серии удалены) -> чистим локальные серии
+            // Слияние облака и кэша. ВАЖНО: серии в облаке НИКОГДА не удаляются (только GET/PUT),
+            // поэтому «ключа нет в облаке» = PUT из onMessage не долетел, а НЕ «серия удалена».
+            // Раньше такие серии стирались из кэша — это и была причина «огонёк слетает, хотя
+            // продлил». Теперь: локальное НЕ удаляем; если оно свежее облака (или его нет в
+            // облаке) — до-заливаем в облако (self-heal). Облаком перезаписываем локальное
+            // только если оно реально свежее (см. cmpFresh: по streakDay, streak, day, out+in).
             try {
+                final long myIdF = myId;
                 SharedPreferences.Editor ed = p.edit();
+                // 1) облачные записи -> кэш, но не затираем более свежее локальное
+                if (obj != null) {
+                    for (Iterator<String> it = obj.keys(); it.hasNext(); ) {
+                        String k = it.next();
+                        String cloudVal = obj.getString(k);
+                        String localVal = p.getString(k, null);
+                        if (localVal == null || cmpFresh(cloudVal, localVal) > 0) {
+                            ed.putString(k, cloudVal); // облако новее (или локального ещё нет)
+                        } else if (cmpFresh(localVal, cloudVal) > 0) {
+                            repushCloud(myIdF, k, localVal); // локальное новее — чиним облако
+                        }
+                    }
+                }
+                // 2) локальные серии, которых нет в облаке -> НЕ удаляем, а до-заливаем
                 for (String existing : new java.util.ArrayList<>(p.getAll().keySet())) {
                     if (existing.indexOf('_') >= 0 || "lastRefresh".equals(existing)) {
                         continue; // мета-ключи (_r/_notified/_reminded, lastRefresh) не трогаем
                     }
                     if (obj == null || !obj.has(existing)) {
-                        ed.remove(existing); // серии нет в облаке — удаляем из кэша
-                    }
-                }
-                if (obj != null) {
-                    for (Iterator<String> it = obj.keys(); it.hasNext(); ) {
-                        String k = it.next();
-                        ed.putString(k, obj.getString(k));
+                        String lv = p.getString(existing, null);
+                        if (lv != null && lv.split(",").length >= 5) {
+                            repushCloud(myIdF, existing, lv);
+                        }
                     }
                 }
                 ed.apply();
@@ -295,6 +312,42 @@ public class DevGramStreaks {
             } catch (Throwable ignore) {
             }
         });
+    }
+
+    // Дозалить локальное состояние серии в облако (self-heal, когда push из onMessage не долетел
+    // или локальное новее). Fire-and-forget в фоне.
+    private static void repushCloud(long myId, String dialogKey, String state) {
+        Utilities.globalQueue.postRunnable(() ->
+                httpSend("PUT", RTDB_BASE + "/streaks/" + myId + "/" + dialogKey + ".json", "\"" + state + "\""));
+    }
+
+    // «Свежесть» состояния серии для слияния кэш<->облако. Возвращает >0 если a свежее b, <0 если
+    // b свежее, 0 если равны. Порядок сравнения: streakDay (кто позже засчитал день) -> streak ->
+    // day (последняя активность) -> out+in (сколько отметок за сегодня). Так более полное/позднее
+    // состояние всегда побеждает, и продление серии не откатывается устаревшей копией.
+    private static int cmpFresh(String a, String b) {
+        long[] fa = fresh(a), fb = fresh(b);
+        for (int i = 0; i < fa.length; i++) {
+            if (fa[i] != fb[i]) {
+                return fa[i] > fb[i] ? 1 : -1;
+            }
+        }
+        return 0;
+    }
+
+    private static long[] fresh(String s) {
+        long streakDay = Long.MIN_VALUE, streak = 0, day = Long.MIN_VALUE, marks = 0;
+        if (s != null) {
+            try {
+                String[] a = s.split(",");
+                day = Long.parseLong(a[0]);
+                marks = Long.parseLong(a[1]) + Long.parseLong(a[2]); // out + in
+                streak = Long.parseLong(a[3]);
+                streakDay = Long.parseLong(a[4]);
+            } catch (Throwable ignore) {
+            }
+        }
+        return new long[]{streakDay, streak, day, marks};
     }
 
     // Зафиксировать новое сообщение. Состояние: day,out,in,streak,streakDay.
