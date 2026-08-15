@@ -47,11 +47,27 @@ public class DevGramPlugins {
     public static String devServerToken() {
         String token = prefs().getString("dev_server_token", "");
         if (token == null || token.length() < 24) {
-            token = java.util.UUID.randomUUID().toString().replace("-", "")
-                    + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            token = generateDevServerToken();
             prefs().edit().putString("dev_server_token", token).apply();
         }
         return token;
+    }
+
+    /** Rotate the local credential and restart an enabled dev server with the new token. */
+    public static synchronized String resetDevServerToken() {
+        boolean shouldRestart = flag("dev_server", false) || isDevServerRunning();
+        String token = generateDevServerToken();
+        prefs().edit().putString("dev_server_token", token).commit();
+        stopDevServer();
+        if (shouldRestart && !isSafeMode()) {
+            startDevServer(DEV_SERVER_PORT, token);
+        }
+        return token;
+    }
+
+    private static String generateDevServerToken() {
+        return java.util.UUID.randomUUID().toString().replace("-", "")
+                + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 
     public static boolean setDevServerEnabled(boolean enabled) {

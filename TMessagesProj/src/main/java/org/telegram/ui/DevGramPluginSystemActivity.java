@@ -114,17 +114,7 @@ public class DevGramPluginSystemActivity extends BaseFragment {
                 DevGramPlugins.setDevServerEnabled(false);
             }
         } else if (item.id == ID_DEV_TOKEN) {
-            String token = DevGramPlugins.devServerToken();
-            String connectionInfo = "Порт: " + DevGramPlugins.DEV_SERVER_PORT + "\nТокен: " + token;
-            new org.telegram.ui.ActionBar.AlertDialog.Builder(getContext())
-                    .setTitle("Токен dev server")
-                    .setMessage(connectionInfo + "\n\nНе передавайте токен другим приложениям.")
-                    .setNegativeButton("Скопировать", (dialog, which) -> {
-                        org.telegram.messenger.AndroidUtilities.addToClipboard(connectionInfo);
-                        BulletinFactory.of(this).createCopyBulletin("Порт и токен скопированы").show();
-                    })
-                    .setPositiveButton("Готово", null)
-                    .show();
+            showDevServerTokenDialog();
             return;
         } else if (item.id == ID_RELOAD) {
             int n = DevGramPlugins.reload();
@@ -145,5 +135,35 @@ public class DevGramPluginSystemActivity extends BaseFragment {
         if (listView != null && listView.adapter != null) {
             listView.adapter.update(true);
         }
+    }
+
+    private void showDevServerTokenDialog() {
+        String connectionInfo = "Порт: " + DevGramPlugins.DEV_SERVER_PORT
+                + "\nТокен: " + DevGramPlugins.devServerToken();
+        new org.telegram.ui.ActionBar.AlertDialog.Builder(getContext())
+                .setTitle("Токен dev server")
+                .setMessage(connectionInfo + "\n\nНе передавайте токен другим приложениям.")
+                .setNeutralButton("Сбросить", (dialog, which) -> confirmDevServerTokenReset())
+                .setNegativeButton("Скопировать", (dialog, which) -> {
+                    org.telegram.messenger.AndroidUtilities.addToClipboard(connectionInfo);
+                    BulletinFactory.of(this).createCopyBulletin("Порт и токен скопированы").show();
+                })
+                .setPositiveButton("Готово", null)
+                .show();
+    }
+
+    private void confirmDevServerTokenReset() {
+        new org.telegram.ui.ActionBar.AlertDialog.Builder(getContext())
+                .setTitle("Сбросить токен?")
+                .setMessage("Старый токен сразу перестанет работать. Dev server перезапустится с новым токеном.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сбросить", (dialog, which) -> {
+                    DevGramPlugins.resetDevServerToken();
+                    org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> {
+                        BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Создан новый токен").show();
+                        showDevServerTokenDialog();
+                    }, 160);
+                })
+                .show();
     }
 }
