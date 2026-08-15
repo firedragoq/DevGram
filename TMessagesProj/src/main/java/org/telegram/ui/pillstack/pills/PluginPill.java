@@ -64,6 +64,16 @@ public class PluginPill extends BasePill {
             if (value != null && !TextUtils.equals(textView.getText(), value)) {
                 animateSizeChange();
                 textView.setText(value, forceRefresh);
+                // AnimatedTextView requests a new measure immediately when text grows,
+                // but intentionally keeps the old width while a shrinking animation runs.
+                // Re-measure after that animation so plugin pills also shrink in place.
+                if (forceRefresh) {
+                    textView.postDelayed(() -> {
+                        textView.requestLayout();
+                        layout.requestLayout();
+                        requestLayout();
+                    }, 320L);
+                }
             }
             markDataUpdated();
         } catch (Throwable ignore) { }

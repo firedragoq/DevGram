@@ -1,13 +1,14 @@
 from java import jclass
 
 from devgram import BasePlugin
+from devgram.intents import open_uri
 from devgram.ui import Button, Header, Selector, Switch, Text
 
 
 class InboxPulse(BasePlugin):
     id = "space.devgram.inboxpulse"
     name = "Inbox Pulse"
-    version = "1.0.0"
+    version = "1.0.1"
     author = "FireDragoq"
     description = "Красивый Pill Stack-виджет непрочитанных сообщений с быстрым переходом к следующему чату"
     icon = "https://devgram.space/favicon.png"
@@ -46,16 +47,16 @@ class InboxPulse(BasePlugin):
                 create=lambda proxy, context, provider: self._create_native_pill(context, provider),
             )
             self._proxy_refs.append(self._creator)
-            config.register(
-                pill_info(
-                    int(self._pill_id),
-                    "Inbox Pulse",
-                    drawables.msg_markunread,
-                    self._signed_color(0xFF8B5CF6),
-                    self._signed_color(0xFF3B82F6),
-                    self._creator,
-                )
+            self._config = config
+            self._pill_info = pill_info(
+                int(self._pill_id),
+                "Inbox Pulse",
+                drawables.msg_markunread,
+                self._signed_color(0xFF8B5CF6),
+                self._signed_color(0xFF3B82F6),
+                self._creator,
             )
+            config.register(self._pill_info)
         except Exception as error:
             # The normal public pill registered above remains fully functional.
             self.log("Inbox Pulse gradient fallback: " + repr(error))
@@ -179,6 +180,14 @@ class InboxPulse(BasePlugin):
             except Exception:
                 pass
 
+    def _rebuild(self):
+        """Recreate the native pill so shrinking text is applied on older DevGram builds."""
+        try:
+            self._live_pills = []
+            self._config.register(self._pill_info)
+        except Exception:
+            self._refresh()
+
     def _open_next_unread(self, pill=None):
         dialogs = self._unread_dialogs()
         if not dialogs:
@@ -199,19 +208,15 @@ class InboxPulse(BasePlugin):
             if dialog_object.isEncryptedDialog(dialog_id):
                 self.bulletin("Секретный чат пропущен", kind="info")
                 return
-            args = jclass("android.os.Bundle")()
             if dialog_object.isUserDialog(dialog_id):
-                args.putLong("user_id", dialog_id)
+                uri = "tg://openmessage?user_id=%d" % dialog_id
             elif dialog_object.isChatDialog(dialog_id):
-                args.putLong("chat_id", -dialog_id)
+                uri = "tg://openmessage?chat_id=%d" % (-dialog_id)
             else:
                 self.bulletin("Этот диалог нельзя открыть из виджета", kind="error")
                 return
-            fragment = jclass("org.telegram.ui.LaunchActivity").getSafeLastFragment()
-            if fragment is None:
-                self.bulletin("Откройте список чатов и повторите", kind="info")
-                return
-            fragment.presentFragment(jclass("org.telegram.ui.ChatActivity")(args))
+            if not open_uri(uri):
+                raise RuntimeError("Telegram URI was not handled")
         except Exception as error:
             self.log("Inbox Pulse navigation error: " + repr(error))
             self.bulletin("Не удалось открыть непрочитанный чат", kind="error")
@@ -221,7 +226,7 @@ class InboxPulse(BasePlugin):
     def _toggle_mode(self, pill=None):
         next_mode = "0" if self.get_setting("count_mode", "0") == "1" else "1"
         self.set_setting("count_mode", next_mode)
-        self._refresh(pill)
+        self._rebuild()
         self.bulletin(
             "Теперь считаются " + ("сообщения" if next_mode == "1" else "чаты"),
             kind="info",
@@ -244,7 +249,7 @@ class InboxPulse(BasePlugin):
 
     def on_setting_changed(self, key, value):
         if key in ("count_mode", "hide_muted"):
-            self._refresh()
+            self._rebuild()
 
     def on_setting_click(self, key):
         if key == "open_next":
