@@ -3028,13 +3028,24 @@ public class DevGramPlugins {
         return true;
     }
 
-    // Установлен ли уже плагин с таким id (по файлу в папке).
+    // Установлен ли уже плагин с таким id (обычный исходник или пакет .dgplugin).
     public static boolean isInstalled(String pluginId) {
         if (pluginId == null || pluginId.isEmpty()) {
             return false;
         }
         String safe = pluginId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
-        return new File(pluginsDir(), safe + ".py").exists();
+        File dir = pluginsDir();
+        if (new File(dir, safe + ".py").isFile()
+                || new File(dir, safe + ".plugin").isFile()
+                || new File(dir, safe + ".dgplugin").isFile()) {
+            return true;
+        }
+        // Поддерживаем плагины, добавленные до унификации имён файлов.
+        for (String row : listPlugins()) {
+            String[] fields = row.split("\u001f", -1);
+            if (fields.length > 0 && pluginId.equals(fields[0])) return true;
+        }
+        return false;
     }
 
     private static boolean httpVerified(String method, String urlStr, String body) {

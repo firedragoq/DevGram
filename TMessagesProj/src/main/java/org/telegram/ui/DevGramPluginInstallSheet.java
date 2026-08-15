@@ -104,6 +104,7 @@ public class DevGramPluginInstallSheet {
         }
         final boolean fromDevChannel = org.telegram.messenger.DevGramBadges.isPluginDevChannel(sourceDialogId);
         final boolean verified = fromDevChannel || (verifyHash != null && !verifyHash.isEmpty() && DevGramPlugins.isVerifiedByHash(verifyHash));
+        final boolean installed = DevGramPlugins.isInstalled(id);
         if (fromDevChannel && verifyHash != null && !verifyHash.isEmpty()) {
             DevGramPlugins.trustFromChannelByHash(verifyHash);
         }
@@ -225,9 +226,10 @@ public class DevGramPluginInstallSheet {
         });
         root.addView(check, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
 
-        // кнопка «Установить»
+        // Для уже установленного ID карточка выполняет обновление тем же безопасным путём.
         TextView install = new TextView(context);
-        install.setText(verified ? "Установить плагин" : "Установить неизвестный плагин");
+        install.setText(installed ? "Обновить плагин"
+                : (verified ? "Установить плагин" : "Установить неизвестный плагин"));
         install.setGravity(Gravity.CENTER);
         install.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
         install.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
@@ -253,7 +255,8 @@ public class DevGramPluginInstallSheet {
                     ? "✓ Проверенный плагин\nОн есть в реестре DevGram — код проверен, можно доверять."
                     : "ⓘ Внимание: неизвестный источник\nПлагина нет в реестре проверенных DevGram, он выполняет код в приложении. Устанавливай только если доверяешь автору.");
             warnTextRef.setTextColor(vv ? 0xFF3BA55D : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-            installRef.setText(vv ? "Установить плагин" : "Установить неизвестный плагин");
+            installRef.setText(installed ? "Обновить плагин"
+                    : (vv ? "Установить плагин" : "Установить неизвестный плагин"));
         };
 
         final boolean team = org.telegram.messenger.DevGramBadges.isTeam(fragment.getUserConfig().getClientUserId());
@@ -387,10 +390,11 @@ public class DevGramPluginInstallSheet {
             sheet.dismiss();
             if (ok) {
                 org.telegram.ui.Components.BulletinFactory.of(fragment)
-                        .createSimpleBulletin(R.raw.contact_check, "Плагин «" + name + "» установлен").show();
+                        .createSimpleBulletin(R.raw.contact_check,
+                                "Плагин «" + name + "» " + (installed ? "обновлён" : "установлен")).show();
             } else {
                 org.telegram.ui.Components.BulletinFactory.of(fragment)
-                        .createErrorBulletin("Не удалось установить плагин").show();
+                        .createErrorBulletin(installed ? "Не удалось обновить плагин" : "Не удалось установить плагин").show();
             }
         });
 
