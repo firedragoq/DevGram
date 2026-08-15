@@ -1705,6 +1705,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     public static float viewOffset = 0.0f;
 
+    private static final java.util.concurrent.ConcurrentLinkedQueue<String> initialLayoutWatchdogLog =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+    private static void logInitialLayoutWatchdog(String message) {
+        initialLayoutWatchdogLog.add(android.os.SystemClock.uptimeMillis() + " " + message);
+        while (initialLayoutWatchdogLog.size() > 300) {
+            initialLayoutWatchdogLog.poll();
+        }
+    }
+
+    public static String getInitialLayoutWatchdogLog() {
+        return String.join("\n", initialLayoutWatchdogLog);
+    }
+
     public class DialogsRecyclerView extends BlurredRecyclerView implements StoriesListPlaceProvider.ClippedView {
 
         public boolean updateDialogsOnNextDraw;
@@ -1783,11 +1797,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         private void ensureInitialLayout() {
             initialLayoutCheckPosted = false;
             RecyclerView.Adapter adapter = getAdapter();
+            int itemCountForLog = adapter == null ? -1 : adapter.getItemCount();
+            logInitialLayoutWatchdog("ensure retry=" + initialLayoutRetryCount
+                    + " items=" + itemCountForLog + " attached=" + isAttachedToWindow()
+                    + " w=" + getWidth() + " h=" + getHeight()
+                    + " computing=" + isComputingLayout() + " children=" + getChildCount());
             if (adapter == null || adapter.getItemCount() == 0 || !isAttachedToWindow()) {
+                logInitialLayoutWatchdog("skip no-adapter-or-detached");
                 return;
             }
 
             if (getWidth() == 0 || getHeight() == 0 || isComputingLayout()) {
+                logInitialLayoutWatchdog("skip zero-size-or-computing");
                 retryInitialLayoutCheck();
                 return;
             }
@@ -1795,6 +1816,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             boolean hasVisiblePosition = parentPage.layoutManager != null
                     && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
             if (getChildCount() != 0 && hasVisiblePosition) {
+                logInitialLayoutWatchdog("already-ok");
                 initialLayoutRetryCount = 0;
                 removeInitialLayoutGlobalListener();
                 return;
@@ -1821,12 +1843,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 // active) so the measure() call below is guaranteed to actually re-measure and
                 // set PFLAG_LAYOUT_REQUIRED, making the following layout() call reliably invoke
                 // onLayout() -> dispatchLayout() at its current bounds and scroll position.
-                requestLayout();
-                forceLayout();
-                measure(
-                        View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY),
-                        View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.EXACTLY));
-                layout(getLeft(), getTop(), getRight(), getBottom());
+                try {
+                    requestLayout();
+                    forceLayout();
+                    measure(
+                            View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.EXACTLY));
+                    layout(getLeft(), getTop(), getRight(), getBottom());
+                    logInitialLayoutWatchdog("forced-layout-done children=" + getChildCount());
+                } catch (Throwable forcedLayoutError) {
+                    logInitialLayoutWatchdog("forced-layout-EXCEPTION " + forcedLayoutError);
+                }
+            } else {
+                logInitialLayoutWatchdog("forced-layout-skipped computing=" + isComputingLayout());
             }
 
             postInvalidateOnAnimation();
@@ -1838,8 +1867,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             hasVisiblePosition = parentPage.layoutManager != null
                     && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
             if (getChildCount() == 0 || !hasVisiblePosition) {
+                logInitialLayoutWatchdog("still-empty -> retry");
                 retryInitialLayoutCheck();
             } else {
+                logInitialLayoutWatchdog("resolved children=" + getChildCount());
                 initialLayoutRetryCount = 0;
                 removeInitialLayoutGlobalListener();
             }
