@@ -3452,6 +3452,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 return !actionBar.isActionModeShowed() && databaseMigrationHint == null;// && !rightSlidingDialogContainer.hasFragment();
             }
         }));
+        fragmentSearchField.showPillStack();
         fragmentSearchField.setSearchFiltersListener(new FragmentSearchField.SearchFiltersListener() {
             @Override
             public void onSearchFilterCleared(FiltersView.MediaFilterData filterData) {

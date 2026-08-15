@@ -194,6 +194,8 @@ android {
             // libcrypto; штатный fallback tg-ws-proxy падает). Предсобранный wheel под Android.
             pip {
                 install "pycryptodome"
+                // Remote debugging for the DevGram plugin development server.
+                install "debugpy==1.8.16"
             }
         }
     }

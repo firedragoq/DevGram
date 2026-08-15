@@ -18593,10 +18593,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (currentMessageObject.messageOwner.video_processing_pending) {
             timeString = formatString(R.string.ScheduledTimeApprox, timeString);
         }
-        // --- DevGram: пометка удалённого сообщения в строке времени (логика из AyuGram, GPL) ---
-        if (currentMessageObject.messageOwner != null && currentMessageObject.messageOwner.devgramDeleted && !TextUtils.isEmpty(timeString)) {
-            timeString = DevGramConfig.getDeletedMark() + " " + timeString;
-        }
         if (signString != null) {
             if (messageObject.messageOwner.via_business_bot_id != 0) {
                 currentTimeString = timeString + ", ";
@@ -18637,7 +18633,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 currentTimeString = TextUtils.concat(formatString(R.string.MessageScheduledRepeatSeconds, period), ", ", currentTimeString);
             }
         }
-        timeTextWidth = timeWidth = (int) Math.ceil(Theme.chat_timePaint.measureText(currentTimeString, 0, currentTimeString == null ? 0 : currentTimeString.length()));
+        // --- DevGram: настраиваемая пометка удалённого сообщения (значок+цвет, логика из AyuGram, GPL) ---
+        int devgramDeletedMarkWidth = 0;
+        if (currentMessageObject.messageOwner != null && currentMessageObject.messageOwner.devgramDeleted && currentTimeString != null) {
+            CharSequence mark = org.telegram.messenger.DevGramDeletedMark.getMark(resourcesProvider);
+            if (mark.length() > 0) {
+                currentTimeString = TextUtils.concat(mark, " ", currentTimeString);
+                devgramDeletedMarkWidth = org.telegram.messenger.DevGramDeletedMark.getMarkWidth();
+            }
+        }
+        timeTextWidth = timeWidth = (int) Math.ceil(Theme.chat_timePaint.measureText(currentTimeString, 0, currentTimeString == null ? 0 : currentTimeString.length())) + devgramDeletedMarkWidth;
         if (currentMessageObject.scheduled && currentMessageObject.messageOwner.date == 0x7FFFFFFE || currentMessageObject.notime) {
             timeWidth -= dp(8);
         }
@@ -20328,7 +20333,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         }
 
-        if (alphaInternal != 1.0f) {
+        // DevGram: полупрозрачность удалённых сообщений (порт AyuGram). Домножаем на общий слой alpha.
+        float devgramEffectiveAlpha = alphaInternal;
+        if (DevGramConfig.getSemiTransparentDeleted()
+                && currentMessageObject != null && currentMessageObject.messageOwner != null
+                && currentMessageObject.messageOwner.devgramDeleted) {
+            devgramEffectiveAlpha *= 0.55f;
+        }
+        if (devgramEffectiveAlpha != 1.0f) {
             int top = 0;
             int left = 0;
             int bottom = getMeasuredHeight();
@@ -20348,14 +20360,17 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     right += dp(8 + 32);
                 }
             }
-            if (getY() < 0) {
-                top = (int) -getY();
-            }
-            if (getY() + getMeasuredHeight() > parentHeight) {
-                bottom = (int) (parentHeight - getY());
+            // parentHeight==0 (напр. превью в настройках) — не обрезаем слой, иначе контент исчезнет
+            if (parentHeight > 0) {
+                if (getY() < 0) {
+                    top = (int) -getY();
+                }
+                if (getY() + getMeasuredHeight() > parentHeight) {
+                    bottom = (int) (parentHeight - getY());
+                }
             }
             rect.set(left, top, right, bottom);
-            canvas.saveLayerAlpha(rect, (int) (255 * alphaInternal), Canvas.ALL_SAVE_FLAG);
+            canvas.saveLayerAlpha(rect, (int) (255 * devgramEffectiveAlpha), Canvas.ALL_SAVE_FLAG);
         }
         boolean clipContent = false;
         if (transitionParams.animateBackgroundBoundsInner && currentBackgroundDrawable != null && !isRoundVideo && (currentMessageObject == null || !currentMessageObject.sendPreview)) {

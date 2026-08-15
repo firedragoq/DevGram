@@ -38,6 +38,64 @@ public class DevGramPlugins {
     private static volatile String firebaseAnonUid;
     private static volatile java.util.Set<String> verifiedHashes = new java.util.HashSet<>();
 
+    public static boolean startDevServer(int port, String token) { return DevGramDevServer.start(port, token); }
+    public static void stopDevServer() { DevGramDevServer.stopServer(); }
+    public static boolean isDevServerRunning() { return DevGramDevServer.isRunning(); }
+    public static final int DEV_SERVER_PORT = 42690;
+
+    /** Random local credential, persisted only in the app's private preferences. */
+    public static String devServerToken() {
+        String token = prefs().getString("dev_server_token", "");
+        if (token == null || token.length() < 24) {
+            token = java.util.UUID.randomUUID().toString().replace("-", "")
+                    + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            prefs().edit().putString("dev_server_token", token).apply();
+        }
+        return token;
+    }
+
+    public static boolean setDevServerEnabled(boolean enabled) {
+        if (enabled && isSafeMode()) {
+            return false;
+        }
+        setFlag("dev_server", enabled);
+        if (!enabled) {
+            stopRemoteDebugger();
+            stopDevServer();
+            return true;
+        }
+        return startDevServer(DEV_SERVER_PORT, devServerToken());
+    }
+
+    public static String startRemoteDebugger(String platform, String host, int port) {
+        try {
+            loader();
+            return Python.getInstance().getModule("devgram.dev_server")
+                    .callAttr("start_debugger", platform, host, port, false).toString();
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return "error:" + e.getClass().getSimpleName();
+        }
+    }
+
+    public static String stopRemoteDebugger() {
+        try {
+            Python.getInstance().getModule("devgram.dev_server").callAttr("stop_debugger");
+            return "stopped";
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return "error:" + e.getClass().getSimpleName();
+        }
+    }
+
+    public static String remoteDebuggerStatus() {
+        try {
+            return Python.getInstance().getModule("devgram.dev_server").callAttr("debugger_status").toString();
+        } catch (Throwable e) {
+            return "unavailable";
+        }
+    }
+
     // Пример-плагин, который кладём при первом запуске (чтобы было что показать).
     private static final String SAMPLE = String.join("\n",
             "from devgram import BasePlugin",
@@ -171,6 +229,9 @@ public class DevGramPlugins {
             refreshRequestHooks();  // повесить хук TL-запросов, если плагины их используют
             loaded = true;
             loading = false;
+            if (flag("dev_mode", false) && !isSafeMode()) {
+                setDevServerEnabled(true);
+            }
             FileLog.d("[DevGramPlugins] загружено плагинов: " + n + " из " + dir.getAbsolutePath());
         } catch (Throwable e) {
             FileLog.e(e);
@@ -189,12 +250,12 @@ public class DevGramPlugins {
     }
 
     // Хук исходящего текста — вернуть, возможно, изменённый текст.
-    public static CharSequence onSendMessage(CharSequence text) {
+    public static CharSequence onSendMessage(int account, CharSequence text) {
         if (text == null || !loaded || isSafeMode()) {
             return text;
         }
         try {
-            PyObject r = loader().callAttr("dispatch_send", text.toString());
+            PyObject r = loader().callAttr("dispatch_send", account, text.toString());
             return r == null ? text : r.toString();
         } catch (Throwable e) {
             FileLog.e(e);
@@ -286,6 +347,18 @@ public class DevGramPlugins {
 
     // ===== клиентское API для плагинов (вызывается из Python) =====
 
+    public static int registerPill(String pluginId, String pillId, String name, String text,
+                                   com.chaquo.python.PyObject valueCallback,
+                                   com.chaquo.python.PyObject clickCallback,
+                                   com.chaquo.python.PyObject longClickCallback,
+                                   boolean enabled) {
+        return DevGramPillStack.registerPluginPill(pluginId, pillId, name, text, valueCallback, clickCallback, longClickCallback, enabled);
+    }
+
+    public static void unregisterPills(String pluginId) {
+        DevGramPillStack.unregisterPluginPills(pluginId);
+    }
+
     public static long myId() {
         return UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
     }
@@ -365,6 +438,43 @@ public class DevGramPlugins {
     public static Object messagesStorage()       { return MessagesStorage.getInstance(UserConfig.selectedAccount); }
     public static Object notificationCenter()    { return NotificationCenter.getInstance(UserConfig.selectedAccount); }
     public static Object fileLoader()            { return FileLoader.getInstance(UserConfig.selectedAccount); }
+    public static Object accountInstance(int account) { return AccountInstance.getInstance(account); }
+    public static Object messagesController(int account) { return MessagesController.getInstance(account); }
+    public static Object userConfig(int account) { return UserConfig.getInstance(account); }
+    public static Object connectionsManager(int account) { return org.telegram.tgnet.ConnectionsManager.getInstance(account); }
+    public static Object sendMessagesHelper(int account) { return SendMessagesHelper.getInstance(account); }
+    public static Object mediaDataController(int account) { return MediaDataController.getInstance(account); }
+    public static Object contactsController(int account) { return ContactsController.getInstance(account); }
+    public static Object messagesStorage(int account) { return MessagesStorage.getInstance(account); }
+    public static Object notificationCenter(int account) { return NotificationCenter.getInstance(account); }
+    public static Object fileLoader(int account) { return FileLoader.getInstance(account); }
+    public static Object mediaController() { return MediaController.getInstance(); }
+    public static Object notificationsController(int account) { return NotificationsController.getInstance(account); }
+    public static Object notificationsSettings(int account) { return MessagesController.getNotificationsSettings(account); }
+    public static Object locationController(int account) { return LocationController.getInstance(account); }
+    public static Object secretChatHelper(int account) { return SecretChatHelper.getInstance(account); }
+    public static Object downloadController(int account) { return DownloadController.getInstance(account); }
+    public static void sendText(int account, long dialogId, String text) {
+        if (text == null || text.isEmpty()) return;
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(text, dialogId, null, null, null, true, null, null, null, true, 0, 0, null, false);
+                SendMessagesHelper.getInstance(account).sendMessage(params);
+            } catch (Throwable e) { FileLog.e(e); }
+        });
+    }
+
+    public static void sendFormattedText(int account, long dialogId, String text, ArrayList<org.telegram.tgnet.TLRPC.MessageEntity> entities) {
+        if (text == null || text.isEmpty()) return;
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(
+                        text, dialogId, null, null, null, true, entities, null, null,
+                        true, 0, 0, null, false);
+                SendMessagesHelper.getInstance(account).sendMessage(params);
+            } catch (Throwable e) { FileLog.e(e); }
+        });
+    }
 
     // ---- client_utils: богатая отправка ----
     // Отправить фото из файла (path — абсолютный путь), с подписью.
@@ -595,15 +705,48 @@ public class DevGramPlugins {
         }
     }
 
-    public static void onUpdate(Object update) {
+    public static void onUpdate(int account, Object update) {
         try {
-            loader().callAttr("dispatch_update", update);
+            loader().callAttr("dispatch_update", account, update);
         } catch (Throwable ignore) {
+        }
+    }
+
+    public static boolean onIntent(android.content.Intent intent) {
+        if (intent == null || !loaded || isSafeMode()) return false;
+        try {
+            return Python.getInstance().getModule("devgram.intents")
+                    .callAttr("dispatch", intent).toBoolean();
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
+        }
+    }
+
+    public static boolean openIntent(android.content.Intent intent) {
+        if (intent == null) return false;
+        try {
+            android.content.Context context = ApplicationLoader.applicationContext;
+            org.telegram.ui.ActionBar.BaseFragment fragment = org.telegram.ui.LaunchActivity.getSafeLastFragment();
+            if (fragment != null && fragment.getParentActivity() != null) {
+                context = fragment.getParentActivity();
+            } else {
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            context.startActivity(intent);
+            return true;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
         }
     }
 
     // ---- диалоги / bulletins ----
     public static void bulletin(String text) {
+        bulletin("info", text, org.telegram.ui.Components.Bulletin.DURATION_LONG, null, null);
+    }
+
+    public static void bulletin(String type, String text, int duration, String button, PyObject callback) {
         if (text == null) {
             return;
         }
@@ -611,14 +754,38 @@ public class DevGramPlugins {
             try {
                 org.telegram.ui.ActionBar.BaseFragment f = org.telegram.ui.LaunchActivity.getSafeLastFragment();
                 if (f != null) {
-                    org.telegram.ui.Components.BulletinFactory.of(f).createSimpleBulletin(R.raw.info, text).show();
+                    org.telegram.ui.Components.BulletinFactory factory = org.telegram.ui.Components.BulletinFactory.of(f);
+                    org.telegram.ui.Components.Bulletin bulletin;
+                    Runnable action = callback == null ? null : () -> callPythonCallback(callback);
+                    if (button != null && !button.isEmpty()) {
+                        int icon = "error".equals(type) ? R.raw.error
+                                : "success".equals(type) ? R.raw.contact_check : R.raw.info;
+                        bulletin = factory.createSimpleBulletin(icon, text, button,
+                                Math.max(500, duration), action);
+                    } else if ("error".equals(type)) {
+                        bulletin = factory.createErrorBulletin(text).setDuration(Math.max(500, duration));
+                    } else if ("success".equals(type)) {
+                        bulletin = factory.createSuccessBulletin(text).setDuration(Math.max(500, duration));
+                    } else {
+                        bulletin = factory.createSimpleBulletin(R.raw.info, text)
+                                .setDuration(Math.max(500, duration));
+                    }
+                    bulletin.show();
                 }
-            } catch (Throwable ignore) {
+            } catch (Throwable e) {
+                FileLog.e(e);
             }
         });
     }
 
     public static void alert(String title, String message) {
+        alert(title, message, "OK", null, null, null, null, null);
+    }
+
+    public static void alert(String title, String message,
+                             String positiveText, PyObject positiveCallback,
+                             String negativeText, PyObject negativeCallback,
+                             String neutralText, PyObject neutralCallback) {
         AndroidUtilities.runOnUIThread(() -> {
             try {
                 org.telegram.ui.ActionBar.BaseFragment f = org.telegram.ui.LaunchActivity.getSafeLastFragment();
@@ -629,12 +796,29 @@ public class DevGramPlugins {
                 org.telegram.ui.ActionBar.AlertDialog.Builder b = new org.telegram.ui.ActionBar.AlertDialog.Builder(a);
                 b.setTitle(title == null ? "" : title);
                 b.setMessage(message == null ? "" : message);
-                b.setPositiveButton("OK", null);
+                if (positiveText != null && !positiveText.isEmpty()) {
+                    b.setPositiveButton(positiveText, (dialog, which) -> callPythonCallback(positiveCallback));
+                }
+                if (negativeText != null && !negativeText.isEmpty()) {
+                    b.setNegativeButton(negativeText, (dialog, which) -> callPythonCallback(negativeCallback));
+                }
+                if (neutralText != null && !neutralText.isEmpty()) {
+                    b.setNeutralButton(neutralText, (dialog, which) -> callPythonCallback(neutralCallback));
+                }
                 b.show();
             } catch (Throwable e) {
                 FileLog.e(e);
             }
         });
+    }
+
+    private static void callPythonCallback(PyObject callback) {
+        if (callback == null || isSafeMode()) return;
+        try {
+            callback.call();
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
     }
 
     // ---- настройки плагина (UI-страница) ----
@@ -661,6 +845,11 @@ public class DevGramPlugins {
         } catch (Throwable e) {
             FileLog.e(e);
         }
+    }
+
+    public static void pluginSettingChanged(String pluginId, String key, String value) {
+        try { loader().callAttr("plugin_setting_changed", pluginId, key, value); }
+        catch (Throwable e) { FileLog.e(e); }
     }
 
     // ===== защита от «кирпича» (авто-безопасный режим после краша) =====
@@ -964,8 +1153,9 @@ public class DevGramPlugins {
                     try {
                         final Object req = frame.args != null && frame.args.length > 0 ? frame.args[0] : null;
                         final String name = req != null ? req.getClass().getSimpleName() : "";
+                        final int account = accountOfController(frame.thisObject);
                         // pre-хук: плагины видят исходящий запрос (могут менять поля объекта на месте)
-                        try { loader().callAttr("dispatch_request", name, req); } catch (Throwable ignore) {}
+                        try { loader().callAttr("dispatch_request", account, name, req); } catch (Throwable ignore) {}
                         // оборачиваем делегат ответа, чтобы поймать ответ/ошибку
                         final Object origDelegate = frame.args != null && frame.args.length > 1 ? frame.args[1] : null;
                         Object proxy = java.lang.reflect.Proxy.newProxyInstance(
@@ -979,7 +1169,7 @@ public class DevGramPlugins {
                                             if (err != null) {
                                                 try { errText = String.valueOf(err.getClass().getField("text").get(err)); } catch (Throwable ignore) {}
                                             }
-                                            loader().callAttr("dispatch_response", name, resp, errText);
+                                            loader().callAttr("dispatch_response", account, name, resp, errText);
                                         } catch (Throwable ignore) {}
                                     }
                                     if (origDelegate != null) {
@@ -1003,6 +1193,17 @@ public class DevGramPlugins {
             FileLog.d("[DevGramPlugins] request hooks installed");
         } catch (Throwable e) {
             FileLog.e(e);
+        }
+    }
+
+    private static int accountOfController(Object controller) {
+        if (controller == null) return UserConfig.selectedAccount;
+        try {
+            java.lang.reflect.Field field = org.telegram.messenger.BaseController.class.getDeclaredField("currentAccount");
+            field.setAccessible(true);
+            return field.getInt(controller);
+        } catch (Throwable ignore) {
+            return UserConfig.selectedAccount;
         }
     }
 
@@ -1351,6 +1552,11 @@ public class DevGramPlugins {
     // Перезагрузить все плагины из папки (без перезапуска приложения). Возвращает число плагинов.
     public static int reload() {
         try {
+            // Plugin pills belong to the current Python runtime and must not survive reload.
+            for (String row : listPlugins()) {
+                String[] parts = row.split("\u001f", -1);
+                if (parts.length > 0) DevGramPillStack.unregisterPluginPills(parts[0]);
+            }
             loaded = true;
             int n = loader().callAttr("reload_all", pluginsDir().getAbsolutePath()).toInt();
             refreshWantsUpdates();
@@ -1361,9 +1567,26 @@ public class DevGramPlugins {
         }
     }
 
+    /** Hot-reload one plugin, matching the development workflow of the Python SDK. */
+    public static int reloadPlugin(String pluginId) {
+        try {
+            DevGramPillStack.unregisterPluginPills(pluginId);
+            int n = loader().callAttr("reload_plugin", pluginId).toInt();
+            if (n > 0) {
+                refreshWantsUpdates();
+                refreshRequestHooks();
+            }
+            return n;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return 0;
+        }
+    }
+
     // Удалить плагин: файл + из реестра.
     public static boolean delete(String pluginId, String fileName) {
         try {
+            DevGramPillStack.unregisterPluginPills(pluginId);
             if (fileName != null && !fileName.isEmpty()) {
                 File f = new File(pluginsDir(), fileName);
                 if (f.exists()) {
@@ -1371,6 +1594,8 @@ public class DevGramPlugins {
                 }
             }
             loader().callAttr("unload_plugin", pluginId);
+            // Для .dgplugin дочищаем распакованные файлы (.devgram/<id>); для .py — no-op.
+            loader().callAttr("delete_package_files", pluginId);
             return true;
         } catch (Throwable e) {
             FileLog.e(e);
@@ -1396,11 +1621,12 @@ public class DevGramPlugins {
 
     // Проверен ли плагин нами: только хеш в облачном реестре после решения модератора.
     public static boolean isVerified(String source) {
-        if (source == null) {
-            return false;
-        }
-        String h = sha256(source);
-        return verifiedHashes.contains(h);
+        return source != null && isVerifiedByHash(sha256(source));
+    }
+
+    // Тот же реестр, но по готовому хешу (для .dgplugin-пакетов ключ — sha256 архива).
+    public static boolean isVerifiedByHash(String hash) {
+        return hash != null && !hash.isEmpty() && verifiedHashes.contains(hash);
     }
 
     // Локальный (не облачный) набор хешей плагинов, доверенных через канал 🧩. Переживает
@@ -1419,11 +1645,13 @@ public class DevGramPlugins {
 
     // Пометить плагин доверенным, потому что он опубликован в канале-разработчике (🧩).
     public static void trustFromChannel(String source) {
-        if (source == null) {
-            return;
-        }
+        if (source != null) trustFromChannelByHash(sha256(source));
+    }
+
+    public static void trustFromChannelByHash(String hash) {
+        if (hash == null || hash.isEmpty()) return;
         java.util.Set<String> set = new java.util.HashSet<>(trustedFromChannel());
-        if (set.add(sha256(source))) {
+        if (set.add(hash)) {
             channelTrusted = set;
             ApplicationLoader.applicationContext
                     .getSharedPreferences("devgram_plugins_trusted", 0)
@@ -1472,31 +1700,39 @@ public class DevGramPlugins {
 
     // Пометить проверенным (командой): пишет хеш в облако + локально (оптимистично).
     public static boolean verify(String source) {
+        return source != null && verifyByHash(sha256(source));
+    }
+
+    public static boolean verifyByHash(String hash) {
         String token = DevGramBadges.getAdminToken();
-        if (token == null || source == null) {
+        if (token == null || hash == null || hash.isEmpty()) {
             return false;
         }
-        String hash = sha256(source);
         java.util.Set<String> set = new java.util.HashSet<>(verifiedHashes);
         set.add(hash);
         verifiedHashes = set;
+        final String h = hash;
         Utilities.globalQueue.postRunnable(() ->
-                httpVerified("PUT", RTDB + "/plugins_verified/" + hash + ".json?auth=" + token, "\"verified\""));
+                httpVerified("PUT", RTDB + "/plugins_verified/" + h + ".json?auth=" + token, "\"verified\""));
         return true;
     }
 
     // Снять проверку (командой): удаляет хеш из облака + локально.
     public static boolean unverify(String source) {
+        return source != null && unverifyByHash(sha256(source));
+    }
+
+    public static boolean unverifyByHash(String hash) {
         String token = DevGramBadges.getAdminToken();
-        if (token == null || source == null) {
+        if (token == null || hash == null || hash.isEmpty()) {
             return false;
         }
-        String hash = sha256(source);
         java.util.Set<String> set = new java.util.HashSet<>(verifiedHashes);
         set.remove(hash);
         verifiedHashes = set;
+        final String h = hash;
         Utilities.globalQueue.postRunnable(() ->
-                httpVerified("DELETE", RTDB + "/plugins_verified/" + hash + ".json?auth=" + token, null));
+                httpVerified("DELETE", RTDB + "/plugins_verified/" + h + ".json?auth=" + token, null));
         return true;
     }
 
@@ -1504,6 +1740,12 @@ public class DevGramPlugins {
     // Запись каталога: карточка плагина с метаданными + исходником для установки.
     public static class CatalogEntry {
         public String id = "", name = "", author = "", version = "", desc = "", icon = "", channel = "", source = "", filter = "";
+        // .dgplugin-пакет: бинарь хостится в архивном канале (packageChat/packageMsg), source пуст
+        public boolean isPackage;
+        public long packageSize;
+        public String packageSha = "";
+        public long packageChat;   // id архивного канала (пишет modbot после одобрения)
+        public int packageMsg;     // id сообщения-документа в архиве
         public double rating;
         public int reviews;
         public long submitterId, submittedAt, updatedAt;
@@ -1947,7 +2189,7 @@ public class DevGramPlugins {
         });
     }
     public static void fetchCatalogEntry(String pluginId, CatalogCallback cb) {
-        final String key=safeKey(pluginId==null?"":pluginId);Utilities.globalQueue.postRunnable(()->{java.util.ArrayList<CatalogEntry> out=new java.util.ArrayList<>();try{String raw=readNode(RTDB+"/plugins_catalog/"+key+".json");if(raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){org.json.JSONObject o=new org.json.JSONObject(raw);CatalogEntry e=new CatalogEntry();e.id=o.optString("id",key);e.name=o.optString("name",e.id);e.author=o.optString("author","");e.version=o.optString("version","");e.desc=o.optString("desc","");e.icon=o.optString("icon","");e.channel=o.optString("channel","");e.source=o.optString("source","");e.filter=o.optString("filter","");e.rating=o.optDouble("rating",0);e.reviews=o.optInt("reviews",0);e.submitterId=o.optLong("submitterId",0);e.submittedAt=o.optLong("submittedAt",0);e.updatedAt=o.optLong("updatedAt",0);e.visible=o.optBoolean("visible",true);out.add(e);}}catch(Throwable ex){FileLog.e(ex);}AndroidUtilities.runOnUIThread(()->cb.onResult(out));});
+        final String key=safeKey(pluginId==null?"":pluginId);Utilities.globalQueue.postRunnable(()->{java.util.ArrayList<CatalogEntry> out=new java.util.ArrayList<>();try{String raw=readNode(RTDB+"/plugins_catalog/"+key+".json");if(raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){org.json.JSONObject o=new org.json.JSONObject(raw);CatalogEntry e=new CatalogEntry();e.id=o.optString("id",key);e.name=o.optString("name",e.id);e.author=o.optString("author","");e.version=o.optString("version","");e.desc=o.optString("desc","");e.icon=o.optString("icon","");e.channel=o.optString("channel","");e.source=o.optString("source","");e.filter=o.optString("filter","");e.rating=o.optDouble("rating",0);e.reviews=o.optInt("reviews",0);e.submitterId=o.optLong("submitterId",0);e.submittedAt=o.optLong("submittedAt",0);e.updatedAt=o.optLong("updatedAt",0);e.visible=o.optBoolean("visible",true);e.isPackage=o.optBoolean("isPackage",false);e.packageSize=o.optLong("packageSize",0);e.packageSha=o.optString("packageSha","");e.packageChat=o.optLong("packageChat",0);e.packageMsg=o.optInt("packageMsg",0);out.add(e);}}catch(Throwable ex){FileLog.e(ex);}AndroidUtilities.runOnUIThread(()->cb.onResult(out));});
     }
 
     // Забрать заявки на модерацию.
@@ -2026,6 +2268,11 @@ public class DevGramPlugins {
                             e.update = o.optBoolean("update", false);
                             e.rejectionReason = o.optString("reason", "");
                             e.visible = o.optBoolean("visible", true);
+                            e.isPackage = o.optBoolean("isPackage", false);
+                            e.packageSize = o.optLong("packageSize", 0);
+                            e.packageSha = o.optString("packageSha", "");
+                            e.packageChat = o.optLong("packageChat", 0);
+                            e.packageMsg = o.optInt("packageMsg", 0);
                             if ("plugins_catalog".equals(node) && !e.visible) {
                                 continue;
                             }
@@ -2196,6 +2443,13 @@ public class DevGramPlugins {
         o.put("submittedAt", e.submittedAt);
         o.put("updatedAt", e.updatedAt);
         o.put("update", e.update);
+        if (e.isPackage) {
+            o.put("isPackage", true);
+            if (e.packageSize > 0) o.put("packageSize", e.packageSize);
+            o.put("packageSha", e.packageSha == null ? "" : e.packageSha);
+            if (e.packageChat != 0) o.put("packageChat", e.packageChat);
+            if (e.packageMsg != 0) o.put("packageMsg", e.packageMsg);
+        }
         return o;
     }
 
@@ -2205,10 +2459,16 @@ public class DevGramPlugins {
 
     public static String validateCatalogEntry(CatalogEntry e) {
         if (e == null) return "Пустая заявка";
-        if (e.id == null || !e.id.matches("[a-zA-Z0-9_\\-]{2,64}")) return "ID: 2–64 символа, только буквы, цифры, _ и -";
+        if (e.id == null || !e.id.matches("[a-zA-Z0-9_.\\-]{2,64}")) return "ID: 2–64 символа, только буквы, цифры, _ . и -";
         if (e.name == null || e.name.trim().length() < 2) return "Укажите название плагина";
         if (e.version == null || e.version.trim().isEmpty()) return "Укажите версию плагина";
         if (e.author == null || e.author.trim().isEmpty()) return "Укажите автора плагина";
+        if (e.isPackage) {
+            // .dgplugin-пакет: исходника нет, бинарь хостится в архиве. Проверяем размер (лимит валидатора 32 МБ).
+            if (e.packageSize <= 0) return "Пустой пакет";
+            if (e.packageSize > 32L * 1024 * 1024) return "Пакет больше 32 МБ";
+            return "";
+        }
         if (e.source == null || e.source.trim().isEmpty()) return "Исходник плагина пуст";
         if (e.source.length() > 1024 * 1024) return "Плагин больше 1 МБ";
         if (parseMeta(e.source).isEmpty()) return "Не удалось разобрать метаданные или синтаксис плагина";
@@ -2961,5 +3221,107 @@ public class DevGramPlugins {
             FileLog.e(e);
             return false;
         }
+    }
+
+    public static boolean installPackage(String sourcePath, String pluginId, boolean enable) {
+        if (sourcePath == null) return false;
+        File tmp = null;
+        File backup = null;
+        File dst = null;
+        try {
+            File src = new File(sourcePath);
+            PyObject validation = loader().callAttr("validate_package", sourcePath);
+            if (validation != null && !validation.toString().isEmpty()) return false;
+            if (pluginId == null || pluginId.isEmpty()) {
+                PyObject meta = loader().callAttr("package_meta", sourcePath);
+                String raw = meta == null ? "" : meta.toString();
+                pluginId = raw.isEmpty() ? "package" : raw.split("\u001f", -1)[0];
+            }
+            String safe = pluginId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+            dst = new File(pluginsDir(), safe + ".dgplugin");
+            tmp = new File(pluginsDir(), safe + ".dgplugin.installing");
+            backup = new File(pluginsDir(), safe + ".dgplugin.backup");
+            java.io.FileInputStream in = new java.io.FileInputStream(src);
+            java.io.FileOutputStream out = new java.io.FileOutputStream(tmp);
+            byte[] buffer = new byte[8192]; int n;
+            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+            in.close(); out.getFD().sync(); out.close();
+            if (backup.exists()) backup.delete();
+            if (dst.exists() && !dst.renameTo(backup)) {
+                tmp.delete();
+                return false;
+            }
+            if (!tmp.renameTo(dst)) {
+                if (backup.exists()) backup.renameTo(dst);
+                return false;
+            }
+            loaded = true;
+            int count = loader().callAttr("load_from_file", dst.getAbsolutePath()).toInt();
+            if (count <= 0) {
+                dst.delete();
+                if (backup.exists() && backup.renameTo(dst)) {
+                    try { loader().callAttr("load_from_file", dst.getAbsolutePath()); } catch (Throwable restoreError) { FileLog.e(restoreError); }
+                }
+                return false;
+            }
+            if (backup.exists()) backup.delete();
+            if (count > 0 && !enable && pluginId != null) loader().callAttr("set_enabled", pluginId, false);
+            return count > 0;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            if (tmp != null) tmp.delete();
+            if (backup != null && backup.exists()) {
+                if (dst != null) dst.delete();
+                if (backup.renameTo(dst)) {
+                    try { loader().callAttr("load_from_file", dst.getAbsolutePath()); } catch (Throwable restoreError) { FileLog.e(restoreError); }
+                }
+            }
+            return false;
+        }
+    }
+
+    public static String packageValidationError(String sourcePath) {
+        try {
+            PyObject result = loader().callAttr("validate_package", sourcePath);
+            return result == null ? "Пакет повреждён" : result.toString();
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return "Не удалось проверить пакет";
+        }
+    }
+
+    public static String packageMeta(String sourcePath) {
+        try {
+            PyObject result = loader().callAttr("package_meta", sourcePath);
+            return result == null ? "" : result.toString();
+        } catch (Throwable e) { FileLog.e(e); return ""; }
+    }
+
+    // Прочитать исходник входного файла (main.py) из архива .dgplugin — для скана возможностей
+    // в карточке установки (общей с .plugin). Возвращает "" при ошибке.
+    public static String packageMainSource(String sourcePath) {
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(sourcePath)) {
+            String main = "main.py";
+            java.util.zip.ZipEntry mf = zf.getEntry("manifest.json");
+            if (mf != null) {
+                try { main = new org.json.JSONObject(readZipEntry(zf, mf)).optString("main", "main.py"); }
+                catch (Throwable ignore) { }
+            }
+            java.util.zip.ZipEntry e = zf.getEntry(main);
+            return e != null ? readZipEntry(zf, e) : "";
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return "";
+        }
+    }
+
+    private static String readZipEntry(java.util.zip.ZipFile zf, java.util.zip.ZipEntry e) throws java.io.IOException {
+        java.io.InputStream in = zf.getInputStream(e);
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+        in.close();
+        return new String(bos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
     }
 }

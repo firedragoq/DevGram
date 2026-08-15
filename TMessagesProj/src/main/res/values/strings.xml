@@ -89,6 +89,8 @@
     <string name="SyncPinsInfo">Sync off allows to pin unlimited amount of dialogs</string>
     <string name="PinDialogsOrder">Pin Dialogs Order</string>
     <string name="RearVideoMessages">Rear camera in Video Messages</string>
+    <string name="DevGramFrontCamera">Front camera</string>
+    <string name="DevGramRearCamera">Rear camera</string>
     <string name="ReplaceForward">Replace original Forward</string>
     <string name="HideSensitiveData">Hide Sensitive Data</string>
     <string name="SystemCamera">Use System Camera for Photo</string>

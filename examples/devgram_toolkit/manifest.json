@@ -1,0 +1,9 @@
+{
+  "id": "space.devgram.toolkit",
+  "name": "DevGram Toolkit",
+  "version": "1.0.0",
+  "author": "firedragoq",
+  "description": "Builder-style demo: message tools, counters, settings and native bulletins.",
+  "entrypoint": "main.py",
+  "min_app_version": "12.9.3"
+}

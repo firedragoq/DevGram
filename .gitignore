@@ -28,6 +28,10 @@ TMessagesProj/jni/tde2e/arm*
 # DevGram: Python bytecode
 __pycache__/
 *.pyc
+.kotlin/
+*.apk
+*.dgplugin
+firebase-debug.log
 server/catalog_guard.env
 server/catalog_guard.sqlite3
 server/catalog_guard.log
