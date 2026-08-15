@@ -233,6 +233,11 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.pillStackLayoutChanged);
+        // DevGram: пересобираем стек при возврате на экран (напр. из настроек Pill Stack),
+        // чтобы изменения применялись сразу, без перезахода в приложение.
+        if (showPillStack) {
+            updatePillStack(false);
+        }
     }
 
     @Override

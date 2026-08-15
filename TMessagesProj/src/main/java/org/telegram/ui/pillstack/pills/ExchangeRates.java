@@ -1,9 +1,12 @@
 package org.telegram.ui.pillstack.pills;
 
+import android.content.Context;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 
 import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.Utilities;
 
@@ -66,13 +69,29 @@ public final class ExchangeRates {
         if (!"AUTO".equals(n)) {
             return (TextUtils.isEmpty(n) || !isSupportedCurrency(n)) ? "USD" : n;
         }
+        // AUTO: валюта региона пользователя (как getTargetCurrency у exteraGram): страна SIM/сети → локаль → USD.
+        String region = regionCurrency();
+        return isSupportedCurrency(region) ? region : "USD";
+    }
+
+    private static String regionCurrency() {
+        // 1) страна SIM/сети (без разрешений) — самый надёжный источник валюты региона
+        try {
+            TelephonyManager tm = (TelephonyManager) ApplicationLoader.applicationContext.getSystemService(Context.TELEPHONY_SERVICE);
+            if (tm != null) {
+                String iso = tm.getSimCountryIso();
+                if (iso == null || iso.isEmpty()) iso = tm.getNetworkCountryIso();
+                if (iso != null && iso.length() == 2) {
+                    Currency cur = Currency.getInstance(new Locale("", iso.toUpperCase(Locale.ROOT)));
+                    if (cur != null) return normalize(cur.getCurrencyCode());
+                }
+            }
+        } catch (Throwable ignore) { }
+        // 2) валюта локали устройства (регион локали)
         try {
             Currency cur = Currency.getInstance(Locale.getDefault());
-            if (cur != null) {
-                String code = normalize(cur.getCurrencyCode());
-                if (isSupportedCurrency(code)) return code;
-            }
-        } catch (Exception ignore) { }
+            if (cur != null) return normalize(cur.getCurrencyCode());
+        } catch (Throwable ignore) { }
         return "USD";
     }
 

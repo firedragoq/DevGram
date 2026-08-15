@@ -120,6 +120,10 @@ public final class PillStackConfig {
         synchronized (sync) {
             load();
             if (registry.remove(id) == null) return;
+            // Плагин выгружен окончательно — убираем его пилюлю из раскладки.
+            activePills.remove((Integer) id);
+            hiddenPills.remove((Integer) id);
+            savePillsLayoutInternal(prefs());
         }
         if (batchRegistration) return;
         sanitizePills();
@@ -183,11 +187,15 @@ public final class PillStackConfig {
     public static void sanitizePills() { synchronized (sync) { load(); sanitizeInternal(); } }
 
     private static void sanitizeInternal() {
-        boolean changed = activePills.removeIf(id -> !registry.containsKey(id));
-        changed |= hiddenPills.removeIf(id -> !registry.containsKey(id) || activePills.contains(id));
+        // Дедуп: один id не может быть одновременно в активных и скрытых.
+        boolean changed = hiddenPills.removeIf(activePills::contains);
+        // Каждый зарегистрированный виджет должен быть где-то (по умолчанию — в скрытых).
         for (Integer id : registry.keySet()) {
             if (!activePills.contains(id) && !hiddenPills.contains(id)) { hiddenPills.add(id); changed = true; }
         }
+        // НЕ вырезаем незарегистрированные id: плагин мог ещё не загрузиться (иначе активная
+        // плагин-пилюля слетала бы в скрытые после перезапуска). Не отрисованные id просто
+        // пропускаются при сборке стека и в настройках, а unregister() чистит их явно.
         if (changed) savePillsLayoutInternal(prefs());
     }
 
