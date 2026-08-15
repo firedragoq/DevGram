@@ -768,6 +768,10 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
         return !recording;
     }
 
+    public void setFrontface(boolean frontface) {
+        isFrontface = frontface;
+    }
+
     public void showCamera(boolean fromPaused) {
         if (textureView != null) {
             return;
@@ -798,11 +802,12 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
         cameraReady = false;
         selectedCamera = null;
         if (!fromPaused) {
-            // DevGram (как exteraGram): сторону камеры кружка берём из rearVideoMessages для ВСЕХ
-            // типов камеры (Camera 1/2/X), а не только Camera 1. Это чинит режимы «Задняя»/«Спросить»
-            // на Camera 2/X (devgramOpenRoundCamera пишет rearVideoMessages до старта записи).
-            android.content.SharedPreferences preferences = org.telegram.messenger.MessagesController.getGlobalMainSettings();
-            isFrontface = !(preferences.getBoolean("rearVideoMessages", false));
+            // В режиме «Спросить» сторона уже выбрана жестом в ChatActivityEnterView.
+            // Для фиксированных режимов по-прежнему читаем сохранённое значение.
+            if (org.telegram.messenger.MessagesController.getGlobalMainSettings().getInt("dg_roundCameraMode", 0) != 2) {
+                android.content.SharedPreferences preferences = org.telegram.messenger.MessagesController.getGlobalMainSettings();
+                isFrontface = !(preferences.getBoolean("rearVideoMessages", false));
+            }
             updateFlash();
             recordedTime = 0;
             progress = 0;

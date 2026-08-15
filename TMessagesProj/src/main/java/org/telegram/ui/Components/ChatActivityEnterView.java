@@ -320,6 +320,8 @@ public class ChatActivityEnterView extends FrameLayout implements
 
         void needStartRecordVideo(int state, boolean notify, int scheduleDate, int scheduleRepeatPeriod, int ttl, long effectId, long stars);
 
+        default void setFrontface(boolean frontface) {}
+
         void toggleVideoRecordingPause();
 
         boolean isVideoRecordingPaused();
@@ -888,8 +890,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         }
     };
 
-    private ActionBarPopupWindow devgramRoundCameraPopupWindow;
-    private ActionBarPopupWindow.ActionBarPopupWindowLayout devgramRoundCameraPopupLayout;
+    private ItemOptions devgramRoundCameraOptions;
 
     private static boolean devgramIsRoundCameraAsk() {
         return MessagesController.getGlobalMainSettings().getInt("dg_roundCameraMode", 0) == 2;
@@ -897,86 +898,31 @@ public class ChatActivityEnterView extends FrameLayout implements
 
     @SuppressLint("ClickableViewAccessibility")
     private void devgramShowRoundCameraChooser() {
-        if (parentActivity == null) {
+        if (parentActivity == null || parentFragment == null || audioVideoSendButton == null) {
             return;
         }
-        devgramRoundCameraPopupLayout = new ActionBarPopupWindow.ActionBarPopupWindowLayout(parentActivity, resourcesProvider);
-        devgramRoundCameraPopupLayout.setAnimationEnabled(false);
-        devgramRoundCameraPopupLayout.setOnTouchListener(new OnTouchListener() {
-            private final Rect popupRect = new Rect();
-
-            @Override
-            public boolean onTouch(View view, MotionEvent event) {
-                if (event.getActionMasked() == MotionEvent.ACTION_DOWN && devgramRoundCameraPopupWindow != null && devgramRoundCameraPopupWindow.isShowing()) {
-                    view.getHitRect(popupRect);
-                    if (!popupRect.contains((int) event.getX(), (int) event.getY())) {
-                        devgramRoundCameraPopupWindow.dismiss();
-                    }
-                }
-                return false;
-            }
-        });
-        devgramRoundCameraPopupLayout.setDispatchKeyEventListener(keyEvent -> {
-            if (keyEvent.getKeyCode() == KeyEvent.KEYCODE_BACK && keyEvent.getRepeatCount() == 0 && devgramRoundCameraPopupWindow != null && devgramRoundCameraPopupWindow.isShowing()) {
-                devgramRoundCameraPopupWindow.dismiss();
-            }
-        });
-        devgramRoundCameraPopupLayout.setShownFromBottom(false);
-
-        ActionBarMenuSubItem frontCameraButton = new ActionBarMenuSubItem(getContext(), true, false, resourcesProvider);
-        frontCameraButton.setTextAndIcon(LocaleController.getString(R.string.DevGramFrontCamera), R.drawable.msg_camera);
-        frontCameraButton.setMinimumWidth(AndroidUtilities.dp(196));
-        frontCameraButton.setOnClickListener(view -> devgramOpenRoundCamera(true));
-        devgramRoundCameraPopupLayout.addView(frontCameraButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
-
-        ActionBarMenuSubItem rearCameraButton = new ActionBarMenuSubItem(getContext(), false, true, resourcesProvider);
-        rearCameraButton.setTextAndIcon(LocaleController.getString(R.string.DevGramRearCamera), R.drawable.msg_camera);
-        rearCameraButton.setMinimumWidth(AndroidUtilities.dp(196));
-        rearCameraButton.setOnClickListener(view -> devgramOpenRoundCamera(false));
-        devgramRoundCameraPopupLayout.addView(rearCameraButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
-        devgramRoundCameraPopupLayout.setupRadialSelectors(getThemedColor(Theme.key_dialogButtonSelector));
-
-        devgramRoundCameraPopupWindow = new ActionBarPopupWindow(devgramRoundCameraPopupLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
-        devgramRoundCameraPopupWindow.setAnimationEnabled(false);
-        devgramRoundCameraPopupWindow.setAnimationStyle(R.style.PopupContextAnimation2);
-        devgramRoundCameraPopupWindow.setOutsideTouchable(true);
-        devgramRoundCameraPopupWindow.setClippingEnabled(true);
-        devgramRoundCameraPopupWindow.setInputMethodMode(ActionBarPopupWindow.INPUT_METHOD_NOT_NEEDED);
-        devgramRoundCameraPopupWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED);
-        devgramRoundCameraPopupWindow.getContentView().setFocusableInTouchMode(true);
-
-        devgramRoundCameraPopupLayout.measure(
-                MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), MeasureSpec.AT_MOST),
-                MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), MeasureSpec.AT_MOST));
-        devgramRoundCameraPopupWindow.setFocusable(true);
-        int[] location = new int[2];
-        View button = getAudioVideoButtonContainer();
-        button.getLocationInWindow(location);
-        int y;
-        if (keyboardVisible && getMeasuredHeight() > AndroidUtilities.dp(isTopViewVisible() ? 48 + 58 : 58)) {
-            y = location[1] + button.getMeasuredHeight();
-        } else {
-            y = location[1] - devgramRoundCameraPopupLayout.getMeasuredHeight() - AndroidUtilities.dp(2);
-        }
-        devgramRoundCameraPopupWindow.showAtLocation(button, Gravity.LEFT | Gravity.TOP,
-                location[0] + button.getMeasuredWidth() - devgramRoundCameraPopupLayout.getMeasuredWidth() + AndroidUtilities.dp(8), y);
-        devgramRoundCameraPopupWindow.dimBehind();
+        devgramRoundCameraOptions = ItemOptions.makeOptions(parentFragment, audioVideoSendButton)
+                .add(R.drawable.msg_openprofile, LocaleController.getString(R.string.DevGramFrontCamera), () -> devgramOpenRoundCamera(true))
+                .add(R.drawable.msg_rear_camera, LocaleController.getString(R.string.DevGramRearCamera), () -> devgramOpenRoundCamera(false))
+                .setMinWidth(196)
+                .setDimAlpha(0)
+                .forceTop(true)
+                .setDiscardScrolls(false)
+                .setDismissOnMoveOutside(true)
+                .setOnDismiss(() -> devgramRoundCameraOptions = null)
+                .show();
 
         try {
-            button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
         } catch (Exception ignore) {
         }
     }
 
     private void devgramOpenRoundCamera(boolean front) {
-        if (devgramRoundCameraPopupWindow != null && devgramRoundCameraPopupWindow.isShowing()) {
-            devgramRoundCameraPopupWindow.dismiss();
-        }
         if (delegate == null) {
             return;
         }
-        // InstantCameraView читает rearVideoMessages в showCamera() — задаём выбранную сторону.
-        MessagesController.getGlobalMainSettings().edit().putBoolean("rearVideoMessages", !front).apply();
+        delegate.setFrontface(front);
         delegate.needStartRecordVideo(0, true, 0, 0, 0, 0, 0);
         if (recordingAudioVideo) {
             return;
@@ -2204,6 +2150,38 @@ public class ChatActivityEnterView extends FrameLayout implements
         }
 
         public int setLockTranslation(float value) {
+            if (value == 10000f) {
+                sendButtonVisible = false;
+                lockAnimatedTranslation = -1;
+                startTranslation = -1;
+                invalidate();
+                snapAnimationProgress = 0f;
+                transformToSeekbar = 0f;
+                exitTransition = 0f;
+                iconScale = 1f;
+                scale = 0f;
+                tooltipAlpha = 0f;
+                showTooltip = false;
+                progressToSendButton = 0f;
+                slideToCancelProgress = 1f;
+                slideToCancelLockProgress = 1f;
+                canceledByGesture = false;
+                return 0;
+            }
+            if (value == 666f) {
+                sendButtonVisible = true;
+                lockAnimatedTranslation = 1f;
+                startTranslation = 1f;
+                invalidate();
+                snapAnimationProgress = 1f;
+                progressToSendButton = 1f;
+                if (slideText != null) {
+                    slideText.setCancelToProgress(1f);
+                }
+                slideToCancelProgress = 1f;
+                slideToCancelLockProgress = 1f;
+                return 0;
+            }
             if (sendButtonVisible) {
                 return 2;
             }
@@ -3058,6 +3036,11 @@ public class ChatActivityEnterView extends FrameLayout implements
             @Override
             public boolean onTouchEvent(MotionEvent motionEvent) {
                 if (isLiveComment) return false;
+                if (devgramRoundCameraOptions != null && devgramRoundCameraOptions.isShown()) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    devgramRoundCameraOptions.dispatchCapturedTouchEvent(motionEvent);
+                    return false;
+                }
                 createRecordCircle();
                 if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
                     if (recordCircle.isSendButtonVisible()) {
