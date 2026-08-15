@@ -114,9 +114,15 @@ public class DevGramPluginSystemActivity extends BaseFragment {
                 DevGramPlugins.setDevServerEnabled(false);
             }
         } else if (item.id == ID_DEV_TOKEN) {
+            String token = DevGramPlugins.devServerToken();
+            String connectionInfo = "Порт: " + DevGramPlugins.DEV_SERVER_PORT + "\nТокен: " + token;
             new org.telegram.ui.ActionBar.AlertDialog.Builder(getContext())
                     .setTitle("Токен dev server")
-                    .setMessage("Порт: 42690\n\n" + DevGramPlugins.devServerToken() + "\n\nНе передавайте токен другим приложениям.")
+                    .setMessage(connectionInfo + "\n\nНе передавайте токен другим приложениям.")
+                    .setNegativeButton("Скопировать", (dialog, which) -> {
+                        org.telegram.messenger.AndroidUtilities.addToClipboard(connectionInfo);
+                        BulletinFactory.of(this).createCopyBulletin("Порт и токен скопированы").show();
+                    })
                     .setPositiveButton("Готово", null)
                     .show();
             return;
