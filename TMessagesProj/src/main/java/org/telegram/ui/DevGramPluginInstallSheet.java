@@ -56,7 +56,7 @@ public class DevGramPluginInstallSheet {
         String capabilities = DevGramPlugins.packageMainSource(path);
         // у пакета нет единого «source»-текста для реестра/каталога — verifySource=null:
         // это отключает source-зависимые кнопки (проверка/публикация), карточка при этом та же.
-        showCard(fragment, id, name, ver, author, desc, iconUrl, sourceDialogId, null, capabilities,
+        showCard(fragment, id, name, ver, author, desc, iconUrl, sourceDialogId, null, capabilities, path,
                 enableAfter -> DevGramPlugins.installPackage(path, id, enableAfter));
     }
 
@@ -84,7 +84,7 @@ public class DevGramPluginInstallSheet {
         String desc = m.length > 4 ? m[4] : "";
         String iconUrl = m.length > 5 ? m[5] : "";
         final String fSource = source;
-        showCard(fragment, id, name, ver, author, desc, iconUrl, sourceDialogId, source, source,
+        showCard(fragment, id, name, ver, author, desc, iconUrl, sourceDialogId, source, source, null,
                 enableAfter -> DevGramPlugins.install(fSource, id, enableAfter));
     }
 
@@ -96,7 +96,7 @@ public class DevGramPluginInstallSheet {
     private static void showCard(BaseFragment fragment, final String id, final String name,
                                  String ver, String author, String desc, String iconUrl,
                                  long sourceDialogId, final String verifySource, String capabilitiesSource,
-                                 final InstallAction installAction) {
+                                 final String packagePath, final InstallAction installAction) {
         Context context = fragment.getParentActivity();
         if (context == null) {
             return;
@@ -287,7 +287,7 @@ public class DevGramPluginInstallSheet {
             org.telegram.tgnet.TLRPC.Chat pubChat = fragment.getMessagesController().getChat(-sourceDialogId);
             channelAdmin = org.telegram.messenger.ChatObject.hasAdminRights(pubChat);
         }
-        if ((team || channelAdmin) && verifySource != null) {
+        if ((team || channelAdmin) && (verifySource != null || packagePath != null)) {
             TextView pubBtn = new TextView(context);
             pubBtn.setGravity(Gravity.CENTER);
             pubBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -300,7 +300,7 @@ public class DevGramPluginInstallSheet {
                     Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
             pubBtn.setText("📚 Опубликовать в каталог");
             final TextView[] rejectionRef = new TextView[1];
-            final String fId = id, fName = name, fVer = ver, fAuthor = author, fDesc = desc, fIcon = iconUrl, fSource = verifySource;
+            final String fId = id, fName = name, fVer = ver, fAuthor = author, fDesc = desc, fIcon = iconUrl, fSource = verifySource == null ? "" : verifySource, fPackage = packagePath;
             final long fChannelId = sourceDialogId;
             pubBtn.setOnClickListener(v -> {
                 DevGramPlugins.CatalogEntry ce = new DevGramPlugins.CatalogEntry();
@@ -312,7 +312,7 @@ public class DevGramPluginInstallSheet {
                 ce.icon = fIcon;
                 ce.source = fSource;
                 ce.channel = channelName(fragment, fChannelId);
-                choosePublishFilter(fragment, ce, () -> applyPendingState(pubBtn, rejectionRef[0]));
+                choosePublishFilter(fragment, ce, fPackage, () -> applyPendingState(pubBtn, rejectionRef[0]));
             });
             TextView rejectionInfo = new TextView(context);
             rejectionRef[0] = rejectionInfo;
@@ -364,7 +364,7 @@ public class DevGramPluginInstallSheet {
                             ce.id = fId; ce.name = fName; ce.version = fVer; ce.author = fAuthor;
                             ce.desc = fDesc; ce.icon = fIcon; ce.source = fSource;
                             ce.channel = channelName(fragment, fChannelId);
-                            choosePublishFilter(fragment, ce, () -> applyPendingState(pubBtnRef, rejectionInfo));
+                            choosePublishFilter(fragment, ce, fPackage, () -> applyPendingState(pubBtnRef, rejectionInfo));
                         });
                     });
                 } else if (status != 0) {
@@ -398,8 +398,8 @@ public class DevGramPluginInstallSheet {
 
     // Публикация в каталог: сначала выбор фильтра (категории), затем запись. Заблокированные плагины
     // (удалённые командой) публиковать нельзя.
-    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce) { choosePublishFilter(fragment, ce, null); }
-    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce, Runnable onSubmitted) {
+    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce) { choosePublishFilter(fragment, ce, null, null); }
+    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce, final String packagePath, Runnable onSubmitted) {
         if (DevGramPlugins.isBlocked(ce.source)) {
             org.telegram.ui.Components.BulletinFactory.of(fragment)
                     .createErrorBulletin("Этот плагин удалён командой — публиковать нельзя").show();
@@ -473,7 +473,7 @@ public class DevGramPluginInstallSheet {
                     row.setEnabled(false);
                     name.setText("Отправляем…");
                     ce.filter = selected;
-                    DevGramPlugins.publishToCatalog(ce, r -> {
+                    DevGramPlugins.SubmissionCallback scb = r -> {
                         if (r == 1 && sheetRef[0] != null) sheetRef[0].dismiss();
                         String msg = r == 1 ? "Заявка отправлена на модерацию"
                                 : (r == -1 ? "Плагин заблокирован — публикация запрещена"
@@ -481,7 +481,13 @@ public class DevGramPluginInstallSheet {
                         org.telegram.ui.Components.BulletinFactory.of(fragment).createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
                         if (r == 1) { if (onSubmitted != null) onSubmitted.run(); }
                         else { row.setEnabled(true); name.setText(selected.isEmpty() ? "Без категории" : selected); }
-                    });
+                    };
+                    // Пакет .dgplugin: сначала шлём файл боту (dgpkg:<id>), потом заявку; иначе обычная публикация исходника.
+                    if (packagePath != null) {
+                        org.telegram.messenger.DevGramPackages.publishPackage(packagePath, ce, scb);
+                    } else {
+                        DevGramPlugins.publishToCatalog(ce, scb);
+                    }
                 });
                 root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 8));
             }

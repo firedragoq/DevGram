@@ -453,6 +453,19 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
 
     // ---------- действия ----------
     private void install(DevGramPlugins.CatalogEntry e) {
+        if (e.isPackage) {
+            // .dgplugin-пакет: качаем бинарь из архивного канала и ставим
+            if (e.packageMsg == 0) {
+                BulletinFactory.of(this).createErrorBulletin("Пакет ещё не размещён в архиве").show();
+                return;
+            }
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.info, "Скачиваю пакет «" + e.name + "»…").show();
+            org.telegram.messenger.DevGramPackages.installCatalogPackage(e, ok ->
+                    BulletinFactory.of(this).createSimpleBulletin(ok ? R.raw.contact_check : R.raw.error,
+                            ok ? "Плагин установлен: " + e.name : "Не удалось установить пакет").show());
+            if (adapter != null) adapter.notifyDataSetChanged();
+            return;
+        }
         if (e.source == null || e.source.isEmpty()) {
             BulletinFactory.of(this).createErrorBulletin("У плагина нет исходника в каталоге").show();
             return;
