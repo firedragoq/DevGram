@@ -12,12 +12,10 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import android.graphics.RectF;
 import android.graphics.RenderNode;
-import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
@@ -31,8 +29,6 @@ import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
-import org.telegram.messenger.UserConfig;
-import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
@@ -41,27 +37,25 @@ import org.telegram.ui.ProfileActivity;
 public class ProfileMusicView extends View {
 
     private final Theme.ResourcesProvider resourcesProvider;
-    private final PorterDuffColorFilter filterColorWhite = new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
-    private final PorterDuffColorFilter filterColorBlack = new PorterDuffColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN);
-
     private Text author, title;
-    private final Paint iconPaint = new Paint();
     private final Paint arrowPaint = new Paint();
+    private final Paint controlPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint controlIconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path arrowPath = new Path();
-    private final Drawable icon;
 
     private final RectF rect = new RectF();
+    private final RectF playRect = new RectF();
     private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clipPath = new Path();
 
     private final ButtonBounce bounce = new ButtonBounce(this);
+    private final ButtonBounce playBounce = new ButtonBounce(this);
 
     public ProfileMusicView(Context context, Theme.ResourcesProvider resourcesProvider) {
         super(context);
         this.resourcesProvider = resourcesProvider;
-
-        icon = context.getResources().getDrawable(R.drawable.files_music).mutate();
 
         arrowPaint.setStyle(Paint.Style.STROKE);
         arrowPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -91,6 +85,8 @@ public class ProfileMusicView extends View {
     private int textColor = Color.WHITE;
     private float parentExpanded;
     private int backgroundColor;
+    private int accentColor;
+    private int controlIconColor;
     private boolean withShadows;
 
     public void setColor(MessagesController.PeerColor peerColor) {
@@ -104,20 +100,27 @@ public class ProfileMusicView extends View {
 
         if (peerColor == null) {
             backgroundColor = Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider);
+            accentColor = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4, resourcesProvider);
+            controlIconColor = Color.WHITE;
             withShadows = true;
         } else {
             backgroundColor = Theme.adaptHSV(ColorUtils.blendARGB(color1, color2, .15f), +.04f, -.09f);
+            accentColor = ColorUtils.setAlphaComponent(Color.WHITE, 52);
+            controlIconColor = Color.WHITE;
             withShadows = false;
         }
         backgroundPaint.setColor(backgroundColor);
+        controlPaint.setColor(accentColor);
+        controlIconPaint.setColor(controlIconColor);
+        controlIconPaint.setStrokeWidth(dpf2(1.7f));
+        controlIconPaint.setStrokeCap(Paint.Cap.ROUND);
+        progressPaint.setColor(peerColor == null ? accentColor : Color.WHITE);
         checkTextColor();
     }
 
     private void checkTextColor() {
         final boolean useBlackText = parentExpanded < 0.8f && AndroidUtilities.computePerceivedBrightness(backgroundColor) > 0.85f;
         textColor = useBlackText ? Color.BLACK : Color.WHITE;
-        icon.setColorFilter(useBlackText ? filterColorBlack : filterColorWhite);
-        iconPaint.setColor(textColor);
         arrowPaint.setColor(Theme.multAlpha(textColor, 0.85f));
         invalidate();
     }
@@ -194,6 +197,25 @@ public class ProfileMusicView extends View {
         setContentDescription(getString(R.string.AccDescrProfileMusic) + " " + author + " — " + title);
     }
 
+    private Runnable onPlayClickListener;
+    private boolean currentTrack;
+    private boolean playing;
+    private float playbackProgress;
+
+    public void setOnPlayClickListener(Runnable listener) {
+        onPlayClickListener = listener;
+    }
+
+    public void setPlaybackState(boolean currentTrack, boolean playing, float progress) {
+        progress = Utilities.clamp(progress, 1f, 0f);
+        if (this.currentTrack != currentTrack || this.playing != playing || this.playbackProgress != progress) {
+            this.currentTrack = currentTrack;
+            this.playing = playing;
+            this.playbackProgress = progress;
+            invalidate();
+        }
+    }
+
     private ProfileActivity.AvatarImageView avatarView;
     private boolean ignoreRect = false;
     private RenderNode renderNode;
@@ -219,6 +241,8 @@ public class ProfileMusicView extends View {
     }
 
     private float currentHeight;
+    private boolean touchCaptured;
+    private boolean playTouch;
 
     public void updatePosition(float y, float newHeight) {
         currentHeight = newHeight;
@@ -231,20 +255,34 @@ public class ProfileMusicView extends View {
         final float alpha = Utilities.clamp01((currentHeight) / dp(21));
         if (alpha <= 0) return false;
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            bounce.setPressed(rect.contains(event.getX(), event.getY()));
-        } else if (event.getAction() == MotionEvent.ACTION_MOVE && bounce.isPressed()) {
-            if (!rect.contains(event.getX(), event.getY())) {
-                bounce.setPressed(false);
-            }
+            touchCaptured = rect.contains(event.getX(), event.getY());
+            playTouch = touchCaptured && playRect.contains(event.getX(), event.getY());
+            playBounce.setPressed(playTouch);
+            bounce.setPressed(touchCaptured && !playTouch);
+            return touchCaptured;
+        } else if (event.getAction() == MotionEvent.ACTION_MOVE && touchCaptured) {
+            boolean inside = (playTouch ? playRect : rect).contains(event.getX(), event.getY());
+            playBounce.setPressed(playTouch && inside);
+            bounce.setPressed(!playTouch && inside);
+            return true;
         } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
             bounce.setPressed(false);
+            playBounce.setPressed(false);
+            touchCaptured = false;
+            return true;
         } else if (event.getAction() == MotionEvent.ACTION_UP) {
-            if (bounce.isPressed()) {
+            boolean handled = touchCaptured;
+            if (playBounce.isPressed() && onPlayClickListener != null) {
+                onPlayClickListener.run();
+            } else if (bounce.isPressed()) {
                 performClick();
             }
             bounce.setPressed(false);
+            playBounce.setPressed(false);
+            touchCaptured = false;
+            return handled;
         }
-        return bounce.isPressed();
+        return touchCaptured;
     }
 
     @Override
@@ -252,41 +290,43 @@ public class ProfileMusicView extends View {
         if (this.author == null || this.title == null) return;
 
         final float alpha = Utilities.clamp01((currentHeight) / dp(21));
-        final float scale = bounce.getScale(0.02f);
+        final float scale = bounce.getScale(0.018f);
         if (alpha <= 0) return;
 
         final int padding = dp(12);
         final int maxWidth = getWidth() - padding * 2;
+        final float chromeWidth = dp(currentTrack ? 66 : 52);
+        final float maxTextWidth = Math.max(dp(36), maxWidth - chromeWidth);
+        this.author.ellipsize(maxTextWidth * .48f);
+        this.title.ellipsize(maxTextWidth - this.author.getWidth());
 
-        this.author.ellipsize((maxWidth - dp(35)) / 2f);
-        this.title.ellipsize(maxWidth - this.author.getWidth() - dp(35));
-
-        final float width = dp(16.6f) + this.author.getWidth() + this.title.getWidth() + dp(8);
-        final float containerWidth = dp(16) + width;
+        final float textWidth = this.author.getWidth() + this.title.getWidth();
+        final float containerWidth = Math.min(maxWidth, Math.max(dp(132), chromeWidth + textWidth));
 
         canvas.save();
         canvas.scale(scale, scale, getWidth() / 2f, getHeight() / 2f);
 
+        final float cardHeight = dp(25) * alpha;
         rect.set(
             (getWidth() - containerWidth) / 2f,
-            dp(10),
+            dp(6),
             (getWidth() + containerWidth) / 2f,
-            dp(10) + dp(17) * alpha
+            dp(6) + cardHeight
         );
         if (withShadows && SharedConfig.shadowsInSections) {
-            backgroundPaint.setShadowLayer(dpf2(2), 0, dpf2(0.33f), multAlpha(0x0a000000, alpha));
-            strokePaint.setShadowLayer(dpf2(0.33f), 0, 0, multAlpha(0x0c000000, alpha));
-            strokePaint.setColor(0);
+            backgroundPaint.setShadowLayer(dpf2(3), 0, dpf2(1), multAlpha(0x18000000, alpha));
         } else {
             backgroundPaint.setShadowLayer(0, 0, 0, 0);
         }
         int wasAlpha = backgroundPaint.getAlpha();
-        backgroundPaint.setAlpha((int) (wasAlpha * alpha));
-        if (withShadows && SharedConfig.shadowsInSections) {
-            canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, strokePaint);
-        }
+        backgroundPaint.setAlpha((int) (wasAlpha * alpha * .92f));
         canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, backgroundPaint);
         backgroundPaint.setAlpha(wasAlpha);
+
+        strokePaint.setStyle(Paint.Style.STROKE);
+        strokePaint.setStrokeWidth(dpf2(.7f));
+        strokePaint.setColor(ColorUtils.setAlphaComponent(textColor, (int) (42 * alpha)));
+        canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, strokePaint);
 
         clipPath.rewind();
         clipPath.addRoundRect(rect, rect.height() / 2f, rect.height() / 2f, Path.Direction.CW);
@@ -301,27 +341,65 @@ public class ProfileMusicView extends View {
             canvas.restore();
         }
 
-        canvas.translate((getWidth() - width) / 2f, 0);
+        final float cy = rect.centerY();
+        final float controlRadius = dp(9.5f) * playBounce.getScale(.08f);
+        final float controlCx = rect.left + dp(13.5f);
+        playRect.set(controlCx - dp(12), cy - dp(12), controlCx + dp(12), cy + dp(12));
+        controlPaint.setAlpha((int) (255 * alpha));
+        canvas.drawCircle(controlCx, cy, controlRadius, controlPaint);
 
-//        final long now = System.currentTimeMillis();
-        final float cy = getHeight() / 2f, hh = dp(6), w = dp(2);
+        controlIconPaint.setAlpha((int) (255 * alpha));
+        if (currentTrack && playing) {
+            canvas.drawLine(controlCx - dp(2.4f), cy - dp(3.4f), controlCx - dp(2.4f), cy + dp(3.4f), controlIconPaint);
+            canvas.drawLine(controlCx + dp(2.4f), cy - dp(3.4f), controlCx + dp(2.4f), cy + dp(3.4f), controlIconPaint);
+        } else {
+            Path playPath = new Path();
+            playPath.moveTo(controlCx - dp(2.2f), cy - dp(4));
+            playPath.lineTo(controlCx + dp(4.1f), cy);
+            playPath.lineTo(controlCx - dp(2.2f), cy + dp(4));
+            playPath.close();
+            canvas.drawPath(playPath, controlIconPaint);
+        }
 
-        final int iconSz = dp(13);
-        icon.setBounds(0, (int) cy - iconSz / 2, iconSz, (int) cy + iconSz / 2);
-        icon.draw(canvas);
-
-        canvas.translate(dp(16.6f), 0);
-        this.author.draw(canvas, 0, cy, textColor, alpha);
+        float textX = rect.left + dp(28);
+        this.author.draw(canvas, textX, cy, textColor, alpha);
         canvas.translate(this.author.getWidth(), 0);
-        this.title.draw(canvas, 0, cy, textColor, 0.85f * alpha);
-        canvas.translate(this.title.getWidth(), 0);
+        this.title.draw(canvas, textX, cy, textColor, 0.72f * alpha);
+        canvas.translate(-this.author.getWidth(), 0);
+
+        if (currentTrack) {
+            float barsX = rect.right - dp(21);
+            float phase = (SystemClock.uptimeMillis() % 900L) / 900f * (float) (Math.PI * 2);
+            controlIconPaint.setColor(textColor);
+            controlIconPaint.setStrokeWidth(dpf2(1.35f));
+            controlIconPaint.setAlpha((int) (190 * alpha));
+            for (int i = 0; i < 3; i++) {
+                float bar = playing ? (.35f + .65f * Math.abs((float) Math.sin(phase + i * 1.55f))) : .35f + i * .15f;
+                float half = dp(3.2f) * bar;
+                canvas.drawLine(barsX + dp(i * 2.8f), cy - half, barsX + dp(i * 2.8f), cy + half, controlIconPaint);
+            }
+            controlIconPaint.setColor(controlIconColor);
+        }
 
         arrowPaint.setStrokeWidth(dpf2(1.16f));
-        canvas.translate(dpf2(4.8f), cy);
+        canvas.translate(rect.right - dp(8), cy);
         canvas.drawPath(arrowPath, arrowPaint);
 
+        if (currentTrack && playbackProgress > 0) {
+            progressPaint.setAlpha((int) (210 * alpha));
+            progressPaint.setStrokeWidth(dpf2(1.25f));
+            progressPaint.setStrokeCap(Paint.Cap.ROUND);
+            canvas.drawLine(rect.left + dp(12), rect.bottom - dpf2(1.2f),
+                    rect.left + dp(12) + (rect.width() - dp(24)) * playbackProgress,
+                    rect.bottom - dpf2(1.2f), progressPaint);
+        }
+
         canvas.restore();
 
         canvas.restore();
+
+        if (currentTrack && playing) {
+            postInvalidateOnAnimation();
+        }
     }
 }
