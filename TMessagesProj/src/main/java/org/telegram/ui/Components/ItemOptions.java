@@ -148,6 +148,8 @@ public class ItemOptions {
     private final float[] point = new float[2];
 
     private Runnable dismissListener;
+    private boolean discardScrolls;
+    private boolean dismissOnMoveOutside;
 
     private float translateX, translateY;
     private int dimAlpha;
@@ -1025,6 +1027,16 @@ public class ItemOptions {
         return this;
     }
 
+    public ItemOptions setDiscardScrolls(boolean discardScrolls) {
+        this.discardScrolls = discardScrolls;
+        return this;
+    }
+
+    public ItemOptions setDismissOnMoveOutside(boolean dismissOnMoveOutside) {
+        this.dismissOnMoveOutside = dismissOnMoveOutside;
+        return this;
+    }
+
     public ItemOptions setFixedWidth(int fixedWidthDp) {
         this.fixedWidthDp = fixedWidthDp;
         return this;
@@ -1470,12 +1482,13 @@ public class ItemOptions {
             }
         }
 
-//        // discard all scrolls/gestures
-//        if (fragment != null && fragment.getFragmentView() != null) {
-//            fragment.getFragmentView().getRootView().dispatchTouchEvent(AndroidUtilities.emptyMotionEvent());
-//        } else if (this.container != null) {
-//            container.dispatchTouchEvent(AndroidUtilities.emptyMotionEvent());
-//        }
+        if (discardScrolls) {
+            if (fragment != null && fragment.getFragmentView() != null) {
+                fragment.getFragmentView().getRootView().dispatchTouchEvent(AndroidUtilities.emptyMotionEvent());
+            } else if (this.container != null) {
+                container.dispatchTouchEvent(AndroidUtilities.emptyMotionEvent());
+            }
+        }
 
         if (blurForMenu && scrimBlur3SourceBitmap != null) {
             setGapBackgroundColor(Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuItem, resourcesProvider), 0.06f));
@@ -1803,6 +1816,25 @@ public class ItemOptions {
     private View hoveredItem;
     private final int[] hoverLoc = new int[2];
 
+    public void dispatchCapturedTouchEvent(MotionEvent event) {
+        if (layout == null || actionBarPopupWindow == null || !actionBarPopupWindow.isShowing()) {
+            return;
+        }
+        MotionEvent copy = MotionEvent.obtain(event);
+        int[] location = new int[2];
+        layout.getLocationOnScreen(location);
+        copy.offsetLocation(-location[0], -location[1]);
+        layout.dispatchTouchEvent(copy);
+        if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+            updateHover((int) event.getRawX(), (int) event.getRawY());
+        } else if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+            releaseHover((int) event.getRawX(), (int) event.getRawY());
+        } else if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+            cancelHover();
+        }
+        copy.recycle();
+    }
+
     private void installHoverReleaseListener() {
         if (scrimView == null) return;
         if (scrimView.getParent() != null) {
@@ -1866,6 +1898,13 @@ public class ItemOptions {
             hoveredItem = null;
             target.setPressed(false);
             target.performClick();
+        } else if (dismissOnMoveOutside && scrimView != null) {
+            int[] location = new int[2];
+            scrimView.getLocationOnScreen(location);
+            if (rawX < location[0] || rawX > location[0] + scrimView.getWidth()
+                    || rawY < location[1] || rawY > location[1] + scrimView.getHeight()) {
+                dismiss();
+            }
         }
     }
 
