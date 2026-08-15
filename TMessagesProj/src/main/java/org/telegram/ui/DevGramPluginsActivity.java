@@ -272,7 +272,8 @@ public class DevGramPluginsActivity extends BaseFragment {
                 return;
             }
             android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_SEND);
-            intent.setType("text/x-python");
+            // единый функционал: .dgplugin — это архив, .py/.plugin — исходник
+            intent.setType(filename.endsWith(".dgplugin") ? "application/octet-stream" : "text/x-python");
             android.net.Uri uri;
             if (android.os.Build.VERSION.SDK_INT >= 24) {
                 uri = androidx.core.content.FileProvider.getUriForFile(getParentActivity(),

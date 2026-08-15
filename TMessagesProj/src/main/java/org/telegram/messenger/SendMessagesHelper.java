@@ -4242,7 +4242,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         String message = sendMessageParams.message;
         // DevGram: хук плагинов на исходящий текст (только без форматирования, чтобы не сбить entities)
         if (message != null && (sendMessageParams.entities == null || sendMessageParams.entities.isEmpty())) {
-            CharSequence devgramHooked = DevGramPlugins.onSendMessage(message);
+            CharSequence devgramHooked = DevGramPlugins.onSendMessage(currentAccount, message);
             if (devgramHooked != null) {
                 if (DevGramPlugins.CANCEL.equals(devgramHooked.toString())) {
                     return; // плагин отменил отправку

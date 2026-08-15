@@ -1,12 +1,12 @@
 /*
- * DevGram: лист установки плагина. Появляется при тапе на файл .plugin в чате/канале —
- * показывает метаданные (имя, версия, автор, описание), предупреждение и кнопку установки.
+ * DevGram: лист установки плагина. Появляется при тапе на файл .plugin/.dgplugin в чате/канале —
+ * показывает метаданные (иконка, имя, версия, автор, описание), бейдж проверки, предупреждение,
+ * возможности и кнопку установки. Карточка ЕДИНАЯ для обоих форматов (см. showCard).
  */
 
 package org.telegram.ui;
 
 import android.content.Context;
-import android.graphics.Typeface;
 import android.text.InputType;
 import android.text.method.PasswordTransformationMethod;
 import android.util.TypedValue;
@@ -32,13 +32,40 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class DevGramPluginInstallSheet {
 
+    // Интерфейс установки: реализация зависит от формата (.py-исходник или .dgplugin-архив).
+    private interface InstallAction { boolean install(boolean enableAfter); }
+
+    // Лист установки .dgplugin-пакета — ТА ЖЕ карточка, что и у .plugin (единая логика).
+    public static void showPackage(BaseFragment fragment, String path, long sourceDialogId) {
+        Context context = fragment.getParentActivity();
+        if (context == null || path == null) return;
+        String validationError = DevGramPlugins.packageValidationError(path);
+        if (!validationError.isEmpty()) {
+            org.telegram.ui.Components.BulletinFactory.of(fragment)
+                    .createErrorBulletin(validationError).show();
+            return;
+        }
+        String[] m = DevGramPlugins.packageMeta(path).split("\u001f", -1);
+        final String id = m.length > 0 ? m[0] : "";
+        String name = m.length > 1 && !m[1].isEmpty() ? m[1] : (id.isEmpty() ? "Плагин" : id);
+        String ver = m.length > 2 ? m[2] : "";
+        String author = m.length > 3 ? m[3] : "";
+        String desc = m.length > 4 ? m[4] : "";
+        String iconUrl = m.length > 5 ? m[5] : "";
+        // возможности сканируем по входному файлу архива (как по исходнику у .plugin)
+        String capabilities = DevGramPlugins.packageMainSource(path);
+        // у пакета нет единого «source»-текста для реестра/каталога — verifySource=null:
+        // это отключает source-зависимые кнопки (проверка/публикация), карточка при этом та же.
+        String pkgSha = org.telegram.messenger.DevGramPackages.sha256File(new java.io.File(path));
+        showCard(fragment, id, name, ver, author, desc, iconUrl, sourceDialogId, null, pkgSha, capabilities, path,
+                enableAfter -> DevGramPlugins.installPackage(path, id, enableAfter));
+    }
+
     public static void show(BaseFragment fragment, String source) {
         show(fragment, source, 0);
     }
 
-    // Показать лист установки для исходника плагина.
-    // sourceDialogId — диалог, откуда открыт плагин (у канала отрицательный). Если это
-    // канал-разработчик плагинов (значок 🧩), плагин автоматически считается проверенным.
+    // Показать лист установки для исходника плагина (.plugin/.py).
     public static void show(BaseFragment fragment, String source, long sourceDialogId) {
         Context context = fragment.getParentActivity();
         if (context == null || source == null) {
@@ -50,19 +77,35 @@ public class DevGramPluginInstallSheet {
                     .createErrorBulletin("Это не похоже на плагин DevGram").show();
             return;
         }
-        String[] m = meta.split("", -1);
+        String[] m = meta.split("\u001f", -1);
         final String id = m.length > 0 ? m[0] : "";
         String name = m.length > 1 && !m[1].isEmpty() ? m[1] : (id.isEmpty() ? "Плагин" : id);
         String ver = m.length > 2 ? m[2] : "";
         String author = m.length > 3 ? m[3] : "";
         String desc = m.length > 4 ? m[4] : "";
         String iconUrl = m.length > 5 ? m[5] : "";
+        final String fSource = source;
+        showCard(fragment, id, name, ver, author, desc, iconUrl, sourceDialogId, source, DevGramPlugins.sha256(source), source, null,
+                enableAfter -> DevGramPlugins.install(fSource, id, enableAfter));
+    }
+
+    // ЕДИНАЯ карточка установки (BottomSheet) для .plugin и .dgplugin.
+    // sourceDialogId — диалог, откуда открыт плагин (у канала отрицательный). Если это
+    // канал-разработчик плагинов (значок 🧩), плагин автоматически считается проверенным.
+    // verifySource != null → source-зависимые фичи (проверка команды, публикация в каталог)
+    // включены (только для .py); для .dgplugin verifySource=null — они скрыты, карточка та же.
+    private static void showCard(BaseFragment fragment, final String id, final String name,
+                                 String ver, String author, String desc, String iconUrl,
+                                 long sourceDialogId, final String verifySource, final String verifyHash, String capabilitiesSource,
+                                 final String packagePath, final InstallAction installAction) {
+        Context context = fragment.getParentActivity();
+        if (context == null) {
+            return;
+        }
         final boolean fromDevChannel = org.telegram.messenger.DevGramBadges.isPluginDevChannel(sourceDialogId);
-        // Любой плагин, опубликованный в канале со значком 🧩, считается проверенным
-        // независимо от того, отправлялся ли он в каталог.
-        final boolean verified = fromDevChannel || DevGramPlugins.isVerified(source);
-        if (fromDevChannel) {
-            DevGramPlugins.trustFromChannel(source);
+        final boolean verified = fromDevChannel || (verifyHash != null && !verifyHash.isEmpty() && DevGramPlugins.isVerifiedByHash(verifyHash));
+        if (fromDevChannel && verifyHash != null && !verifyHash.isEmpty()) {
+            DevGramPlugins.trustFromChannelByHash(verifyHash);
         }
 
         LinearLayout root = new LinearLayout(context);
@@ -155,12 +198,13 @@ public class DevGramPluginInstallSheet {
         warn.addView(warnText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         root.addView(warn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 18, 0, 0));
 
-        String lowerSource = source.toLowerCase(java.util.Locale.US);
+        String lowerSource = capabilitiesSource == null ? "" : capabilitiesSource.toLowerCase(java.util.Locale.US);
         java.util.ArrayList<String> capabilities = new java.util.ArrayList<>();
         if (lowerSource.contains("wants_request_hooks") || lowerSource.contains("on_request")) capabilities.add("перехват сетевых запросов");
         if (lowerSource.contains("on_message") || lowerSource.contains("message")) capabilities.add("обработка сообщений");
         if (lowerSource.contains("open(") || lowerSource.contains("pathlib") || lowerSource.contains("os.path")) capabilities.add("доступ к локальным файлам");
         if (lowerSource.contains("http://") || lowerSource.contains("https://") || lowerSource.contains("requests.")) capabilities.add("обращение к интернету");
+        if (lowerSource.contains("register_pill")) capabilities.add("виджеты строки поиска (Pill Stack)");
         if (!capabilities.isEmpty()) {
             TextView access = new TextView(context);
             access.setText("Возможности плагина:\n• " + android.text.TextUtils.join("\n• ", capabilities));
@@ -214,8 +258,8 @@ public class DevGramPluginInstallSheet {
 
         final boolean team = org.telegram.messenger.DevGramBadges.isTeam(fragment.getUserConfig().getClientUserId());
 
-        // команда: сделать проверенным / убрать
-        if (team) {
+        // команда: сделать проверенным / убрать (реестр по хешу: исходник .py или sha архива .dgplugin)
+        if (team && verifyHash != null && !verifyHash.isEmpty()) {
             TextView teamBtn = new TextView(context);
             teamBtn.setGravity(Gravity.CENTER);
             teamBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -225,7 +269,7 @@ public class DevGramPluginInstallSheet {
             Runnable applyTeam = () -> tb.setText(vState[0] ? "✕ Убрать из проверенных" : "✓ Сделать проверенным");
             applyTeam.run();
             teamBtn.setOnClickListener(v -> ensureAdmin(fragment, () -> {
-                boolean ok = vState[0] ? DevGramPlugins.unverify(source) : DevGramPlugins.verify(source);
+                boolean ok = vState[0] ? DevGramPlugins.unverifyByHash(verifyHash) : DevGramPlugins.verifyByHash(verifyHash);
                 if (ok) {
                     vState[0] = !vState[0];
                     applyVerified.run();
@@ -237,14 +281,14 @@ public class DevGramPluginInstallSheet {
             root.addView(teamBtn, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
         }
 
-        // Опубликовать в каталог — команда ИЛИ АДМИН канала-разработчика (🧩).
-        // Обычный подписчик дев-канала кнопку НЕ видит (только тот, кто может там постить).
+        // Опубликовать в каталог — команда ИЛИ АДМИН канала-разработчика (🧩). Работает и для
+        // .py (исходник в RTDB), и для .dgplugin (файл в архив через бота) — единая кнопка.
         boolean channelAdmin = false;
         if (fromDevChannel && sourceDialogId < 0) {
             org.telegram.tgnet.TLRPC.Chat pubChat = fragment.getMessagesController().getChat(-sourceDialogId);
             channelAdmin = org.telegram.messenger.ChatObject.hasAdminRights(pubChat);
         }
-        if (team || channelAdmin) {
+        if ((team || channelAdmin) && (verifySource != null || packagePath != null)) {
             TextView pubBtn = new TextView(context);
             pubBtn.setGravity(Gravity.CENTER);
             pubBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -257,7 +301,7 @@ public class DevGramPluginInstallSheet {
                     Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
             pubBtn.setText("📚 Опубликовать в каталог");
             final TextView[] rejectionRef = new TextView[1];
-            final String fId = id, fName = name, fVer = ver, fAuthor = author, fDesc = desc, fIcon = iconUrl, fSource = source;
+            final String fId = id, fName = name, fVer = ver, fAuthor = author, fDesc = desc, fIcon = iconUrl, fSource = verifySource == null ? "" : verifySource, fPackage = packagePath;
             final long fChannelId = sourceDialogId;
             pubBtn.setOnClickListener(v -> {
                 DevGramPlugins.CatalogEntry ce = new DevGramPlugins.CatalogEntry();
@@ -269,7 +313,7 @@ public class DevGramPluginInstallSheet {
                 ce.icon = fIcon;
                 ce.source = fSource;
                 ce.channel = channelName(fragment, fChannelId);
-                choosePublishFilter(fragment, ce, () -> applyPendingState(pubBtn, rejectionRef[0]));
+                choosePublishFilter(fragment, ce, fPackage, () -> applyPendingState(pubBtn, rejectionRef[0]));
             });
             TextView rejectionInfo = new TextView(context);
             rejectionRef[0] = rejectionInfo;
@@ -321,7 +365,7 @@ public class DevGramPluginInstallSheet {
                             ce.id = fId; ce.name = fName; ce.version = fVer; ce.author = fAuthor;
                             ce.desc = fDesc; ce.icon = fIcon; ce.source = fSource;
                             ce.channel = channelName(fragment, fChannelId);
-                            choosePublishFilter(fragment, ce, () -> applyPendingState(pubBtnRef, rejectionInfo));
+                            choosePublishFilter(fragment, ce, fPackage, () -> applyPendingState(pubBtnRef, rejectionInfo));
                         });
                     });
                 } else if (status != 0) {
@@ -339,7 +383,7 @@ public class DevGramPluginInstallSheet {
         BottomSheet sheet = builder.create();
 
         install.setOnClickListener(v -> {
-            boolean ok = DevGramPlugins.install(source, id, enableAfter[0]);
+            boolean ok = installAction.install(enableAfter[0]);
             sheet.dismiss();
             if (ok) {
                 org.telegram.ui.Components.BulletinFactory.of(fragment)
@@ -355,8 +399,8 @@ public class DevGramPluginInstallSheet {
 
     // Публикация в каталог: сначала выбор фильтра (категории), затем запись. Заблокированные плагины
     // (удалённые командой) публиковать нельзя.
-    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce) { choosePublishFilter(fragment, ce, null); }
-    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce, Runnable onSubmitted) {
+    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce) { choosePublishFilter(fragment, ce, null, null); }
+    private static void choosePublishFilter(BaseFragment fragment, DevGramPlugins.CatalogEntry ce, final String packagePath, Runnable onSubmitted) {
         if (DevGramPlugins.isBlocked(ce.source)) {
             org.telegram.ui.Components.BulletinFactory.of(fragment)
                     .createErrorBulletin("Этот плагин удалён командой — публиковать нельзя").show();
@@ -427,15 +471,24 @@ public class DevGramPluginInstallSheet {
                 arrow.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon));
                 row.addView(arrow, LayoutHelper.createLinear(24, 24, Gravity.CENTER_VERTICAL));
                 row.setOnClickListener(v -> {
-                    if (sheetRef[0] != null) sheetRef[0].dismiss();
+                    row.setEnabled(false);
+                    name.setText("Отправляем…");
                     ce.filter = selected;
-                    int r = DevGramPlugins.publishToCatalog(ce);
-                    String msg = r == 1 ? "Отправлено в каталог"
-                            : (r == -1 ? "Плагин заблокирован — публикация запрещена"
-                            : (r == -2 ? DevGramPlugins.validateCatalogEntry(ce) : "Не удалось опубликовать"));
-                    org.telegram.ui.Components.BulletinFactory.of(fragment)
-                            .createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
-                    if (r == 1 && onSubmitted != null) onSubmitted.run();
+                    DevGramPlugins.SubmissionCallback scb = r -> {
+                        if (r == 1 && sheetRef[0] != null) sheetRef[0].dismiss();
+                        String msg = r == 1 ? "Заявка отправлена на модерацию"
+                                : (r == -1 ? "Плагин заблокирован — публикация запрещена"
+                                : (r == -2 ? DevGramPlugins.validateCatalogEntry(ce) : "Firebase не подтвердил отправку. Нажмите ещё раз"));
+                        org.telegram.ui.Components.BulletinFactory.of(fragment).createSimpleBulletin(r == 1 ? R.raw.contact_check : R.raw.error, msg).show();
+                        if (r == 1) { if (onSubmitted != null) onSubmitted.run(); }
+                        else { row.setEnabled(true); name.setText(selected.isEmpty() ? "Без категории" : selected); }
+                    };
+                    // Пакет .dgplugin: сначала шлём файл боту (dgpkg:<id>), потом заявку; иначе обычная публикация исходника.
+                    if (packagePath != null) {
+                        org.telegram.messenger.DevGramPackages.publishPackage(packagePath, ce, scb);
+                    } else {
+                        DevGramPlugins.publishToCatalog(ce, scb);
+                    }
                 });
                 root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 8));
             }
@@ -524,7 +577,7 @@ public class DevGramPluginInstallSheet {
         AndroidUtilities.showKeyboard(emailEt);
     }
 
-    // Аватарка плагina по URL: кеш → иначе качаем в фоне → ставим на UI-потоке.
+    // Аватарка плагина по URL: кеш → иначе качаем в фоне → ставим на UI-потоке.
     private static void loadIcon(final android.widget.ImageView iv, final String url) {
         final Context ctx = iv.getContext();
         if (ctx == null) return;

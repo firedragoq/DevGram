@@ -879,8 +879,6 @@ public class ChatActivityEnterView extends FrameLayout implements
         @Override
         public void run() {
             if (delegate != null) {
-                // DevGram (как exteraGram): режим «Спросить» — показать выбор камеры кружка
-                // после инициализации камеры, до старта записи.
                 if (devgramIsRoundCameraAsk()) {
                     devgramShowRoundCameraChooser();
                 } else {
@@ -890,34 +888,90 @@ public class ChatActivityEnterView extends FrameLayout implements
         }
     };
 
-    // DevGram: камера кружков в режиме «Спросить» (dg_roundCameraMode == 2).
-    private boolean devgramRoundCameraChooserShowing;
+    private ActionBarPopupWindow devgramRoundCameraPopupWindow;
+    private ActionBarPopupWindow.ActionBarPopupWindowLayout devgramRoundCameraPopupLayout;
+
     private static boolean devgramIsRoundCameraAsk() {
         return MessagesController.getGlobalMainSettings().getInt("dg_roundCameraMode", 0) == 2;
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private void devgramShowRoundCameraChooser() {
         if (parentActivity == null) {
             return;
         }
-        devgramRoundCameraChooserShowing = true;
-        AlertDialog.Builder b = new AlertDialog.Builder(parentActivity, resourcesProvider);
-        b.setTitle("Камера кружка");
-        b.setItems(new CharSequence[]{"Передняя", "Задняя"},
-                (d, which) -> devgramOpenRoundCamera(which == 0));
-        b.setOnDismissListener(d -> {
-            // Закрыли без выбора — запись так и не стартовала (needStartRecordVideo(0) отложен),
-            // InstantCameraView не показан. Просто снимаем «взведённое» состояние жеста.
-            if (!recordingAudioVideo) {
-                devgramRoundCameraChooserShowing = false;
-                CameraController.getInstance().cancelOnInitRunnable(onFinishInitCameraRunnable);
+        devgramRoundCameraPopupLayout = new ActionBarPopupWindow.ActionBarPopupWindowLayout(parentActivity, resourcesProvider);
+        devgramRoundCameraPopupLayout.setAnimationEnabled(false);
+        devgramRoundCameraPopupLayout.setOnTouchListener(new OnTouchListener() {
+            private final Rect popupRect = new Rect();
+
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN && devgramRoundCameraPopupWindow != null && devgramRoundCameraPopupWindow.isShowing()) {
+                    view.getHitRect(popupRect);
+                    if (!popupRect.contains((int) event.getX(), (int) event.getY())) {
+                        devgramRoundCameraPopupWindow.dismiss();
+                    }
+                }
+                return false;
             }
         });
-        b.show();
+        devgramRoundCameraPopupLayout.setDispatchKeyEventListener(keyEvent -> {
+            if (keyEvent.getKeyCode() == KeyEvent.KEYCODE_BACK && keyEvent.getRepeatCount() == 0 && devgramRoundCameraPopupWindow != null && devgramRoundCameraPopupWindow.isShowing()) {
+                devgramRoundCameraPopupWindow.dismiss();
+            }
+        });
+        devgramRoundCameraPopupLayout.setShownFromBottom(false);
+
+        ActionBarMenuSubItem frontCameraButton = new ActionBarMenuSubItem(getContext(), true, false, resourcesProvider);
+        frontCameraButton.setTextAndIcon(LocaleController.getString(R.string.DevGramFrontCamera), R.drawable.msg_camera);
+        frontCameraButton.setMinimumWidth(AndroidUtilities.dp(196));
+        frontCameraButton.setOnClickListener(view -> devgramOpenRoundCamera(true));
+        devgramRoundCameraPopupLayout.addView(frontCameraButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
+
+        ActionBarMenuSubItem rearCameraButton = new ActionBarMenuSubItem(getContext(), false, true, resourcesProvider);
+        rearCameraButton.setTextAndIcon(LocaleController.getString(R.string.DevGramRearCamera), R.drawable.msg_camera);
+        rearCameraButton.setMinimumWidth(AndroidUtilities.dp(196));
+        rearCameraButton.setOnClickListener(view -> devgramOpenRoundCamera(false));
+        devgramRoundCameraPopupLayout.addView(rearCameraButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
+        devgramRoundCameraPopupLayout.setupRadialSelectors(getThemedColor(Theme.key_dialogButtonSelector));
+
+        devgramRoundCameraPopupWindow = new ActionBarPopupWindow(devgramRoundCameraPopupLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
+        devgramRoundCameraPopupWindow.setAnimationEnabled(false);
+        devgramRoundCameraPopupWindow.setAnimationStyle(R.style.PopupContextAnimation2);
+        devgramRoundCameraPopupWindow.setOutsideTouchable(true);
+        devgramRoundCameraPopupWindow.setClippingEnabled(true);
+        devgramRoundCameraPopupWindow.setInputMethodMode(ActionBarPopupWindow.INPUT_METHOD_NOT_NEEDED);
+        devgramRoundCameraPopupWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED);
+        devgramRoundCameraPopupWindow.getContentView().setFocusableInTouchMode(true);
+
+        devgramRoundCameraPopupLayout.measure(
+                MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), MeasureSpec.AT_MOST),
+                MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), MeasureSpec.AT_MOST));
+        devgramRoundCameraPopupWindow.setFocusable(true);
+        int[] location = new int[2];
+        View button = getAudioVideoButtonContainer();
+        button.getLocationInWindow(location);
+        int y;
+        if (keyboardVisible && getMeasuredHeight() > AndroidUtilities.dp(isTopViewVisible() ? 48 + 58 : 58)) {
+            y = location[1] + button.getMeasuredHeight();
+        } else {
+            y = location[1] - devgramRoundCameraPopupLayout.getMeasuredHeight() - AndroidUtilities.dp(2);
+        }
+        devgramRoundCameraPopupWindow.showAtLocation(button, Gravity.LEFT | Gravity.TOP,
+                location[0] + button.getMeasuredWidth() - devgramRoundCameraPopupLayout.getMeasuredWidth() + AndroidUtilities.dp(8), y);
+        devgramRoundCameraPopupWindow.dimBehind();
+
+        try {
+            button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+        } catch (Exception ignore) {
+        }
     }
 
     private void devgramOpenRoundCamera(boolean front) {
-        devgramRoundCameraChooserShowing = false;
+        if (devgramRoundCameraPopupWindow != null && devgramRoundCameraPopupWindow.isShowing()) {
+            devgramRoundCameraPopupWindow.dismiss();
+        }
         if (delegate == null) {
             return;
         }
@@ -931,11 +985,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         updateRecordInterface(RECORD_STATE_ENTER, true);
         if (recordCircle != null) {
             recordCircle.showWaves(false, false);
-            // Палец уже отпущен (жест «проглочен» гардом) — фиксируем запись hands-free,
-            // имитируя слайд-лок: две установки lockTranslation с разницей ≥ порога (dp57).
-            setSlideToCancelProgress(1f);
-            recordCircle.setLockTranslation(AndroidUtilities.dp(200));
-            recordCircle.setLockTranslation(AndroidUtilities.dp(120));
+            recordCircle.setLockTranslation(666);
         }
         if (recordTimerView != null) {
             recordTimerView.reset();
@@ -982,8 +1032,6 @@ public class ChatActivityEnterView extends FrameLayout implements
                 } else {
                     onFinishInitCameraRunnable.run();
                 }
-                // DevGram: в режиме «Спросить» интерфейс записи запускается уже после выбора камеры
-                // (в devgramOpenRoundCamera), а не здесь.
                 if (!devgramIsRoundCameraAsk() && !recordingAudioVideo) {
                     recordingAudioVideo = true;
                     updateRecordInterface(RECORD_STATE_ENTER, true);
@@ -3011,11 +3059,6 @@ public class ChatActivityEnterView extends FrameLayout implements
             public boolean onTouchEvent(MotionEvent motionEvent) {
                 if (isLiveComment) return false;
                 createRecordCircle();
-                // DevGram: пока открыт выбор камеры кружка («Спросить») — глотаем касания кнопки,
-                // чтобы отпускание пальца не завершило жест до выбора стороны.
-                if (devgramRoundCameraChooserShowing) {
-                    return true;
-                }
                 if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
                     if (recordCircle.isSendButtonVisible()) {
                         if (!hasRecordVideo || calledRecordRunnable) {

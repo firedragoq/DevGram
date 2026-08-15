@@ -16149,6 +16149,14 @@ public class ChatActivity extends BaseFragment implements
         if (messageObject == null || messageObject.isOut() || !messageObject.isSecretMedia() || messageObject.messageOwner.ttl != 0x7FFFFFFF) {
             return null;
         }
+        // DevGram (порт поведения AyuGram): в режиме призрака статусы прочтения не уходят,
+        // поэтому сервер НЕ уничтожает медиа «на один просмотр». Значит и локально его затирать
+        // нельзя — иначе просмотр = безвозвратная потеря. При выключенных read-пакетах просто
+        // оставляем медиа как есть (без forceExpired и без doDeleteShowOnceTask) — его можно
+        // пересмотреть. Завязано на sendReadPackets, как и вся ghost-логика.
+        if (!DevGramConfig.sendReadPackets) {
+            return null;
+        }
         final long taskId = getMessagesController().createDeleteShowOnceTask(dialog_id, messageObject.getId());
         messageObject.forceExpired = true;
         if (messageObject.isOutOwner() || !messageObject.isRoundOnce() && !messageObject.isVoiceOnce()) {
@@ -42518,7 +42526,7 @@ public class ChatActivity extends BaseFragment implements
                 }
                 // DevGram: файл .plugin (всегда) или .py (если это реально плагин) — лист установки
                 String devgramDocName = message.getDocumentName() != null ? message.getDocumentName().toLowerCase() : "";
-                if (devgramDocName.endsWith(".plugin") || devgramDocName.endsWith(".py")) {
+                if (devgramDocName.endsWith(".plugin") || devgramDocName.endsWith(".py") || devgramDocName.endsWith(".dgplugin")) {
                     File locFile = null;
                     if (message.messageOwner.attachPath != null && message.messageOwner.attachPath.length() != 0) {
                         File f = new File(message.messageOwner.attachPath);
@@ -42541,6 +42549,10 @@ public class ChatActivity extends BaseFragment implements
                                 off += r;
                             }
                             fis.close();
+                            if (devgramDocName.endsWith(".dgplugin")) {
+                                DevGramPluginInstallSheet.showPackage(ChatActivity.this, locFile.getAbsolutePath(), getDialogId());
+                                return;
+                            }
                             String src = new String(data, java.nio.charset.StandardCharsets.UTF_8);
                             // .plugin — всегда показываем лист; .py — только если это плагин DevGram
                             boolean forcePlugin = devgramDocName.endsWith(".plugin");

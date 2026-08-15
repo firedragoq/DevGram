@@ -111,6 +111,8 @@
     <string name="DisableMotionPhotoInfo">Прикреплять движущиеся фото Google/Samsung как обычные фото, а не видео</string>
     <string name="PinDialogsOrder">Порядок закреплённых диалогов</string>
     <string name="RearVideoMessages">Задняя камера в видеосообщениях</string>
+    <string name="DevGramFrontCamera">Передняя камера</string>
+    <string name="DevGramRearCamera">Задняя камера</string>
     <string name="ReplaceForward">Заменить оригинальное пересылание</string>
     <string name="HideSensitiveData">Скрыть конфиденциальные данные</string>
     <string name="SystemCamera">Использовать системную камеру для фото</string>

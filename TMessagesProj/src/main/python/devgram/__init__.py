@@ -24,9 +24,30 @@ DevGram: Python API плагинов (аналог base_plugin у exteraGram).
 """
 
 from java import jclass
+import os
+import json
 
 _FileLog = jclass("org.telegram.messenger.FileLog")
 _Plugins = jclass("org.telegram.messenger.DevGramPlugins")
+
+class HookStrategy:
+    PASS = "pass"
+    MODIFY = "modify"
+    CANCEL = "cancel"
+
+class HookResult:
+    def __init__(self, strategy=HookStrategy.PASS, params=None, result=None):
+        self.strategy, self.params, self.result = strategy, params, result
+
+class AccountClient:
+    def __init__(self, account): self.account = int(account)
+    def get_messages_controller(self): return _Plugins.messagesController(self.account)
+    def get_user_config(self): return _Plugins.userConfig(self.account)
+    def get_connections_manager(self): return _Plugins.connectionsManager(self.account)
+    def send_text(self, dialog_id, text): _Plugins.sendText(self.account, int(dialog_id), str(text))
+
+def get_selected_account(): return int(_Plugins.currentAccount())
+def get_client(account=None): return AccountClient(get_selected_account() if account is None else account)
 
 
 class BasePlugin:
@@ -41,9 +62,11 @@ class BasePlugin:
     min_app_version = ""   # минимальная версия приложения (напр. "12.9")
     min_sdk = ""           # минимальная версия API плагинов DevGram (напр. "2")
     requirements = []      # список pip-зависимостей (если движок их поддерживает)
+    sdk_version = "1"
 
     def __init__(self):
         self.enabled = True
+        self._package_root = ""
 
     # ---- жизненный цикл ----
     def on_load(self):
@@ -77,6 +100,14 @@ class BasePlugin:
     def on_receive_response(self, name, response, error):
         """После ответа сервера на TL-запрос. name — имя запроса, response — Java-объект ответа (или None),
         error — текст ошибки (или None). Только чтение. Переопредели, чтобы включить хук."""
+        return None
+
+    def on_send_request_hook(self, account, name, request):
+        """Account-aware variant of on_send_request. Override this instead of the legacy callback."""
+        return None
+
+    def on_receive_response_hook(self, account, name, response, error):
+        """Account-aware variant of on_receive_response. Override this instead of the legacy callback."""
         return None
 
     # ---- меню сообщения ----
@@ -157,6 +188,12 @@ class BasePlugin:
     # ---- доступ к контроллерам (текущий аккаунт) ----
     def current_account(self):
         return _Plugins.currentAccount()
+
+    def client(self, account=None):
+        return get_client(account)
+
+    def get_hook_account(self):
+        return self.current_account()
 
     def messages_controller(self):
         return _Plugins.messagesController()
@@ -299,13 +336,18 @@ class BasePlugin:
         _Plugins.writeData(self.id, str(name), str(content))
 
     # ---- диалоги / bulletins ----
-    def bulletin(self, text):
-        """Показать плашку-bulletin (в стиле Telegram)."""
-        _Plugins.bulletin(str(text))
+    def bulletin(self, text, kind="info", duration=2750, button=None, callback=None):
+        """Показать Telegram-плашку. kind: info/success/error."""
+        _Plugins.bulletin(str(kind), str(text), int(duration),
+                          None if button is None else str(button), callback)
 
-    def alert(self, title, message=""):
-        """Показать диалог с заголовком и текстом."""
-        _Plugins.alert(str(title), str(message))
+    def alert(self, title, message="", positive="OK", on_positive=None,
+              negative=None, on_negative=None, neutral=None, on_neutral=None):
+        """Показать диалог с кнопками и callback-функциями."""
+        _Plugins.alert(str(title), str(message),
+                       None if positive is None else str(positive), on_positive,
+                       None if negative is None else str(negative), on_negative,
+                       None if neutral is None else str(neutral), on_neutral)
 
     # ---- UI: страница настроек плагина ----
     def settings(self):
@@ -316,6 +358,42 @@ class BasePlugin:
         ("button", "ключ", "Название")            — кнопка (зовёт on_setting_click)
         Значения читаются/пишутся через get_setting/set_setting."""
         return []
+
+    def create_settings(self):
+        return self.settings()
+
+    def on_setting_changed(self, key, value):
+        pass
+
+    def register_pill(self, pill_id, name, text="", value=None, on_click=None, on_long_click=None, enabled=False):
+        """Register an interactive Pill Stack widget owned by this plugin."""
+        return _Plugins.registerPill(str(self.id), str(pill_id), str(name), str(text), value, on_click, on_long_click, bool(enabled))
+
+    def unregister_pills(self):
+        _Plugins.unregisterPills(str(self.id))
+
+    def asset_path(self, name):
+        """Absolute path to an asset bundled under assets/ in a .dgplugin package."""
+        if not self._package_root: return ""
+        root = os.path.abspath(os.path.join(self._package_root, "assets"))
+        path = os.path.abspath(os.path.join(root, str(name)))
+        return path if path.startswith(root + os.sep) and os.path.isfile(path) else ""
+
+    def string(self, key, default=None, locale=None, **values):
+        """Read a localized string from locales/<language>.json with English fallback."""
+        if not self._package_root: return default if default is not None else str(key)
+        if locale is None:
+            try: locale = str(jclass("org.telegram.messenger.LocaleController").getInstance().getCurrentLocale().getLanguage())
+            except Exception: locale = "en"
+        data = {}
+        for language in ("en", str(locale)):
+            path = os.path.join(self._package_root, "locales", language + ".json")
+            try:
+                with open(path, encoding="utf-8") as stream: data.update(json.load(stream))
+            except Exception: pass
+        text = str(data.get(str(key), default if default is not None else key))
+        try: return text.format(**values)
+        except Exception: return text
 
     def on_setting_click(self, key):
         """Клик по кнопке-настройке (type='button')."""
@@ -331,6 +409,17 @@ class BasePlugin:
         for t in param_types:
             pts.add(str(t))
         return _Plugins.hook(self.id, str(class_name), str(method_name), pts)
+
+    add_hook = hook
+
+    def add_on_send_message_hook(self):
+        return True
+
+    def on_update_hook(self, update_name, account, update):
+        return HookResult()
+
+    def on_send_message_hook(self, account, params):
+        return HookResult()
 
     def before_hook(self, frame):
         """До оригинала. frame.args — аргументы (можно менять: frame.args[0]=...),

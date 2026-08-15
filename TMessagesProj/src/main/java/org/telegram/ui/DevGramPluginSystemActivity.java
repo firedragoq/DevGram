@@ -35,6 +35,7 @@ public class DevGramPluginSystemActivity extends BaseFragment {
     private static final int ID_CRASH = 11;
     private static final int ID_DOCS = 20;
     private static final int ID_VERIFIED = 21;
+    private static final int ID_DEV_TOKEN = 22;
 
     private static final String DOCS_URL = "https://docs.devgram.space";
     private static final String VERIFIED_URL = "https://t.me/addlist/IUMDGoyECehlN2Fi";
@@ -74,6 +75,7 @@ public class DevGramPluginSystemActivity extends BaseFragment {
         items.add(UItem.asShadow("Встроенный Python: v" + DevGramPlugins.pythonVersion() + " (в составе приложения)."));
         items.add(UItem.asButton(ID_RELOAD, R.drawable.msg_reset, "Перезагрузить плагины"));
         items.add(UItem.asShadow("Перечитывает папку с плагинами без перезапуска приложения."));
+        items.add(UItem.asButton(ID_DEV_TOKEN, R.drawable.msg_info, "Токен dev server", "Нужен утилите загрузки .dgplugin"));
 
         items.add(UItem.asHeader("Диагностика"));
         items.add(UItem.asButton(ID_CRASH, R.drawable.msg_info, "Показать отчёт о сбое"));
@@ -89,8 +91,13 @@ public class DevGramPluginSystemActivity extends BaseFragment {
         if (item.id == ID_SAFE_MODE) {
             boolean safeMode = !DevGramPlugins.isSafeMode();
             DevGramPlugins.setFlag("safe_mode", safeMode);
-            if (!safeMode) {
+            if (safeMode) {
+                DevGramPlugins.setDevServerEnabled(false);
+            } else {
                 int n = DevGramPlugins.reload();
+                if (DevGramPlugins.flag("dev_mode", false)) {
+                    DevGramPlugins.setDevServerEnabled(true);
+                }
                 BulletinFactory.of(this).createSimpleBulletin(
                         R.raw.contact_check,
                         "Безопасный режим выключен. Загружено плагинов: " + n
@@ -99,7 +106,20 @@ public class DevGramPluginSystemActivity extends BaseFragment {
         } else if (item.id == ID_COMPACT) {
             DevGramPlugins.setFlag("compact_view", !DevGramPlugins.flag("compact_view", false));
         } else if (item.id == ID_DEV_MODE) {
-            DevGramPlugins.setFlag("dev_mode", !DevGramPlugins.flag("dev_mode", false));
+            boolean enabled = !DevGramPlugins.flag("dev_mode", false);
+            DevGramPlugins.setFlag("dev_mode", enabled);
+            if (enabled) {
+                DevGramPlugins.setDevServerEnabled(true);
+            } else {
+                DevGramPlugins.setDevServerEnabled(false);
+            }
+        } else if (item.id == ID_DEV_TOKEN) {
+            new org.telegram.ui.ActionBar.AlertDialog.Builder(getContext())
+                    .setTitle("Токен dev server")
+                    .setMessage("Порт: 42690\n\n" + DevGramPlugins.devServerToken() + "\n\nНе передавайте токен другим приложениям.")
+                    .setPositiveButton("Готово", null)
+                    .show();
+            return;
         } else if (item.id == ID_RELOAD) {
             int n = DevGramPlugins.reload();
             BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, "Перезагружено плагинов: " + n).show();

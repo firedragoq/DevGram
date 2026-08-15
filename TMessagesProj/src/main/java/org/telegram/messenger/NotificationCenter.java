@@ -273,6 +273,8 @@ public class NotificationCenter {
     public static final int contentSettingsLoaded = totalEvents++;
     public static final int musicListLoaded = totalEvents++;
     public static final int musicIdsLoaded = totalEvents++;
+    public static final int pillStackLayoutChanged = totalEvents++;
+    public static final int pillStackSettingsChanged = totalEvents++;
     public static final int profileMusicUpdated = totalEvents++;
     public static final int updatedChatRanks = totalEvents++;
     public static final int joinedGroup = totalEvents++;

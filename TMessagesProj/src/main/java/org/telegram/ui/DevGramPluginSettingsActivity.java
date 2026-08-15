@@ -71,6 +71,7 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
             String type = r.length > 0 ? r[0] : "";
             String key = r.length > 1 ? r[1] : "";
             String title = r.length > 2 ? r[2] : "";
+            String options = r.length > 3 ? r[3] : "";
             if ("header".equals(type)) {
                 items.add(UItem.asHeader(title));
             } else if ("switch".equals(type)) {
@@ -81,6 +82,12 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
                 items.add(UItem.asButton(i, R.drawable.msg_edit, title, val.isEmpty() ? "—" : val));
             } else if ("button".equals(type)) {
                 items.add(UItem.asButton(i, R.drawable.msg_settings, title));
+            } else if ("selector".equals(type)) {
+                String value = DevGramPlugins.pluginGet(pluginId, key, "0");
+                int selected = 0; try { selected = Integer.parseInt(value); } catch (Exception ignore) { }
+                String[] choices = options.split("\\|", -1);
+                String current = choices.length > 0 && selected >= 0 && selected < choices.length ? choices[selected] : "—";
+                items.add(UItem.asButton(i, R.drawable.msg_list, title, current));
             }
         }
         if (rows.isEmpty()) {
@@ -97,14 +104,30 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
         String type = r.length > 0 ? r[0] : "";
         String key = r.length > 1 ? r[1] : "";
         String title = r.length > 2 ? r[2] : "";
+        String options = r.length > 3 ? r[3] : "";
         if ("switch".equals(type)) {
             boolean on = "1".equals(DevGramPlugins.pluginGet(pluginId, key, "0"));
             DevGramPlugins.pluginSet(pluginId, key, on ? "0" : "1");
+            DevGramPlugins.pluginSettingChanged(pluginId, key, on ? "0" : "1");
             refresh();
         } else if ("button".equals(type)) {
             DevGramPlugins.pluginSettingClick(pluginId, key);
         } else if ("text".equals(type)) {
             editText(key, title);
+        } else if ("selector".equals(type)) {
+            String[] choices = options.split("\\|", -1);
+            int selected = 0; try { selected = Integer.parseInt(DevGramPlugins.pluginGet(pluginId, key, "0")); } catch (Exception ignore) { }
+            AlertDialog.Builder dialog = new AlertDialog.Builder(getParentActivity());
+            dialog.setTitle(title);
+            CharSequence[] labels = new CharSequence[choices.length];
+            for (int i = 0; i < choices.length; i++) labels[i] = (i == selected ? "• " : "    ") + choices[i];
+            dialog.setItems(labels, (d, which) -> {
+                DevGramPlugins.pluginSet(pluginId, key, String.valueOf(which));
+                DevGramPlugins.pluginSettingChanged(pluginId, key, String.valueOf(which));
+                d.dismiss(); refresh();
+            });
+            dialog.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+            showDialog(dialog.create());
         }
     }
 
@@ -128,6 +151,7 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
         b.setView(box);
         b.setPositiveButton("OK", (d, w) -> {
             DevGramPlugins.pluginSet(pluginId, key, et.getText().toString());
+            DevGramPlugins.pluginSettingChanged(pluginId, key, et.getText().toString());
             refresh();
         });
         b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);

@@ -104,6 +104,7 @@ import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.ContactsLoadingObserver;
 import org.telegram.messenger.DialogObject;
+import org.telegram.messenger.DevGramPlugins;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.FingerprintController;
@@ -1556,6 +1557,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     @SuppressLint("Range")
     private boolean handleIntent(Intent intent, boolean isNew, boolean restore, boolean fromPassword, Browser.Progress progress, boolean rebuildFragments, boolean openedTelegram) {
+        if (DevGramPlugins.onIntent(intent)) {
+            return true;
+        }
         if (GiftInfoBottomSheet.handleIntent(intent, progress)) {
             return true;
         }
@@ -3468,6 +3472,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             case "ghost":
                 presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GHOST));
                 break;
+            case "spy":
+                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
+                break;
             case "chats":
                 presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_CHATS));
                 break;
@@ -3478,6 +3485,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 DevGramOtherActivity other = new DevGramOtherActivity();
                 presentFragment(other);
                 AndroidUtilities.runOnUIThread(() -> DevGramSupportSheet.show(other), 350L);
+                break;
+            case "other":
+                presentFragment(new DevGramOtherActivity());
                 break;
             default:
                 presentFragment(new DevGramSettingsActivity());

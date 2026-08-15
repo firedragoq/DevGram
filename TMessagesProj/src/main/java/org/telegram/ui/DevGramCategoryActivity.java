@@ -59,6 +59,12 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_SAVE_HISTORY = 6;
     private static final int ID_SAVE_MEDIA = 10;
     private static final int ID_SAVE_BOTS = 11;
+    private static final int ID_DELETED_ICON = 700;      // значок пометки удалённого
+    private static final int ID_DELETED_ICON_COLOR = 701; // цвет пометки удалённого
+    private static final int ID_DELETED_TRANSPARENT = 702; // полупрозрачные удалённые
+    private static final int ID_DELETED_PREVIEW = 703;   // превью удалённого сообщения
+    private org.telegram.ui.Components.DevGramDeletedPreviewCell deletedPreviewCell;
+    private org.telegram.ui.Components.DevGramDeletedColorRow deletedColorRow;
     // Основные
     private static final int ID_SHOW_CONTACTS = 7;
     private static final int ID_DISABLE_ADS = 14;
@@ -155,6 +161,7 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_ACTIONBAR_TITLE = 59;
     private static final int ID_DIVIDER_STYLE = 60;
     private static final int ID_GLASS_OUTLINE = 61;
+    private static final int ID_PILL_STACK = 62;
 
     // Варианты для строк-селекторов (как в exteraGram)
     private static final String[] ACTIONBAR_TITLE_OPTIONS = {"Название приложения", "Имя пользователя", "Имя", "Чаты"};
@@ -449,6 +456,33 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(!DevGramConfig.sendUploadTyping));
             items.add(UItem.asShadow("Собеседники не видят ваше прочтение, статус «в сети» и «печатает…»."));
         } else if (category == CATEGORY_SPY) {
+            // Пометка удалённых: живое превью сверху + 3 функции (как у AyuGram), остальное ниже
+            items.add(UItem.asHeader("Пометка удалённых"));
+            if (deletedPreviewCell == null) {
+                deletedPreviewCell = new org.telegram.ui.Components.DevGramDeletedPreviewCell(getContext());
+            }
+            items.add(UItem.asCustom(ID_DELETED_PREVIEW, deletedPreviewCell));
+            items.add(UItem.asCheck(ID_DELETED_TRANSPARENT, "Полупрозрачные удалёнки")
+                    .setChecked(DevGramConfig.getSemiTransparentDeleted()));
+            items.add(UItem.asButton(ID_DELETED_ICON, "Метка удалёнок",
+                    org.telegram.messenger.DevGramDeletedMark.getMark(resourceProvider)));
+            if (org.telegram.messenger.DevGramDeletedMark.getIcon() != 0) {
+                if (deletedColorRow == null) {
+                    deletedColorRow = new org.telegram.ui.Components.DevGramDeletedColorRow(getContext(), resourceProvider);
+                    deletedColorRow.setOnColorClick(idx -> {
+                        org.telegram.messenger.DevGramDeletedMark.setColorIndex(idx);
+                        if (deletedPreviewCell != null) deletedPreviewCell.refresh();
+                        // Значение строки — Spannable с одинаковым zero-width символом для
+                        // всех цветов. DiffUtil не видит смену span, поэтому нужен полный bind.
+                        refreshListImmediately();
+                    });
+                }
+                deletedColorRow.setSelected(org.telegram.messenger.DevGramDeletedMark.getColorIndex());
+                items.add(UItem.asCustom(ID_DELETED_ICON_COLOR, deletedColorRow));
+            }
+            items.add(UItem.asShadow("Значок появляется у удалённых сообщений в строке времени."));
+            // Сохранение — ниже
+            items.add(UItem.asHeader("Сохранение"));
             items.add(UItem.asCheck(ID_SAVE_DELETED, "Сохранять удалённые")
                     .setChecked(DevGramConfig.saveDeletedMessages));
             items.add(UItem.asCheck(ID_SAVE_HISTORY, "Сохранять историю изменений")
@@ -519,6 +553,7 @@ public class DevGramCategoryActivity extends BaseFragment {
 
             // — Внешний вид —
             items.add(UItem.asHeader("Внешний вид"));
+            items.add(UItem.asButton(ID_PILL_STACK, "Pill Stack", "Интерактивные виджеты в поле поиска"));
             items.add(UItem.asCustom(getFabPreview()));
             items.add(UItem.asCheck(ID_SYSTEM_FONTS, "Системные шрифты")
                     .setChecked(gPref("dg_systemFonts", true)));
@@ -897,6 +932,35 @@ public class DevGramCategoryActivity extends BaseFragment {
         }
     }
 
+    // ===== Пометка удалённых: кастомизация значка и цвета (порт AyuGram) =====
+
+    private static final String[] DELETED_ICON_NAMES = {"Нет", "Корзина", "Крест", "Перечёркнутый глаз"};
+
+    private CharSequence[] markNames(String[] base, int current) {
+        CharSequence[] out = new CharSequence[base.length];
+        for (int i = 0; i < base.length; i++) out[i] = (i == current ? "✓ " : "") + base[i];
+        return out;
+    }
+
+    private void showDeletedIconPicker() {
+        if (getParentActivity() == null) return;
+        org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle("Значок удалённых");
+        int current = org.telegram.messenger.DevGramDeletedMark.getIcon();
+        CharSequence[] names = markNames(DELETED_ICON_NAMES, current);
+        b.setItems(names, org.telegram.messenger.DevGramDeletedMark.ICONS, (dlg, which) -> {
+            org.telegram.messenger.DevGramDeletedMark.setIcon(which);
+            if (deletedPreviewCell != null) deletedPreviewCell.refresh();
+            // DiffUtil сравнивает текст Spannable без его image span и считает разные
+            // значки одинаковыми. Неанимированное обновление гарантирует немедленный bind,
+            // а также сразу добавляет или убирает строку выбора цвета для варианта «Нет».
+            refreshListImmediately();
+        });
+        b.setNegativeButton(org.telegram.messenger.LocaleController.getString(R.string.Cancel), null);
+        showDialog(b.create());
+    }
+
     private void onItemClick(UItem item, View view, int position, float x, float y) {
         if (item.id == ID_GHOST_MASTER) {
             DevGramConfig.toggleGhostMode();
@@ -914,6 +978,12 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setSaveMedia(!DevGramConfig.saveMedia);
         } else if (item.id == ID_SAVE_BOTS) {
             DevGramConfig.setSaveInBotChats(!DevGramConfig.saveInBotChats);
+        } else if (item.id == ID_DELETED_TRANSPARENT) {
+            DevGramConfig.setSemiTransparentDeleted(!DevGramConfig.getSemiTransparentDeleted());
+            if (deletedPreviewCell != null) deletedPreviewCell.refresh();
+        } else if (item.id == ID_DELETED_ICON) {
+            showDeletedIconPicker();
+            return;
         } else if (item.id == ID_DISABLE_ADS) {
             DevGramConfig.setDisableAds(!DevGramConfig.disableAds);
         } else if (item.id == ID_LOCAL_PREMIUM) {
@@ -1042,6 +1112,9 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("dg_systemFonts", true);
             org.telegram.messenger.AndroidUtilities.invalidateDevgramSystemFonts();
             showRestartRequiredBulletin();
+        } else if (item.id == ID_PILL_STACK) {
+            presentFragment(new PillStackPreferencesActivity());
+            return;
         } else if (item.id == ID_GOOEY) {
             gToggle("dg_gooey", true);
         } else if (item.id == ID_ACTIONBAR_TITLE) {
@@ -1355,6 +1428,12 @@ public class DevGramCategoryActivity extends BaseFragment {
     private void refreshList() {
         if (listView != null && listView.adapter != null) {
             listView.adapter.update(true);
+        }
+    }
+
+    private void refreshListImmediately() {
+        if (listView != null && listView.adapter != null) {
+            listView.adapter.update(false);
         }
     }
 

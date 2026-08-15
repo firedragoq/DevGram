@@ -18395,7 +18395,7 @@ public class MessagesController extends BaseController implements NotificationCe
         // DevGram: хук плагинов на сырые TL-апдейты (только если кто-то подписан — без нагрузки)
         if (DevGramPlugins.wantsUpdates()) {
             for (int i = 0, N = updates.size(); i < N; i++) {
-                DevGramPlugins.onUpdate(updates.get(i));
+                DevGramPlugins.onUpdate(currentAccount, updates.get(i));
             }
         }
         if (updates.isEmpty()) {
