@@ -1718,6 +1718,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         private RecyclerView.Adapter observedInitialLayoutAdapter;
         private boolean initialLayoutCheckPosted;
         private int initialLayoutRetryCount;
+        private ViewTreeObserver.OnGlobalLayoutListener initialLayoutGlobalListener;
 
         private final RecyclerView.AdapterDataObserver initialLayoutObserver = new RecyclerView.AdapterDataObserver() {
             @Override
@@ -1795,6 +1796,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
             if (getChildCount() != 0 && hasVisiblePosition) {
                 initialLayoutRetryCount = 0;
+                removeInitialLayoutGlobalListener();
                 return;
             }
 
@@ -1825,14 +1827,41 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 retryInitialLayoutCheck();
             } else {
                 initialLayoutRetryCount = 0;
+                removeInitialLayoutGlobalListener();
             }
         }
 
         private void retryInitialLayoutCheck() {
-            if (++initialLayoutRetryCount <= 4 && !initialLayoutCheckPosted) {
+            // No hard attempt cap: on cold start, the glass tab bar/blur rendering can push the
+            // parent traversal that finally gives this view real bounds well past a short fixed
+            // budget, which used to make the retries give up before anything ever laid the list
+            // out (the screen then stayed blank until the first touch forced a full traversal).
+            // The delay is still capped per step to avoid spamming postDelayed too aggressively,
+            // and the global layout listener below catches the real fix as soon as it happens
+            // instead of waiting out the delay.
+            if (!initialLayoutCheckPosted) {
                 initialLayoutCheckPosted = true;
-                postDelayed(initialLayoutCheckRunnable, initialLayoutRetryCount * 32L);
+                postDelayed(initialLayoutCheckRunnable, Math.min(++initialLayoutRetryCount, 10) * 32L);
             }
+            installInitialLayoutGlobalListener();
+        }
+
+        private void installInitialLayoutGlobalListener() {
+            if (initialLayoutGlobalListener != null || !isAttachedToWindow()) {
+                return;
+            }
+            initialLayoutGlobalListener = this::scheduleInitialLayoutCheck;
+            getViewTreeObserver().addOnGlobalLayoutListener(initialLayoutGlobalListener);
+        }
+
+        private void removeInitialLayoutGlobalListener() {
+            if (initialLayoutGlobalListener == null) {
+                return;
+            }
+            if (getViewTreeObserver().isAlive()) {
+                getViewTreeObserver().removeOnGlobalLayoutListener(initialLayoutGlobalListener);
+            }
+            initialLayoutGlobalListener = null;
         }
 
         public void prepareSelectorForAnimation() {
@@ -2151,6 +2180,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         protected void onDetachedFromWindow() {
             removeCallbacks(initialLayoutCheckRunnable);
             initialLayoutCheckPosted = false;
+            removeInitialLayoutGlobalListener();
             super.onDetachedFromWindow();
         }
 
