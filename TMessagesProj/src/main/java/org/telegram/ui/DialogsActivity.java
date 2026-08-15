@@ -436,28 +436,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             listView.updateDialogsOnNextDraw = true;
             updating = false;
             listView.invalidate();
-
-            // RecyclerView can receive the initial dialogs diff while a layout request is
-            // already pending. Its update runnable then deliberately returns early, expecting
-            // that pending traversal to consume the adapter operations. On some Android 16
-            // devices that traversal is not scheduled again: the adapter is populated, but the
-            // list keeps zero children until the first touch/scroll. A zero-distance scroll uses
-            // RecyclerView's normal consumePendingUpdateOperations() path without moving the
-            // list and guarantees that the first dialog cells are laid out immediately.
-            if (listView.getChildCount() == 0 && dialogsAdapter.getItemCount() > 0) {
-                listView.postOnAnimation(() -> {
-                    if (listView.isAttachedToWindow()
-                            && listView.getChildCount() == 0
-                            && dialogsAdapter.getItemCount() > 0) {
-                        listView.scrollBy(0, 0);
-                        listView.requestLayout();
-                        listView.invalidate();
-                        if (fragmentView != null) {
-                            fragmentView.invalidate();
-                        }
-                    }
-                });
-            }
+            listView.scheduleInitialLayoutCheck();
         };
 
         @Override
@@ -1736,6 +1715,43 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         private int lastTop;
         private int lastListPadding;
         private float rightFragmentOpenedProgress;
+        private RecyclerView.Adapter observedInitialLayoutAdapter;
+        private boolean initialLayoutCheckPosted;
+        private int initialLayoutRetryCount;
+
+        private final RecyclerView.AdapterDataObserver initialLayoutObserver = new RecyclerView.AdapterDataObserver() {
+            @Override
+            public void onChanged() {
+                scheduleInitialLayoutCheck();
+            }
+
+            @Override
+            public void onItemRangeChanged(int positionStart, int itemCount) {
+                scheduleInitialLayoutCheck();
+            }
+
+            @Override
+            public void onItemRangeChanged(int positionStart, int itemCount, Object payload) {
+                scheduleInitialLayoutCheck();
+            }
+
+            @Override
+            public void onItemRangeInserted(int positionStart, int itemCount) {
+                scheduleInitialLayoutCheck();
+            }
+
+            @Override
+            public void onItemRangeRemoved(int positionStart, int itemCount) {
+                scheduleInitialLayoutCheck();
+            }
+
+            @Override
+            public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+                scheduleInitialLayoutCheck();
+            }
+        };
+
+        private final Runnable initialLayoutCheckRunnable = this::ensureInitialLayout;
 
         Paint paint = new Paint();
         RectF rectF = new RectF();
@@ -1753,6 +1769,70 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             super(context);
             parentPage = page;
             additionalClipBottom = dp(200);
+        }
+
+        private void scheduleInitialLayoutCheck() {
+            if (initialLayoutCheckPosted) {
+                return;
+            }
+            initialLayoutCheckPosted = true;
+            postOnAnimation(initialLayoutCheckRunnable);
+        }
+
+        private void ensureInitialLayout() {
+            initialLayoutCheckPosted = false;
+            RecyclerView.Adapter adapter = getAdapter();
+            if (adapter == null || adapter.getItemCount() == 0 || !isAttachedToWindow()) {
+                return;
+            }
+
+            if (getWidth() == 0 || getHeight() == 0 || isComputingLayout()) {
+                retryInitialLayoutCheck();
+                return;
+            }
+
+            boolean hasVisiblePosition = parentPage.layoutManager != null
+                    && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
+            if (getChildCount() != 0 && hasVisiblePosition) {
+                initialLayoutRetryCount = 0;
+                return;
+            }
+
+            // Samsung's Android 16 build can leave RecyclerView with a populated adapter but no
+            // children after the loading row is replaced. Consuming adapter updates from the
+            // observer catches every update path, unlike the dialogs update runnable alone.
+            scrollBy(0, 0);
+
+            hasVisiblePosition = parentPage.layoutManager != null
+                    && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
+            if ((getChildCount() == 0 || !hasVisiblePosition) && !isComputingLayout()) {
+                // requestLayout may remain pending until the first MotionEvent on affected
+                // devices. Laying out the RecyclerView at its current bounds performs that same
+                // traversal immediately without changing its size or scroll position.
+                requestLayout();
+                layout(getLeft(), getTop(), getRight(), getBottom());
+            }
+
+            postInvalidateOnAnimation();
+            parentPage.postInvalidateOnAnimation();
+            if (fragmentView != null) {
+                fragmentView.postInvalidateOnAnimation();
+            }
+
+            hasVisiblePosition = parentPage.layoutManager != null
+                    && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
+            if (getChildCount() == 0 || !hasVisiblePosition) {
+                retryInitialLayoutCheck();
+            } else {
+                initialLayoutRetryCount = 0;
+            }
+        }
+
+        private void retryInitialLayoutCheck() {
+            if (++initialLayoutRetryCount <= 4 && !initialLayoutCheckPosted) {
+                initialLayoutCheckPosted = true;
+                postDelayed(initialLayoutCheckRunnable, initialLayoutRetryCount * 32L);
+            }
         }
 
         public void prepareSelectorForAnimation() {
@@ -2060,14 +2140,33 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            initialLayoutCheckPosted = false;
+            initialLayoutRetryCount = 0;
+            scheduleInitialLayoutCheck();
+        }
+
+        @Override
         protected void onDetachedFromWindow() {
+            removeCallbacks(initialLayoutCheckRunnable);
+            initialLayoutCheckPosted = false;
             super.onDetachedFromWindow();
         }
 
         @Override
         public void setAdapter(RecyclerView.Adapter adapter) {
+            if (observedInitialLayoutAdapter != null) {
+                observedInitialLayoutAdapter.unregisterAdapterDataObserver(initialLayoutObserver);
+            }
             super.setAdapter(adapter);
+            observedInitialLayoutAdapter = adapter;
+            if (observedInitialLayoutAdapter != null) {
+                observedInitialLayoutAdapter.registerAdapterDataObserver(initialLayoutObserver);
+            }
             firstLayout = true;
+            initialLayoutRetryCount = 0;
+            scheduleInitialLayoutCheck();
         }
 
         @Override
