@@ -436,6 +436,28 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             listView.updateDialogsOnNextDraw = true;
             updating = false;
             listView.invalidate();
+
+            // RecyclerView can receive the initial dialogs diff while a layout request is
+            // already pending. Its update runnable then deliberately returns early, expecting
+            // that pending traversal to consume the adapter operations. On some Android 16
+            // devices that traversal is not scheduled again: the adapter is populated, but the
+            // list keeps zero children until the first touch/scroll. A zero-distance scroll uses
+            // RecyclerView's normal consumePendingUpdateOperations() path without moving the
+            // list and guarantees that the first dialog cells are laid out immediately.
+            if (listView.getChildCount() == 0 && dialogsAdapter.getItemCount() > 0) {
+                listView.postOnAnimation(() -> {
+                    if (listView.isAttachedToWindow()
+                            && listView.getChildCount() == 0
+                            && dialogsAdapter.getItemCount() > 0) {
+                        listView.scrollBy(0, 0);
+                        listView.requestLayout();
+                        listView.invalidate();
+                        if (fragmentView != null) {
+                            fragmentView.invalidate();
+                        }
+                    }
+                });
+            }
         };
 
         @Override
