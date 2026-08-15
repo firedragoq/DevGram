@@ -61,15 +61,13 @@ public final class DevGramPackages {
             final String sha = sha256File(f);
             AndroidUtilities.runOnUIThread(() -> {
                 e.packageSha = sha;
+                // Файл боту — best-effort (у бота должен оказаться файл к моменту одобрения).
                 resolveUsernameThen(account, CATALOG_BOT_USERNAME, (user, chat) -> {
-                    if (user == null) {
-                        // бот не резолвится — без файла у бота публиковать бессмысленно
-                        cb.onResult(0);
-                        return;
-                    }
-                    DevGramPlugins.sendFile(user.id, path, "dgpkg:" + e.id);
-                    DevGramPlugins.publishToCatalog(e, cb);
+                    if (user != null) DevGramPlugins.sendFile(user.id, path, "dgpkg:" + e.id);
                 });
+                // Заявку регистрируем ВСЕГДА — статус «⏳ На модерации» появится сразу,
+                // как у .plugin (статусы ключуются по id: pending/catalog/rejected).
+                DevGramPlugins.publishToCatalog(e, cb);
             });
         });
     }
