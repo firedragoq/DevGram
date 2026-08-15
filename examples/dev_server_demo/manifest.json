@@ -1,0 +1,10 @@
+{
+  "id": "space.devgram.devserverdemo",
+  "name": "Dev Server Demo",
+  "version": "1.0.0",
+  "author": "FireDragoq",
+  "main": "main.py",
+  "description": "Тестовый плагин для проверки установки и hot reload через Dev Server.",
+  "icon": "https://devgram.space/favicon.png",
+  "min_app_version": "12.9.3"
+}

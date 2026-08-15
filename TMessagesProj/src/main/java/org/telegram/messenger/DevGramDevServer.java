@@ -2,8 +2,6 @@ package org.telegram.messenger;
 
 import fi.iki.elonen.NanoHTTPD;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.util.Map;
 
 /** Local-only development endpoint for installing a .dgplugin over ADB. */
@@ -34,18 +32,54 @@ public final class DevGramDevServer extends NanoHTTPD {
         String supplied = session.getHeaders().get("x-devgram-token");
         if (token.length() > 0 && (supplied == null || !token.equals(supplied)))
             return newFixedLengthResponse(Response.Status.UNAUTHORIZED, MIME_PLAINTEXT, "bad token");
-        if (Method.POST.equals(session.getMethod()) && "/upload".equals(session.getUri())) {
+        if ((Method.POST.equals(session.getMethod()) || Method.PUT.equals(session.getMethod()))
+                && "/upload".equals(session.getUri())) {
+            File upload = null;
             try {
                 Map<String, String> files = new java.util.HashMap<>();
                 session.parseBody(files);
-                String temp = files.get("postData");
-                if (temp == null) return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "empty body");
-                File target = new File(DevGramPlugins.pluginsDir(), "devserver-upload.dgplugin");
-                java.nio.file.Files.copy(new File(temp).toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                boolean ok = DevGramPlugins.installPackage(target.getAbsolutePath(), null, true);
-                int count = DevGramPlugins.reload();
-                return newFixedLengthResponse(ok ? Response.Status.OK : Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "installed=" + ok + ";reloaded=" + count);
-            } catch (Throwable e) { FileLog.e(e); return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "error"); }
+                // NanoHTTPD stores multipart files under their field name. For a raw
+                // PUT it uses "content". Raw binary POST must not be read from
+                // "postData": NanoHTTPD decodes that value as text and corrupts ZIPs.
+                String contentType = session.getHeaders().get("content-type");
+                boolean multipart = contentType != null
+                        && contentType.toLowerCase(java.util.Locale.US).startsWith("multipart/form-data");
+                String sourcePath = files.get("file");
+                // Older DevGram builds looked specifically for this field name.
+                // It is safe here only for multipart, where the value is a temp path.
+                if (sourcePath == null && multipart) sourcePath = files.get("postData");
+                if (sourcePath == null) sourcePath = files.get("content");
+                if (sourcePath == null) {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT,
+                            "upload must be multipart/form-data (field: postData) or raw PUT");
+                }
+                File source = new File(sourcePath);
+                if (!source.isFile() || source.length() == 0) {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "empty upload");
+                }
+                upload = File.createTempFile("devgram-upload-", ".dgplugin",
+                        ApplicationLoader.applicationContext.getCacheDir());
+                java.nio.file.Files.copy(source.toPath(), upload.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                String validationError = DevGramPlugins.packageValidationError(upload.getAbsolutePath());
+                if (validationError != null && !validationError.isEmpty()) {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT,
+                            "invalid package: " + validationError);
+                }
+                boolean ok = DevGramPlugins.installPackage(upload.getAbsolutePath(), null, true);
+                return newFixedLengthResponse(ok ? Response.Status.OK : Response.Status.BAD_REQUEST,
+                        MIME_PLAINTEXT, ok ? "installed=true" : "installed=false; plugin failed to load");
+            } catch (Throwable e) {
+                FileLog.e(e);
+                String message = e.getMessage();
+                if (message == null || message.trim().isEmpty()) message = "unknown error";
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT,
+                        "upload failed: " + e.getClass().getSimpleName() + ": " + message);
+            } finally {
+                if (upload != null && upload.exists() && !upload.delete()) {
+                    FileLog.e("DevGramDevServer: failed to delete temporary upload");
+                }
+            }
         }
         if (Method.POST.equals(session.getMethod()) && "/reload".equals(session.getUri())) {
             String pluginId = session.getParms().get("plugin");
