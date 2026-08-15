@@ -557,6 +557,15 @@ public class DevGramConfig {
         return "🗑";
     }
 
+    // DevGram: полупрозрачность удалённых сообщений (порт AyuGram semiTransparentDeletedMessages)
+    public static boolean getSemiTransparentDeleted() {
+        return MessagesController.getGlobalMainSettings().getBoolean("dg_semiTransparentDeleted", false);
+    }
+
+    public static void setSemiTransparentDeleted(boolean v) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("dg_semiTransparentDeleted", v).apply();
+    }
+
     public static String getEditedMark() {
         return LocaleController.getString("EditedMessage", R.string.EditedMessage);
     }
