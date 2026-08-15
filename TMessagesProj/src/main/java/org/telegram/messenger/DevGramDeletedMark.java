@@ -32,6 +32,9 @@ public final class DevGramDeletedMark {
     // палитра цветов пометки (0 = цвет темы key_chat_inTimeText), остальные — как у AyuGram
     public static final int[] COLORS = {0xFFE44337, 0xFFDB2E37, 0xFFC03A53, 0xFF937A46, 0xFF4D849D, 0xFF474F2B};
 
+    // размер значка под строку времени (как у AyuGram — компактный, не 18dp)
+    private static final int ICON_SIZE = AndroidUtilities.dp(14);
+
     private static SpannableStringBuilder cached;
     private static int cachedIcon = -1;
     private static int cachedColor = -1;
@@ -76,6 +79,7 @@ public final class DevGramDeletedMark {
 
         SpannableStringBuilder sb = new SpannableStringBuilder("​");
         ColoredImageSpan span = new ColoredImageSpan(drawable);
+        span.setSize(ICON_SIZE); // компактно под строку времени (как у AyuGram), а не 18dp
         int color = colorIndex > 0
                 ? COLORS[colorIndex - 1]
                 : Theme.getColor(Theme.key_chat_inTimeText, resourcesProvider);
@@ -90,10 +94,7 @@ public final class DevGramDeletedMark {
 
     /** Ширина значка + пробела в пикселях (Paint.measureText спаны не учитывает — добавляем вручную). */
     public static int getMarkWidth() {
-        int icon = getIcon();
-        if (icon == 0) return 0;
-        Drawable d = ContextCompat.getDrawable(ApplicationLoader.applicationContext, ICONS[icon]);
-        int w = d != null ? d.getIntrinsicWidth() : AndroidUtilities.dp(18);
-        return w + AndroidUtilities.dp(3); // + пробел между значком и временем
+        if (getIcon() == 0) return 0;
+        return ICON_SIZE + AndroidUtilities.dp(3); // значок (setSize) + пробел до времени
     }
 }

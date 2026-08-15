@@ -70,10 +70,13 @@ public class DevGramDeletedPreviewCell extends LinearLayout {
         messageObject.eventId = 1L;
     }
 
-    /** Пересобрать сообщение и перерисовать (после смены значка/цвета/прозрачности). */
+    /** Пересобрать сообщение и перерисовать (после смены значка/цвета/прозрачности).
+     * Строим СВЕЖИЙ MessageObject — иначе ChatMessageCell не перегенерирует лэйаут строки
+     * времени (значок/цвет применялись бы только после переоткрытия экрана). */
     public void refresh() {
-        if (messageObject != null) messageObject.messageOwner.devgramDeleted = true;
+        buildMessage();
         cell.setMessageObject(messageObject, null, false, false, false);
+        cell.requestLayout();
         cell.invalidate();
         invalidate();
     }
