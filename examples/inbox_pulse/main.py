@@ -1,14 +1,13 @@
 from java import jclass
 
 from devgram import BasePlugin
-from devgram.intents import open_uri
 from devgram.ui import Button, Header, Selector, Switch, Text
 
 
 class InboxPulse(BasePlugin):
     id = "space.devgram.inboxpulse"
     name = "Inbox Pulse"
-    version = "1.0.1"
+    version = "1.0.2"
     author = "FireDragoq"
     description = "Красивый Pill Stack-виджет непрочитанных сообщений с быстрым переходом к следующему чату"
     icon = "https://devgram.space/favicon.png"
@@ -204,19 +203,8 @@ class InboxPulse(BasePlugin):
         self._last_dialog_id = dialog_id
 
         try:
-            dialog_object = jclass("org.telegram.messenger.DialogObject")
-            if dialog_object.isEncryptedDialog(dialog_id):
-                self.bulletin("Секретный чат пропущен", kind="info")
-                return
-            if dialog_object.isUserDialog(dialog_id):
-                uri = "tg://openmessage?user_id=%d" % dialog_id
-            elif dialog_object.isChatDialog(dialog_id):
-                uri = "tg://openmessage?chat_id=%d" % (-dialog_id)
-            else:
-                self.bulletin("Этот диалог нельзя открыть из виджета", kind="error")
-                return
-            if not open_uri(uri):
-                raise RuntimeError("Telegram URI was not handled")
+            if not self.open_dialog(dialog_id):
+                raise RuntimeError("native openDialog returned false")
         except Exception as error:
             self.log("Inbox Pulse navigation error: " + repr(error))
             self.bulletin("Не удалось открыть непрочитанный чат", kind="error")

@@ -757,6 +757,40 @@ public class DevGramPlugins {
         }
     }
 
+    /** Open a Telegram dialog without exposing overloaded Fragment APIs to Python. */
+    public static boolean openDialog(long dialogId) {
+        if (dialogId == 0 || DialogObject.isFolderDialogId(dialogId)) return false;
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            AndroidUtilities.runOnUIThread(() -> openDialogInternal(dialogId));
+            return true;
+        }
+        return openDialogInternal(dialogId);
+    }
+
+    private static boolean openDialogInternal(long dialogId) {
+        try {
+            org.telegram.ui.ActionBar.BaseFragment fragment = org.telegram.ui.LaunchActivity.getSafeLastFragment();
+            if (fragment == null || fragment.getParentLayout() == null) return false;
+            android.os.Bundle args = new android.os.Bundle();
+            if (DialogObject.isEncryptedDialog(dialogId)) {
+                args.putInt("enc_id", DialogObject.getEncryptedChatId(dialogId));
+            } else if (DialogObject.isUserDialog(dialogId)) {
+                args.putLong("user_id", dialogId);
+            } else if (DialogObject.isChatDialog(dialogId)) {
+                args.putLong("chat_id", -dialogId);
+            } else {
+                return false;
+            }
+            int account = fragment.getCurrentAccount();
+            if (account < 0) account = UserConfig.selectedAccount;
+            if (!MessagesController.getInstance(account).checkCanOpenChat(args, fragment)) return false;
+            return fragment.presentFragment(new org.telegram.ui.ChatActivity(args));
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
+        }
+    }
+
     // ---- диалоги / bulletins ----
     public static void bulletin(String text) {
         bulletin("info", text, org.telegram.ui.Components.Bulletin.DURATION_LONG, null, null);

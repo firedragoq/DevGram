@@ -326,6 +326,10 @@ class BasePlugin:
         """Прочитать текст из буфера обмена."""
         return _Plugins.getClipboard()
 
+    def open_dialog(self, dialog_id):
+        """Open a Telegram user, group, channel or secret dialog by dialog ID."""
+        return bool(_Plugins.openDialog(int(dialog_id)))
+
     # ---- file_utils (файлы в личной папке плагина) ----
     def read_file(self, name):
         """Прочитать файл из личной папки плагина (или '')."""

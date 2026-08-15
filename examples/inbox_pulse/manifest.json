@@ -1,7 +1,7 @@
 {
   "id": "space.devgram.inboxpulse",
   "name": "Inbox Pulse",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "FireDragoq",
   "main": "main.py",
   "description": "Градиентный Pill Stack-виджет: считает непрочитанные чаты и открывает следующий одним нажатием.",
