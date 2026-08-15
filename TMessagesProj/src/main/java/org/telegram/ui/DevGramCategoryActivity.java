@@ -155,6 +155,7 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_ACTIONBAR_TITLE = 59;
     private static final int ID_DIVIDER_STYLE = 60;
     private static final int ID_GLASS_OUTLINE = 61;
+    private static final int ID_PILL_STACK = 62;
 
     // Варианты для строк-селекторов (как в exteraGram)
     private static final String[] ACTIONBAR_TITLE_OPTIONS = {"Название приложения", "Имя пользователя", "Имя", "Чаты"};
@@ -519,6 +520,7 @@ public class DevGramCategoryActivity extends BaseFragment {
 
             // — Внешний вид —
             items.add(UItem.asHeader("Внешний вид"));
+            items.add(UItem.asButton(ID_PILL_STACK, "Pill Stack", "Интерактивные виджеты в поле поиска"));
             items.add(UItem.asCustom(getFabPreview()));
             items.add(UItem.asCheck(ID_SYSTEM_FONTS, "Системные шрифты")
                     .setChecked(gPref("dg_systemFonts", true)));
@@ -1042,6 +1044,9 @@ public class DevGramCategoryActivity extends BaseFragment {
             gToggle("dg_systemFonts", true);
             org.telegram.messenger.AndroidUtilities.invalidateDevgramSystemFonts();
             showRestartRequiredBulletin();
+        } else if (item.id == ID_PILL_STACK) {
+            presentFragment(new PillStackPreferencesActivity());
+            return;
         } else if (item.id == ID_GOOEY) {
             gToggle("dg_gooey", true);
         } else if (item.id == ID_ACTIONBAR_TITLE) {

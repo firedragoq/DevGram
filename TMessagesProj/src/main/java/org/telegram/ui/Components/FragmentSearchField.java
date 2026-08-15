@@ -36,11 +36,14 @@ import androidx.annotation.NonNull;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimationNotificationsLocker;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Adapters.FiltersView;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.pillstack.PillStackConfig;
+import org.telegram.ui.pillstack.pills.BasePill;
 
 import java.util.ArrayList;
 
@@ -49,7 +52,7 @@ import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
 
 @SuppressLint("ViewConstructor")
-public class FragmentSearchField extends FrameLayout implements FactorAnimator.Target, Theme.Colorable {
+public class FragmentSearchField extends FrameLayout implements FactorAnimator.Target, Theme.Colorable, NotificationCenter.NotificationCenterDelegate {
     private static final int ANIMATOR_ID_CLOSE_BUTTON_VISIBLE = 0;
     private static final int ANIMATOR_ID_SEARCH_ICON_VISIBLE = 1;
     private static final int ANIMATOR_ID_SEARCH_FILTERS_WIDTH = 2;
@@ -66,6 +69,8 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
     private boolean closeButtonForcedVisible;
     public final EditTextBoldCursor editText;
     private BlurredBackgroundDrawable blurredBackgroundDrawable;
+    private PillStackView pillStackView;
+    private boolean showPillStack;
 
     public FragmentSearchField(Context context, Theme.ResourcesProvider resourcesProvider) {
         super(context);
@@ -178,6 +183,69 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
         additionalIconsLayout.addView(icon);
     }
 
+    public void showPillStack() {
+        showPillStack = true;
+        updatePillStack(true);
+    }
+
+    // DevGram (порт exteraGram): стек виджетов-пилюль СПРАВА в строке поиска (иконка поиска остаётся слева).
+    private void updatePillStack(boolean animate) {
+        if (showPillStack && !PillStackConfig.getActivePills().isEmpty()) {
+            boolean justCreated = false;
+            if (pillStackView == null) {
+                pillStackView = new PillStackView(getContext());
+                addView(pillStackView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT,
+                        (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.CENTER_VERTICAL, 6, 0, 6, 0));
+                justCreated = true;
+            }
+            final PillStackView view = pillStackView;
+            view.clearPills();
+            int startIndex = 0;
+            java.util.List<Integer> active = PillStackConfig.getActivePills();
+            for (int i = 0; i < active.size(); i++) {
+                int id = active.get(i);
+                BasePill pill = PillStackConfig.createPill(getContext(), resourcesProvider, id);
+                if (pill != null) {
+                    view.addPill(pill);
+                    if (id == PillStackConfig.getLastActivePillId()) startIndex = view.getPillsCount() - 1;
+                }
+            }
+            if (view.getPillsCount() == 0) {
+                removeView(view);
+                pillStackView = null;
+                return;
+            }
+            view.setCurrentIndex(startIndex);
+            view.setVisibilityFactor(1f - animatorCloseIconVisible.getFloatValue());
+            if (justCreated && animate) {
+                view.setAlpha(0f);
+                view.setScaleX(0.6f);
+                view.setScaleY(0.6f);
+                view.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(250L).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+            }
+        } else if (pillStackView != null) {
+            removeView(pillStackView);
+            pillStackView = null;
+        }
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.pillStackLayoutChanged);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.pillStackLayoutChanged);
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.pillStackLayoutChanged) updatePillStack(true);
+    }
+
     private Drawable bg;
 
     @Override
@@ -288,6 +356,9 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
         if (blurredBackgroundDrawable != null) {
             blurredBackgroundDrawable.updateColors();
         }
+        if (pillStackView != null) {
+            pillStackView.updateColors();
+        }
 
         for (int i = 0, N = additionalIconsLayout.getChildCount(); i < N; i++) {
             final View view = additionalIconsLayout.getChildAt(i);
@@ -337,6 +408,9 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
         if (id == ANIMATOR_ID_CLOSE_BUTTON_VISIBLE) {
             FragmentFloatingButton.setAnimatedVisibility(closeIcon, factor);
             closeIcon.setRotation((1 - factor) * 90);
+            if (pillStackView != null) {
+                pillStackView.setVisibilityFactor(1f - factor);
+            }
         } else if (id == ANIMATOR_ID_SEARCH_ICON_VISIBLE) {
             FragmentFloatingButton.setAnimatedVisibility(searchIcon, factor);
         } else if (id == ANIMATOR_ID_SEARCH_FILTERS_WIDTH) {
