@@ -1808,10 +1808,24 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             hasVisiblePosition = parentPage.layoutManager != null
                     && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
             if ((getChildCount() == 0 || !hasVisiblePosition) && !isComputingLayout()) {
-                // requestLayout may remain pending until the first MotionEvent on affected
-                // devices. Laying out the RecyclerView at its current bounds performs that same
-                // traversal immediately without changing its size or scroll position.
+                // requestLayout() alone only *schedules* a future system traversal - it does
+                // not itself mark PFLAG_LAYOUT_REQUIRED (only a real measure() pass does that,
+                // see View.measure()). Calling layout() right after requestLayout() with no
+                // measure() in between therefore sees unchanged bounds and no
+                // PFLAG_LAYOUT_REQUIRED, so onLayout()/dispatchLayout() never actually runs and
+                // the RecyclerView stays childless until a real touch-driven traversal comes
+                // along - this used to be the case here, which is why the screen stayed blank
+                // well past this retry loop even though the adapter already had data.
+                // forceLayout() bypasses RecyclerView's own requestLayout() override (which can
+                // silently no-op while mLayoutSuppressed or an intercepted batch update is
+                // active) so the measure() call below is guaranteed to actually re-measure and
+                // set PFLAG_LAYOUT_REQUIRED, making the following layout() call reliably invoke
+                // onLayout() -> dispatchLayout() at its current bounds and scroll position.
                 requestLayout();
+                forceLayout();
+                measure(
+                        View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.EXACTLY));
                 layout(getLeft(), getTop(), getRight(), getBottom());
             }
 
