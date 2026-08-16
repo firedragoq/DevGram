@@ -4911,6 +4911,23 @@ public class ChatActivity extends BaseFragment implements
         avatarContainer.updateSubtitle();
         updateTitleIcons();
 
+        // DevGram: в iOS-режиме на месте кнопки «⋮» — аватарка (как в реальном
+        // Telegram-iOS/Swiftgram). Саму кнопку меню (headerItem) и её ~18 мест
+        // переключения видимости/альфы по всему файлу (текстовый ввод, поиск, режим
+        // выделения и т.д.) НЕ трогаем — слишком много завязанных состояний, риск что-то
+        // сломать. Вместо этого аватарка просто визуально перекрывает её через
+        // bringToFront() (что автоматически даёт аватарке приоритет и в перехвате тапов),
+        // а доступ к тому же меню действий — по долгому тапу на аватарку.
+        if (MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false)) {
+            avatarContainer.bringToFront();
+            if (headerItem != null) {
+                avatarContainer.avatarImageView.setOnLongClickListener(v -> {
+                    headerItem.toggleSubMenu();
+                    return true;
+                });
+            }
+        }
+
         if (chatMode == 0 && (!isThreadChat() || isTopic) && !isReport()) {
             attachItem = menu.lazilyAddItem(chat_menu_attach, otherIcon, themeDelegate);
             attachItem.onView(cell -> otherIcon.addView(cell.getIconView()));
