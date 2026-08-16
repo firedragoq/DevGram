@@ -2225,11 +2225,24 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 RecyclerView.ViewHolder holder = parentPage.listView.findViewHolderForAdapterPosition(pos);
                 if (holder != null) {
                     int top = holder.itemView.getTop();
-                    if (parentPage.dialogsType == DIALOGS_TYPE_DEFAULT && hasHiddenArchive() && parentPage.archivePullViewState == ARCHIVE_ITEM_STATE_HIDDEN) {
-                        pos = Math.max(1, pos);
+                    // pos==0 here can still be the stale pre-data-load holder (e.g. right after
+                    // the adapter grows from the loading placeholder to the real dialog list),
+                    // so its measured top does not describe where position 1 belongs once the
+                    // archive row at position 0 gets skipped below. Reusing that stale top as the
+                    // scroll offset for position 1 left a gap the height of one row above the
+                    // first real chat that only cleared once some other navigation forced a fresh
+                    // layout. Anchoring position 1 at offset 0 instead matches how the list is
+                    // actually supposed to start right under the search bar in that case.
+                    boolean skippingHiddenArchiveRow = pos == 0 && parentPage.dialogsType == DIALOGS_TYPE_DEFAULT
+                            && hasHiddenArchive() && parentPage.archivePullViewState == ARCHIVE_ITEM_STATE_HIDDEN;
+                    int offset = skippingHiddenArchiveRow
+                            ? 0
+                            : (int) (top - lastListPadding + scrollAdditionalOffset + parentPage.pageAdditionalOffset);
+                    if (skippingHiddenArchiveRow) {
+                        pos = 1;
                     }
                     ignoreLayout = true;
-                    parentPage.layoutManager.scrollToPositionWithOffset(pos, (int) (top - lastListPadding + scrollAdditionalOffset + parentPage.pageAdditionalOffset));
+                    parentPage.layoutManager.scrollToPositionWithOffset(pos, offset);
                     ignoreLayout = false;
                 }
             } else if (pos == RecyclerView.NO_POSITION && firstLayout) {
