@@ -4926,6 +4926,9 @@ public class ChatActivity extends BaseFragment implements
         // а доступ к тому же меню действий — по долгому тапу на аватарку.
         if (MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false)) {
             avatarContainer.bringToFront();
+            // DevGram: стеклянная «пилюля»-фон под «⋮» (~58dp) шире аватарки (42dp) — без
+            // этого из-под аватарки торчал несимметричный ободок чужого фона.
+            actionBar.setHideGlassMenuPill(true);
             if (headerItem != null) {
                 avatarContainer.avatarImageView.setOnLongClickListener(v -> {
                     headerItem.toggleSubMenu();

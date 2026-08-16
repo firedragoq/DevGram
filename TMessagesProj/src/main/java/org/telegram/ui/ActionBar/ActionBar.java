@@ -212,6 +212,19 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
     }
 
+    // DevGram: в iOS-режиме аватарка чата рисуется поверх кнопки «⋮» (сама кнопка и её
+    // меню остаются рабочими под капотом, см. ChatActivity — там же вызывается этот сеттер).
+    // Стеклянная «пилюля»-фон этой кнопки (glassDrawableMenu) заметно шире аватарки
+    // (~58dp против 42dp), поэтому без этого флага из-под аватарки торчал несимметричный
+    // белый ободок чужого фона — выглядело как «аватарка стоит неровно».
+    private boolean hideGlassMenuPill;
+    public void setHideGlassMenuPill(boolean hide) {
+        if (hideGlassMenuPill != hide) {
+            hideGlassMenuPill = hide;
+            invalidate();
+        }
+    }
+
     private ChatAvatarContainer chatAvatarContainer;
 
     public void setGlassOnlyBack() {
@@ -2265,7 +2278,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 glassDrawableBack.setBounds(0, t, s + p * 2, b);
                 glassDrawableBack.draw(canvas);
             }
-            if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack) {
+            if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack && !hideGlassMenuPill) {
                 glassDrawableMenu.setBounds(getWidth() - Math.max(s, menuWidth) - p * 2, t, getWidth(), b);
                 glassDrawableMenu.setAlpha(hasForcedMenuWidth ? 255 : (int) (255 * animatorHasMenuItems.getFloatValue()));
                 glassDrawableMenu.draw(canvas);
