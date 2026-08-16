@@ -236,6 +236,69 @@ public class DevGramConfig {
         MessagesController.getGlobalMainSettings().edit().putInt("folderTabsStyle", v).apply();
     }
 
+    // Общий переключатель дизайна приложения: DevGram (наш) / iOS / «Старый» (пресет в стиле
+    // AyuGram — не отдельный рендер-код, а конкретная комбинация уже существующих
+    // exteraGram-настроек внешнего вида: радиус аватарок, размер бейджа непрочитанных,
+    // цветовая тема и т.п.).
+    public static final int DESIGN_MODE_DEVGRAM = 0;
+    public static final int DESIGN_MODE_IOS = 1;
+    public static final int DESIGN_MODE_OLD = 2;
+
+    public static int getDesignMode() {
+        return MessagesController.getGlobalMainSettings().getInt("dg_designMode", DESIGN_MODE_DEVGRAM);
+    }
+
+    public static void setDesignMode(int v) {
+        MessagesController.getGlobalMainSettings().edit().putInt("dg_designMode", v).apply();
+    }
+
+    // Применяет пресет для выбранного режима дизайна поверх уже существующих настроек
+    // внешнего вида (это не новый рендер-код — decompile AyuGram/exteraGram показал, что там
+    // те же ячейки/баблы, что и у нас, просто с другим набором значений тех же настроек:
+    // радиус аватарок, MD3-эффекты, «липкая» анимация и т.п.). Пользователь может донастроить
+    // каждый пункт вручную после применения пресета — это отправная точка, не жёсткая блокировка.
+    public static void applyDesignPreset(int mode) {
+        setDesignMode(mode);
+        SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
+        switch (mode) {
+            case DESIGN_MODE_IOS:
+                // Круглые аватарки, без Material-эффектов (MD3/«липкая» анимация — андроидные),
+                // заголовок по центру — как в iOS. Профиль в стиле iOS уже был отдельным
+                // тумблером (iosProfile) — включаем его тоже.
+                editor.putFloat("avatarCornersF", 30f);
+                editor.putBoolean("dg_singleCorner", true);
+                editor.putBoolean("dg_md3", false);
+                editor.putBoolean("dg_gooey", false);
+                editor.putBoolean("dg_centerTitle", true);
+                editor.apply();
+                setIosProfile(true);
+                break;
+            case DESIGN_MODE_OLD:
+                // «Старый» вид: без MD3/«липкой» анимации и стеклянных эффектов — то, что
+                // реально отличает AyuGram/классический Telegram от текущего DevGram, судя по
+                // декомпиляции — не форма аватарок/баблов (там сток), а именно новые
+                // Material3/glass-эффекты, которых в AyuGram просто нет/выключены.
+                editor.putFloat("avatarCornersF", 28f);
+                editor.putBoolean("dg_singleCorner", false);
+                editor.putBoolean("dg_md3", false);
+                editor.putBoolean("dg_gooey", false);
+                editor.putBoolean("dg_centerTitle", false);
+                editor.apply();
+                setIosProfile(false);
+                break;
+            default:
+                // DevGram — текущий дизайн мода по умолчанию.
+                editor.putFloat("avatarCornersF", 28f);
+                editor.putBoolean("dg_singleCorner", false);
+                editor.putBoolean("dg_md3", true);
+                editor.putBoolean("dg_gooey", true);
+                editor.putBoolean("dg_centerTitle", false);
+                editor.apply();
+                setIosProfile(true);
+                break;
+        }
+    }
+
     public static void setDisableMarkdown(boolean v) {
         disableMarkdown = v;
         if (preferences != null) {

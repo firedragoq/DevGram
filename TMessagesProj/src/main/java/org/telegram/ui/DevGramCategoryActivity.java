@@ -71,7 +71,6 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_LOCAL_PREMIUM = 15;
     private static final int ID_STREAKS = 16;
     private static final int ID_VPN = 17;
-    private static final int ID_IOS_PROFILE = 18;
     private static final int ID_VPN_DIAG = 19;
     private static final int ID_TRANSLATE_BUTTON = 160;
     private static final int ID_TRANSLATE_CHAT = 161;
@@ -92,6 +91,7 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_ARCHIVE_ON_PULL = 176;
     private static final int ID_DISABLE_UNARCHIVE_SWIPE = 177;
     // Внешний вид
+    private static final int ID_DESIGN_MODE = 40; // общий пресет дизайна: DevGram/iOS/Старый
     private static final int ID_NUMBER_ROUNDING = 20;
     private static final int ID_AVATAR_SHAPE = 21; // форма аватара (перенос из скрытых Fork-настроек)
     private static final int ID_SQUARE_FAB = 25;   // квадратная кнопка (FAB)
@@ -496,6 +496,21 @@ public class DevGramCategoryActivity extends BaseFragment {
             // Секции и порядок — как в exteraGram 12.9.0:
             // Закругление аватарок → Список чатов → Папки с чатами → Внешний вид → Настройки размытия
 
+            // — Дизайн — общий пресет внешнего вида приложения. Применяет комбинацию уже
+            // существующих настроек этого экрана (радиус аватарок, MD3-эффекты, «липкая»
+            // анимация, заголовок по центру, профиль в стиле iOS) — не отдельный рендер-код.
+            // Отправная точка, а не жёсткая блокировка: любой пункт можно донастроить вручную
+            // ниже после выбора пресета.
+            items.add(UItem.asHeader("Дизайн"));
+            items.add(UItem.asSlideView(
+                    new String[]{"DevGram", "iOS", "Старый"},
+                    org.telegram.messenger.DevGramConfig.getDesignMode(),
+                    index -> {
+                        org.telegram.messenger.DevGramConfig.applyDesignPreset(index);
+                        refreshThenRebuildAppearanceScreens();
+                    }).setId(ID_DESIGN_MODE));
+            items.add(UItem.asShadow("Пресет внешнего вида. Ниже можно донастроить каждый пункт отдельно."));
+
             // — Закругление аватарок — непрерывный слайдер Квадрат..Круг + живое превью
             items.add(UItem.asHeader("Закругление аватарок"));
             items.add(UItem.asIntSlideView(1, 0, avatarCornersInit(), 30,
@@ -578,8 +593,6 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asHeader("Интерфейс DevGram"));
             items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
                     .setChecked(getUserConfig().showContactsTab));
-            items.add(UItem.asCheck(ID_IOS_PROFILE, "Профиль в стиле iOS")
-                    .setChecked(DevGramConfig.iosProfile));
             items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
                     .setChecked(DevGramConfig.hideEmojiCategories));
             items.add(UItem.asShadow("Настройки навигации, профилей и панели выбора эмодзи."));
@@ -990,8 +1003,6 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setLocalPremium(!DevGramConfig.localPremium);
         } else if (item.id == ID_STREAKS) {
             DevGramConfig.setStreaksEnabled(!DevGramConfig.streaksEnabled);
-        } else if (item.id == ID_IOS_PROFILE) {
-            DevGramConfig.setIosProfile(!DevGramConfig.iosProfile);
         } else if (item.id == ID_VPN) {
             boolean enable = !org.telegram.messenger.DevGramProxy.isEnabled();
             org.telegram.messenger.DevGramProxy.setEnabled(enable);
