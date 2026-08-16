@@ -1821,14 +1821,33 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             // Samsung's Android 16 build can leave RecyclerView with a populated adapter but no
             // children after the loading row is replaced. Consuming adapter updates from the
             // observer catches every update path, unlike the dialogs update runnable alone.
-            // (A forced requestLayout()+measure()+layout() pass used to run here too, but it
-            // never actually fired in practice - childCount was always non-zero by the time this
-            // point was reached - and when it did get a chance to run, calling measure()
-            // re-entered onMeasure()'s firstLayout-gated scroll-to-position-1 restoration (the
-            // hidden-archive skip) with whatever scrollYOffset happened to be mid-animation at
-            // that instant, leaving the list scrolled to a stale position with a blank gap above
-            // the first real row. scrollBy(0, 0) alone is what actually resolves this.)
             scrollBy(0, 0);
+
+            // scrollBy(0, 0) alone isn't enough: watchdog logs showed onMeasure() itself simply
+            // not running during this window at all - firstLayout stayed true and layoutReq
+            // stayed true no matter how long we waited, even well after dialogsLoaded flipped to
+            // true, meaning the hidden-archive scroll-restoration code (and the firstLayout=false
+            // flip that depends on it) never got a chance to execute, fixed offset or not. A
+            // forced requestLayout()+measure()+layout() pass used to live here to force that
+            // traversal, but it was removed because it kept landing mid-animation on a stale
+            // scrollYOffset and leaving a gap - that offset bug has since been fixed at the
+            // source in onMeasure() (skippingHiddenArchiveRow now anchors at 0 instead of a
+            // stale top), so forcing onMeasure() to actually run here is safe again and is what
+            // actually lets it resolve both the empty list and the archive-skip correctly instead
+            // of leaving them stuck until some unrelated navigation forces a fresh traversal.
+            hasVisiblePosition = parentPage.layoutManager != null
+                    && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
+            if ((getChildCount() == 0 || !hasVisiblePosition) && !isComputingLayout()) {
+                try {
+                    requestLayout();
+                    forceLayout();
+                    measure(
+                            View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.EXACTLY));
+                    layout(getLeft(), getTop(), getRight(), getBottom());
+                } catch (Throwable ignored) {
+                }
+            }
 
             // The ActionBar title (e.g. the "DevGram" wordmark) can get stuck the same way
             // during this same cold-start data transition: something calls requestLayout() on
