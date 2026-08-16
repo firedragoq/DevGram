@@ -723,15 +723,29 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(250, 0xFF2AABEE, 0xFF229ED9, R.drawable.settings_devgram, "DevGram", "Настройки мода"));
         items.add(UItem.asShadow(null));
 
-        items.add(SettingCell.Factory.of(1, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
+        // DevGram: в режиме дизайна «iOS» разбиваем этот блок на несколько мелких карточек
+        // (как в Settings.app/Telegram-iOS) вместо одной большой — стоковая exteraGram
+        // группировка (всё одним списком) остаётся для остальных режимов дизайна. Цвета
+        // значков в этом режиме тоже подогнаны под реальные скриншоты Swiftgram/Telegram-iOS
+        // (форма/цвета квадратов там заметно отличаются от нашего дефолтного набора).
+        boolean iosGrouping = org.telegram.messenger.DevGramConfig.getDesignMode() == org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS;
+        IconBackgroundColors accountColor = iosGrouping ? IconBackgroundColors.RED : IconBackgroundColors.BLUE;
+        IconBackgroundColors privacyColor = iosGrouping ? IconBackgroundColors.GRAY : IconBackgroundColors.GREEN;
+        IconBackgroundColors dataColor = iosGrouping ? IconBackgroundColors.GREEN : IconBackgroundColors.BLUE_DEEP;
+        IconBackgroundColors devicesColor = iosGrouping ? IconBackgroundColors.ORANGE : IconBackgroundColors.CYAN;
+        IconBackgroundColors languageColor = iosGrouping ? IconBackgroundColors.BLUE : IconBackgroundColors.PURPLE;
+        items.add(SettingCell.Factory.of(1, accountColor.top, accountColor.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
+        if (iosGrouping) items.add(UItem.asShadow(null));
         items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
-        items.add(SettingCell.Factory.of(3, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
+        items.add(SettingCell.Factory.of(3, privacyColor.top, privacyColor.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
         items.add(SettingCell.Factory.of(5, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
-        items.add(SettingCell.Factory.of(6, IconBackgroundColors.BLUE_DEEP.top, IconBackgroundColors.BLUE_DEEP.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
+        if (iosGrouping) items.add(UItem.asShadow(null));
+        items.add(SettingCell.Factory.of(6, dataColor.top, dataColor.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
         items.add(SettingCell.Factory.of(7, IconBackgroundColors.BLUE_ALT.top, IconBackgroundColors.BLUE_ALT.bottom, R.drawable.settings_folders, getString(R.string.SettingsFolders), getString(R.string.SettingsFoldersInfo)));
-        items.add(SettingCell.Factory.of(8, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
+        items.add(SettingCell.Factory.of(8, devicesColor.top, devicesColor.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
         items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
-        items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
+        if (iosGrouping) items.add(UItem.asShadow(null));
+        items.add(SettingCell.Factory.of(10, languageColor.top, languageColor.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
 
         items.add(UItem.asShadow(null));
 
@@ -766,15 +780,18 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(SettingCell.Factory.of(15, 0xFFF45255, 0xFFDF3955, R.drawable.settings_business, getString(R.string.TelegramBusiness)));
         }
         if (!getMessagesController().premiumPurchaseBlocked()) {
-            items.add(SettingCell.Factory.of(16, 0xFFF38B31, 0xFFE26314, R.drawable.settings_gift, getString(R.string.SendAGift)));
+            IconBackgroundColors giftColor = iosGrouping ? IconBackgroundColors.MAGENTA : null;
+            items.add(SettingCell.Factory.of(16, giftColor != null ? giftColor.top : 0xFFF38B31, giftColor != null ? giftColor.bottom : 0xFFE26314, R.drawable.settings_gift, getString(R.string.SendAGift)));
         }
         if (items.get(items.size() - 1).viewType != UniversalAdapter.VIEW_TYPE_SHADOW)
             items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SettingsHelp)));
-        items.add(SettingCell.Factory.of(17, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_ask, getString(R.string.AskAQuestion)));
+        IconBackgroundColors askColor = iosGrouping ? IconBackgroundColors.TEAL : IconBackgroundColors.ORANGE;
+        IconBackgroundColors featuresColor = iosGrouping ? IconBackgroundColors.YELLOW : IconBackgroundColors.PURPLE;
+        items.add(SettingCell.Factory.of(17, askColor.top, askColor.bottom, R.drawable.settings_ask, getString(R.string.AskAQuestion)));
         items.add(SettingCell.Factory.of(18, IconBackgroundColors.BLUE_LIGHT.top, IconBackgroundColors.BLUE_LIGHT.bottom, R.drawable.settings_faq, getString(R.string.TelegramFAQ)));
-        items.add(SettingCell.Factory.of(23, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_features, getString(R.string.TelegramFeatures)));
+        items.add(SettingCell.Factory.of(23, featuresColor.top, featuresColor.bottom, R.drawable.settings_features, getString(R.string.TelegramFeatures)));
         items.add(SettingCell.Factory.of(19, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_policy, getString(R.string.PrivacyPolicy)));
 
         if (BuildVars.LOGS_ENABLED || BuildVars.DEBUG_PRIVATE_VERSION) {
@@ -1314,7 +1331,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             @Override
             public void draw(@NonNull Canvas canvas) {
-                final float r = dp(10);
+                // DevGram: в iOS-режиме значки настроек — «сквиркл» (менее круглый угол,
+                // как в Settings.app), в остальных режимах оставляем как было.
+                final float r = dp(org.telegram.messenger.DevGramConfig.getDesignMode() == org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS ? 7 : 10);
                 AndroidUtilities.rectTmp.set(getBounds());
                 matrix.reset();
                 matrix.postTranslate(AndroidUtilities.rectTmp.left, AndroidUtilities.rectTmp.top);
