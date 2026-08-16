@@ -1705,20 +1705,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     public static float viewOffset = 0.0f;
 
-    private static final java.util.concurrent.ConcurrentLinkedQueue<String> initialLayoutWatchdogLog =
-            new java.util.concurrent.ConcurrentLinkedQueue<>();
-
-    private static void logInitialLayoutWatchdog(String message) {
-        initialLayoutWatchdogLog.add(android.os.SystemClock.uptimeMillis() + " " + message);
-        while (initialLayoutWatchdogLog.size() > 300) {
-            initialLayoutWatchdogLog.poll();
-        }
-    }
-
-    public static String getInitialLayoutWatchdogLog() {
-        return String.join("\n", initialLayoutWatchdogLog);
-    }
-
     public class DialogsRecyclerView extends BlurredRecyclerView implements StoriesListPlaceProvider.ClippedView {
 
         public boolean updateDialogsOnNextDraw;
@@ -1798,18 +1784,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         private void ensureInitialLayout() {
             initialLayoutCheckPosted = false;
             RecyclerView.Adapter adapter = getAdapter();
-            int itemCountForLog = adapter == null ? -1 : adapter.getItemCount();
-            logInitialLayoutWatchdog("ensure retry=" + initialLayoutRetryCount
-                    + " items=" + itemCountForLog + " attached=" + isAttachedToWindow()
-                    + " w=" + getWidth() + " h=" + getHeight()
-                    + " computing=" + isComputingLayout() + " children=" + getChildCount());
             if (adapter == null || adapter.getItemCount() == 0 || !isAttachedToWindow()) {
-                logInitialLayoutWatchdog("skip no-adapter-or-detached");
+                return;
+            }
+
+            if (getVisibility() != VISIBLE) {
+                // The inactive folder page sits GONE until swiped to, so it never gets real
+                // bounds while hidden - retrying here would just spin forever. Whatever makes it
+                // visible again (folder switch, adapter rebind) re-triggers this check on its own.
+                initialLayoutRetryCount = 0;
                 return;
             }
 
             if (getWidth() == 0 || getHeight() == 0 || isComputingLayout()) {
-                logInitialLayoutWatchdog("skip zero-size-or-computing");
                 retryInitialLayoutCheck();
                 return;
             }
@@ -1826,7 +1813,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             // makes sure a later data load re-triggers the forced pass below instead of being
             // silently swallowed by this early return.
             if (getChildCount() != 0 && hasVisiblePosition && initialLayoutConfirmedItemCount == itemCount) {
-                logInitialLayoutWatchdog("already-ok");
                 initialLayoutRetryCount = 0;
                 removeInitialLayoutGlobalListener();
                 return;
@@ -1835,38 +1821,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             // Samsung's Android 16 build can leave RecyclerView with a populated adapter but no
             // children after the loading row is replaced. Consuming adapter updates from the
             // observer catches every update path, unlike the dialogs update runnable alone.
+            // (A forced requestLayout()+measure()+layout() pass used to run here too, but it
+            // never actually fired in practice - childCount was always non-zero by the time this
+            // point was reached - and when it did get a chance to run, calling measure()
+            // re-entered onMeasure()'s firstLayout-gated scroll-to-position-1 restoration (the
+            // hidden-archive skip) with whatever scrollYOffset happened to be mid-animation at
+            // that instant, leaving the list scrolled to a stale position with a blank gap above
+            // the first real row. scrollBy(0, 0) alone is what actually resolves this.)
             scrollBy(0, 0);
-
-            hasVisiblePosition = parentPage.layoutManager != null
-                    && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
-            if ((getChildCount() == 0 || !hasVisiblePosition) && !isComputingLayout()) {
-                // requestLayout() alone only *schedules* a future system traversal - it does
-                // not itself mark PFLAG_LAYOUT_REQUIRED (only a real measure() pass does that,
-                // see View.measure()). Calling layout() right after requestLayout() with no
-                // measure() in between therefore sees unchanged bounds and no
-                // PFLAG_LAYOUT_REQUIRED, so onLayout()/dispatchLayout() never actually runs and
-                // the RecyclerView stays childless until a real touch-driven traversal comes
-                // along - this used to be the case here, which is why the screen stayed blank
-                // well past this retry loop even though the adapter already had data.
-                // forceLayout() bypasses RecyclerView's own requestLayout() override (which can
-                // silently no-op while mLayoutSuppressed or an intercepted batch update is
-                // active) so the measure() call below is guaranteed to actually re-measure and
-                // set PFLAG_LAYOUT_REQUIRED, making the following layout() call reliably invoke
-                // onLayout() -> dispatchLayout() at its current bounds and scroll position.
-                try {
-                    requestLayout();
-                    forceLayout();
-                    measure(
-                            View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY),
-                            View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.EXACTLY));
-                    layout(getLeft(), getTop(), getRight(), getBottom());
-                    logInitialLayoutWatchdog("forced-layout-done children=" + getChildCount());
-                } catch (Throwable forcedLayoutError) {
-                    logInitialLayoutWatchdog("forced-layout-EXCEPTION " + forcedLayoutError);
-                }
-            } else {
-                logInitialLayoutWatchdog("forced-layout-skipped computing=" + isComputingLayout());
-            }
 
             postInvalidateOnAnimation();
             parentPage.postInvalidateOnAnimation();
@@ -1877,10 +1839,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             hasVisiblePosition = parentPage.layoutManager != null
                     && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
             if (getChildCount() == 0 || !hasVisiblePosition) {
-                logInitialLayoutWatchdog("still-empty -> retry");
                 retryInitialLayoutCheck();
             } else {
-                logInitialLayoutWatchdog("resolved children=" + getChildCount());
                 initialLayoutRetryCount = 0;
                 initialLayoutConfirmedItemCount = itemCount;
                 removeInitialLayoutGlobalListener();
