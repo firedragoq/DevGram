@@ -4590,7 +4590,13 @@ public class ChatActivity extends BaseFragment implements
             });
             getConnectionsManager().bindRequestToGuid(req, classGuid);
         } else {
-            actionBar.addView(avatarContainer, 0, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT, !inPreviewMode ? 52 : 0, 0, 52, 0));
+            // DevGram: в iOS-режиме аватарка должна физически попадать в ту же область
+            // экрана, где рисуется кнопка «⋮» (menu добавлен с Gravity.RIGHT и нулевым
+            // отступом от края ActionBar — см. ActionBar.createMenu()), иначе перекрытие
+            // через bringToFront() ниже перекрывает пустоту: обычный правый отступ 52dp
+            // держит avatarContainer далеко от правого края, они с меню даже не пересекаются.
+            final int dgAvatarRightMargin = MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false) ? 0 : 52;
+            actionBar.addView(avatarContainer, 0, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT, !inPreviewMode ? 52 : 0, 0, dgAvatarRightMargin, 0));
             actionBar.createMenu().bringToFront();
         }
         actionBar.setOnActionModeFactorChangeListener(() -> {
@@ -30590,7 +30596,8 @@ public class ChatActivity extends BaseFragment implements
         }
         if (avatarContainer != null) {
             avatarContainer.setOccupyStatusBar(!value);
-            avatarContainer.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT, !inPreviewMode ? 52 : 0, 0, 52, 0));
+            final int dgAvatarRightMargin = MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false) ? 0 : 52;
+            avatarContainer.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT, !inPreviewMode ? 52 : 0, 0, dgAvatarRightMargin, 0));
         }
         if (chatActivityEnterView != null) {
             chatActivityEnterView.setVisibility(!value ? View.VISIBLE : View.INVISIBLE);
