@@ -19081,7 +19081,16 @@ public class ChatActivity extends BaseFragment implements
                 }*/ else {
                     showSearchAsIcon = false;
                 }
-                if (showSearchAsIcon || showAudioCallAsIcon || UserObject.isBotForumWithEditableTopics(currentUser)) {
+                // DevGram: в iOS-режиме этот пересчёт (на каждое изменение ширины экрана)
+                // затирал правый отступ avatarContainer обратно на 52/92dp — сводя на нет
+                // фикс из createView(), где отступ обнулён специально, чтобы аватарка
+                // физически попадала в область, где рисуется «⋮». Держим 0dp и здесь.
+                final boolean dgAvatarRight = MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false);
+                if (dgAvatarRight) {
+                    if (avatarContainer != null && avatarContainer.getLayoutParams() != null) {
+                        ((ViewGroup.MarginLayoutParams) avatarContainer.getLayoutParams()).rightMargin = 0;
+                    }
+                } else if (showSearchAsIcon || showAudioCallAsIcon || UserObject.isBotForumWithEditableTopics(currentUser)) {
                     if (avatarContainer != null && avatarContainer.getLayoutParams() != null) {
                         ((ViewGroup.MarginLayoutParams) avatarContainer.getLayoutParams()).rightMargin = AndroidUtilities.dp(chatMode == MODE_SAVED ? 52 : 92);
                     }
