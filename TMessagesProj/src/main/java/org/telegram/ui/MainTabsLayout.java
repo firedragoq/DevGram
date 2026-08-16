@@ -311,8 +311,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     protected void dispatchDraw(@NonNull Canvas canvas) {
         if (drawCustomSelector) {
             final float x = animatedLongSelectedViewCenterX + animatedLongSelectedViewOffsetX;
-            boolean md3 = org.telegram.ui.Components.DevGramMaterial3.enabled()
-                    && org.telegram.messenger.MessagesController.getGlobalMainSettings().getBoolean("dg_md3_bottomnav", false);
+            boolean md3 = org.telegram.ui.Components.DevGramMaterial3.navigationEnabled()
+                    || org.telegram.ui.Components.DevGramMaterial3.iosNavigation();
             final float availableWidth = getInterpolatedWidthByX(x, this);
             final float sWidth = md3 ? Math.min(dp(56), Math.max(0, availableWidth - dp(8))) : availableWidth;
             final float sHeight = md3 ? Math.min(dp(32), getHeight()) : getHeight() - getPaddingTop() - getPaddingBottom();

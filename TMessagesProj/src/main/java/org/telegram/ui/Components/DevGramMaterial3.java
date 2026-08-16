@@ -36,14 +36,15 @@ public class DevGramMaterial3 {
         return enabled() && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_bottomnav", false);
     }
 
-    // DevGram: нижний таб-бар в режиме дизайна iOS — плоская сплошная полоса на всю ширину
-    // (как в Settings.app/Telegram-iOS), а не плавающая скруглённая капсула MD3/классик.
+    // DevGram: нижний таб-бар в режиме дизайна iOS — та же плавающая скруглённая капсула на
+    // всю ширину, что и в MD3-режиме (сверено по реальным скриншотам Swiftgram: там именно
+    // плавающая капсула с отступами от краёв, а не плоская стыкованная полоса).
     public static boolean iosNavigation() {
         return org.telegram.messenger.DevGramConfig.getDesignMode() == org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS;
     }
 
     public static int mainTabsHeightDp() {
-        return iosNavigation() ? 56 : (navigationEnabled() ? 64 : 72);
+        return iosNavigation() ? 64 : (navigationEnabled() ? 64 : 72);
     }
 
     // Материаловым виджетам нужна тема Material3 в контексте, иначе не заинфлейтятся/упадут.

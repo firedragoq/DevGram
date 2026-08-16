@@ -55,8 +55,9 @@ import me.vkryl.android.animator.FactorAnimator;
 
 public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, FactorAnimator.Target {
     private static boolean material3Navigation() {
-        return DevGramMaterial3.enabled() && MessagesController.getGlobalMainSettings()
-                .getBoolean("dg_md3_bottomnav", false);
+        // DevGram: iOS-режим использует ту же геометрию элементов таб-бара (64dp),
+        // что и MD3-навигация — см. DevGramMaterial3.iosNavigation()/mainTabsHeightDp().
+        return DevGramMaterial3.navigationEnabled() || DevGramMaterial3.iosNavigation();
     }
     private final TextView textView;
     private final RLottieImageView imageView;

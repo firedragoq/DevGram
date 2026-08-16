@@ -274,11 +274,25 @@ public class DevGramConfig {
                 setIosProfile(true);
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, true);
                 LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, true);
-                // В iOS-режиме вкладка «Контакты» всегда видна в нижнем меню (как в
-                // Settings.app/Telegram-iOS) — включаем сразу и прячем возможность её скрыть.
+                // В iOS-режиме вкладки «Контакты» и «Звонки» всегда видны в нижнем меню
+                // (как в Settings.app/Telegram-iOS) — включаем сразу. Важно: после прямого
+                // изменения UserConfig обязательно шлём те же уведомления, что и родные
+                // тумблеры показа/скрытия — иначе у уже открытого MainTabsActivity не
+                // пересобираются позиции вкладок в ViewPager, и клик по табу попадает на
+                // фрагмент, оставшийся от старой раскладки (баг: «Контакты» открывали «Настройки»).
                 for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
                     if (UserConfig.getInstance(a).isClientActivated()) {
-                        UserConfig.getInstance(a).setShowContactsTab(true);
+                        UserConfig userConfig = UserConfig.getInstance(a);
+                        boolean contactsWasHidden = !userConfig.showContactsTab;
+                        userConfig.setShowContactsTab(true);
+                        if (contactsWasHidden) {
+                            NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+                        }
+                        boolean callsWasHidden = !userConfig.showCallsTab;
+                        userConfig.setShowCallsTab(true);
+                        if (callsWasHidden) {
+                            NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.callTabsVisibleToggled);
+                        }
                     }
                 }
                 break;

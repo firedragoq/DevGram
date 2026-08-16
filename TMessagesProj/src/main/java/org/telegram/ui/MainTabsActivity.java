@@ -358,10 +358,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewBackground = iBlur3FactoryGlass.create(tabsView, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
         // A full-width rectangular M3 bar looks especially heavy over gesture navigation.
         // Keep the M3 item geometry, but present the bar as a rounded 28dp container.
-        // DevGram: в iOS-режиме — плоская полоса на всю ширину без скруглений/отступов,
-        // как в Settings.app/Telegram-iOS, вместо плавающей капсулы.
-        tabsViewBackground.setRadius(iosNavigation ? 0 : (md3Navigation ? dp(org.telegram.ui.Components.DevGramMaterial3.RADIUS_LARGE_DP) : dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f)));
-        tabsViewBackground.setPadding(iosNavigation ? 0 : (md3Navigation ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f)));
+        // DevGram: в iOS-режиме — та же плавающая капсула на всю ширину, что и в MD3
+        // (реальные скриншоты Swiftgram показали именно floating pill с отступами от краёв,
+        // а не плоскую стыкованную полосу).
+        tabsViewBackground.setRadius((md3Navigation || iosNavigation) ? dp(org.telegram.ui.Components.DevGramMaterial3.RADIUS_LARGE_DP) : dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
+        tabsViewBackground.setPadding((md3Navigation || iosNavigation) ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
         tabsView.setBackground(tabsViewBackground);
 
         BlurredBackgroundDrawableViewFactory iBlur3FactoryFade = new BlurredBackgroundDrawableViewFactory(iBlur3SourceColor);
@@ -379,8 +380,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewWrapper.addView(tabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
                 org.telegram.ui.Components.DevGramMaterial3.mainTabsHeightDp(),
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
-                md3Navigation ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0,
-                md3Navigation ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0));
+                (md3Navigation || iosNavigation) ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0,
+                (md3Navigation || iosNavigation) ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0));
         tabsViewWrapper.setClipToPadding(false);
         contentView.addView(tabsViewWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
 
