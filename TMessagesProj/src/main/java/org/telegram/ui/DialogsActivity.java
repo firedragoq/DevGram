@@ -1830,6 +1830,27 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             // the first real row. scrollBy(0, 0) alone is what actually resolves this.)
             scrollBy(0, 0);
 
+            // The ActionBar title (e.g. the "DevGram" wordmark) can get stuck the same way
+            // during this same cold-start data transition: something calls requestLayout() on
+            // it but the traversal that would actually honor that request never runs, leaving
+            // the title collapsed to 0x0 (isLayoutRequested() stays true, isLaidOut() stays
+            // false) until some unrelated navigation forces a fresh traversal. Forcing a
+            // synchronous remeasure+layout at its own already-correct bounds resolves it
+            // immediately instead of waiting on that navigation - and since this isn't
+            // DialogsRecyclerView's own onMeasure(), it can't re-trigger the archive-scroll bug
+            // above.
+            if (actionBar != null && actionBar.getWidth() > 0 && actionBar.getHeight() > 0 && actionBar.isLayoutRequested()) {
+                try {
+                    actionBar.requestLayout();
+                    actionBar.forceLayout();
+                    actionBar.measure(
+                            View.MeasureSpec.makeMeasureSpec(actionBar.getWidth(), View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(actionBar.getHeight(), View.MeasureSpec.EXACTLY));
+                    actionBar.layout(actionBar.getLeft(), actionBar.getTop(), actionBar.getRight(), actionBar.getBottom());
+                } catch (Throwable ignored) {
+                }
+            }
+
             postInvalidateOnAnimation();
             parentPage.postInvalidateOnAnimation();
             if (fragmentView != null) {
