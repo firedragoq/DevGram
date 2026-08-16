@@ -2551,6 +2551,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 thumbImage[i].setImageCoords(thumbLeft + (thumbSize + 2) * i, avatarTop + dp(31) + (twoLinesForName ? dp(20) : 0) - (!(useForceThreeLines || SharedConfig.useThreeLinesLayout) && tags != null && !tags.isEmpty() ? dp(9) : 0), dp(18), dp(18));
             }
         } else {
+            // DevGram: в iOS-режиме аватарки в списке чатов крупнее (56dp — как в реальном
+            // Telegram-iOS/Swiftgram; тот же размер уже используется здесь для трёхстрочного
+            // режима), в остальных режимах — как раньше (52dp).
+            final int dgAvatarSize = org.telegram.messenger.DevGramConfig.getDesignMode() == org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS ? 56 : 52;
             avatarTop = dp(9);
             messageNameTop = dp(31);
             timeTop = dp(16);
@@ -2562,14 +2566,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
             if (LocaleController.isRTL) {
                 buttonLeft = typingLeft = messageLeft = messageNameLeft = dp(22);
-                avatarLeft = getMeasuredWidth() - dp(52 + avatarStart);
+                avatarLeft = getMeasuredWidth() - dp(dgAvatarSize + avatarStart);
                 thumbLeft = avatarLeft - dp(11 + (thumbsCount * (thumbSize + 2) - 2));
             } else {
                 buttonLeft = typingLeft = messageLeft = messageNameLeft = dp(messagePaddingStart + 4);
                 avatarLeft = dp(avatarStart);
                 thumbLeft = avatarLeft + dp(56 + 11);
             }
-            storyParams.originalAvatarRect.set(avatarLeft, avatarTop, avatarLeft + dp(52), avatarTop + dp(52));
+            storyParams.originalAvatarRect.set(avatarLeft, avatarTop, avatarLeft + dp(dgAvatarSize), avatarTop + dp(dgAvatarSize));
             for (int i = 0; i < thumbImage.length; ++i) {
                 thumbImage[i].setImageCoords(thumbLeft + (thumbSize + 2) * i, avatarTop + dp(30) + (twoLinesForName ? dp(20) : 0) - (!(useForceThreeLines || SharedConfig.useThreeLinesLayout) && tags != null && !tags.isEmpty() ? dp(9) : 0), dp(thumbSize), dp(thumbSize));
             }
