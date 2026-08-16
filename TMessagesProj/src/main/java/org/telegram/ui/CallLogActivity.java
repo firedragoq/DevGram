@@ -2019,7 +2019,8 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		ItemOptions io = ItemOptions.makeOptions(this, otherItem);
 		// io.setColors(getThemedColor(Theme.key_actionBarDefaultTitle), getThemedColor(Theme.key_actionBarDefaultTitle));
 		io.setDimAlpha(0x08);
-		if (getUserConfig().showCallsTab) {
+		// DevGram: в iOS-режиме «Звонки» нельзя скрыть — пункт в меню «⋮» не показываем.
+		if (getUserConfig().showCallsTab && !org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) {
 			io.add(R.drawable.msg_archive_hide, getString(R.string.HideCallTab), () -> {
 				setCallsTabVisible(false);
 				final BulletinFactory factory = hasMainTabs ? BulletinFactory.global() : BulletinFactory.of(CallLogActivity.this);

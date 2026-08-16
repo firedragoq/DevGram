@@ -295,33 +295,45 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         tabsView = new MainTabsLayout(context, resourceProvider);
         tabsView.setClipChildren(false);
-        boolean md3Navigation = org.telegram.ui.Components.DevGramMaterial3.navigationEnabled();
-        boolean iosNavigation = org.telegram.ui.Components.DevGramMaterial3.iosNavigation();
-        int tabsPadding = (md3Navigation || iosNavigation) ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN + 4);
-        tabsView.setPadding(tabsPadding, tabsPadding, tabsPadding, tabsPadding);
-        tabsView.setMaxWidth((md3Navigation || iosNavigation) ? 0 : dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
+
+        // DevGram: в iOS-режиме нет отдельного таба профиля (как в Settings.app/Telegram-iOS —
+        // свой профиль открывается через карточку в «Настройках», не через нижний таб) и нет
+        // общего слота Звонки/Настройки — вместо профиля в его слоте живут «Настройки», а
+        // Звонки всегда занимают свой собственный слот (см. createBaseFragmentAt/posProfile).
+        boolean iosNav = org.telegram.ui.Components.DevGramMaterial3.iosNavigation();
 
         tabs = new GlassTabView[5];
         tabs[INDEX_CHATS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
         tabs[INDEX_CONTACTS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CONTACTS, R.string.MainTabsContacts);
         tabs[INDEX_SETTINGS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Settings);
         tabs[INDEX_CALLS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CALLS, R.string.MainTabsCalls);
-        tabs[INDEX_PROFILE] = GlassTabView.createAvatar(context, resourceProvider, currentAccount, R.string.MainTabsProfile);
+        tabs[INDEX_PROFILE] = iosNav
+                ? GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Settings)
+                : GlassTabView.createAvatar(context, resourceProvider, currentAccount, R.string.MainTabsProfile);
         tabs[INDEX_CHATS].setOnLongClickListener(this::openFoldersSelector);
         tabs[INDEX_CONTACTS].setOnLongClickListener(this::openContactsSelector);
         tabs[INDEX_CALLS].setOnLongClickListener(this::openCallsSelector);
-        tabs[INDEX_PROFILE].setOnLongClickListener(this::openAccountSelector);
+        if (!iosNav) {
+            tabs[INDEX_PROFILE].setOnLongClickListener(this::openAccountSelector);
+        }
 
         tabsView.addTabToIgnoreClick(tabs[INDEX_CHATS]);
         tabsView.addTabToIgnoreClick(tabs[INDEX_CONTACTS]);
         tabsView.addTabToIgnoreClick(tabs[INDEX_PROFILE]);
         tabsView.addTabToIgnoreClick(tabs[INDEX_CALLS]);
 
-        for (int index = 0; index < tabs.length; index++) {
-            final GlassTabView view = tabs[index];
+        // DevGram: порядок слева направо. В iOS-режиме — Контакты/Звонки/Чаты/Настройки
+        // (сверено по реальным скриншотам Swiftgram), таб «Настройки» (INDEX_SETTINGS) не
+        // используется вовсе — его роль в бывшем слоте профиля выполняет tabs[INDEX_PROFILE].
+        final int[] visualOrder = iosNav
+                ? new int[]{INDEX_CONTACTS, INDEX_CALLS, INDEX_CHATS, INDEX_PROFILE}
+                : new int[]{INDEX_CHATS, INDEX_CONTACTS, INDEX_SETTINGS, INDEX_CALLS, INDEX_PROFILE};
 
-            final int idx = index;
-            tabs[index].setOnClickListener(v -> {
+        for (int i = 0; i < visualOrder.length; i++) {
+            final int idx = visualOrder[i];
+            final GlassTabView view = tabs[idx];
+
+            view.setOnClickListener(v -> {
                 if (viewPager.isManualScrolling() || viewPager.isTouch()) {
                     return;
                 }
@@ -339,7 +351,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 viewPager.scrollToPosition(position);
             });
 
-            tabsView.addView(tabs[index]);
+            tabsView.addView(view);
             tabsView.setViewVisible(view, true, false);
         }
         checkUi_callTabVisible(getUserConfig().showCallsTab, false);
@@ -356,13 +368,6 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         iBlur3FactoryGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
 
         tabsViewBackground = iBlur3FactoryGlass.create(tabsView, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
-        // A full-width rectangular M3 bar looks especially heavy over gesture navigation.
-        // Keep the M3 item geometry, but present the bar as a rounded 28dp container.
-        // DevGram: в iOS-режиме — та же плавающая капсула на всю ширину, что и в MD3
-        // (реальные скриншоты Swiftgram показали именно floating pill с отступами от краёв,
-        // а не плоскую стыкованную полосу).
-        tabsViewBackground.setRadius((md3Navigation || iosNavigation) ? dp(org.telegram.ui.Components.DevGramMaterial3.RADIUS_LARGE_DP) : dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
-        tabsViewBackground.setPadding((md3Navigation || iosNavigation) ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
         tabsView.setBackground(tabsViewBackground);
 
         BlurredBackgroundDrawableViewFactory iBlur3FactoryFade = new BlurredBackgroundDrawableViewFactory(iBlur3SourceColor);
@@ -378,12 +383,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewWrapper = new FrameLayout(context);
         tabsViewWrapper.setOnClickListener(v -> {});
         tabsViewWrapper.addView(tabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
-                org.telegram.ui.Components.DevGramMaterial3.mainTabsHeightDp(),
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
-                (md3Navigation || iosNavigation) ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0,
-                (md3Navigation || iosNavigation) ? org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP : 0, 0));
+                LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
         tabsViewWrapper.setClipToPadding(false);
         contentView.addView(tabsViewWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
+        applyTabsBarGeometry();
 
         updateLayoutWrapper = new UpdateLayoutWrapper(context);
         contentView.addView(updateLayoutWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
@@ -396,6 +399,44 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         updateLayout();
         checkUnreadCount(false);
         return contentView;
+    }
+
+    // DevGram: форма/ширина/радиус нижнего бара (капсула MD3/iOS против классики) читались
+    // один раз в createView() в локальные переменные — если пользователь переключает пресет
+    // дизайна прямо в открытом приложении (без пересоздания MainTabsActivity), контейнер бара
+    // оставался в старой геометрии, а отдельные элементы таба (своя подсветка выбора,
+    // скользящий селектор долгого тапа) уже читают DevGramMaterial3 live и сразу перескакивали
+    // на новую — получался нахлёст из старой и новой формы. Вынесено в отдельный метод и
+    // перевызывается из onApplyWindowInsets(), чтобы контейнер тоже обновлялся.
+    private void applyTabsBarGeometry() {
+        if (tabsView == null || tabsViewWrapper == null) {
+            return;
+        }
+        boolean md3Navigation = org.telegram.ui.Components.DevGramMaterial3.navigationEnabled();
+        boolean iosNavigation = org.telegram.ui.Components.DevGramMaterial3.iosNavigation();
+        boolean pill = md3Navigation || iosNavigation;
+
+        int tabsPadding = pill ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN + 4);
+        tabsView.setPadding(tabsPadding, tabsPadding, tabsPadding, tabsPadding);
+        tabsView.setMaxWidth(pill ? 0 : dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
+
+        if (tabsViewBackground != null) {
+            tabsViewBackground.setRadius(pill ? dp(org.telegram.ui.Components.DevGramMaterial3.RADIUS_LARGE_DP) : dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
+            tabsViewBackground.setPadding(pill ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
+        }
+
+        final int inset = pill ? dp(org.telegram.ui.Components.DevGramMaterial3.HORIZONTAL_INSET_DP) : 0;
+        final int height = dp(org.telegram.ui.Components.DevGramMaterial3.mainTabsHeightDp());
+        final ViewGroup.LayoutParams rawLp = tabsView.getLayoutParams();
+        if (rawLp instanceof FrameLayout.LayoutParams) {
+            final FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) rawLp;
+            if (lp.height != height || lp.leftMargin != inset || lp.rightMargin != inset) {
+                lp.height = height;
+                lp.leftMargin = inset;
+                lp.rightMargin = inset;
+                tabsView.setLayoutParams(lp);
+            }
+        }
     }
 
     private void checkUnreadCount(boolean animated) {
@@ -479,18 +520,22 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         if (getContext() == null || getParentActivity() == null) return false;
         final ItemOptions o = ItemOptions.makeOptions(this, anchor);
         o.add(R.drawable.menu_call_create, getString(R.string.GroupCallCreate2), () -> CallLogActivity.openCreateCall(this));
-        if (getUserConfig().showCallsTab) {
-            o.add(R.drawable.msg_archive_hide, getString(R.string.HideCallTab), () -> {
-                getUserConfig().setShowCallsTab(false);
-                checkUi_callTabVisible(false, true);
-                NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.callTabsVisibleToggled);
-            });
-        } else {
-            o.add(R.drawable.menu_add_tab_24, getString(R.string.GroupCallShowInMainTabs), () -> {
-                getUserConfig().setShowCallsTab(true);
-                checkUi_callTabVisible(true, true);
-                NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.callTabsVisibleToggled);
-            });
+        // DevGram: в iOS-режиме «Звонки» нельзя скрыть из нижнего меню (как в
+        // Settings.app/Telegram-iOS) — пункт скрытия/показа просто не показываем.
+        if (!org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) {
+            if (getUserConfig().showCallsTab) {
+                o.add(R.drawable.msg_archive_hide, getString(R.string.HideCallTab), () -> {
+                    getUserConfig().setShowCallsTab(false);
+                    checkUi_callTabVisible(false, true);
+                    NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.callTabsVisibleToggled);
+                });
+            } else {
+                o.add(R.drawable.menu_add_tab_24, getString(R.string.GroupCallShowInMainTabs), () -> {
+                    getUserConfig().setShowCallsTab(true);
+                    checkUi_callTabVisible(true, true);
+                    NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.callTabsVisibleToggled);
+                });
+            }
         }
         o.setBlur(true);
         o.translate(0, -dp(4));
@@ -770,6 +815,13 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             args.putBoolean("hasMainTabs", true);
             return new SettingsActivity(args);
         } else if (position == posProfile()) {
+            // DevGram: в iOS-режиме бывший слот профиля занят «Настройками» — свой профиль
+            // в этом режиме открывается изнутри Настроек (карточка «Мой профиль»).
+            if (org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) {
+                Bundle args = new Bundle();
+                args.putBoolean("hasMainTabs", true);
+                return new SettingsActivity(args);
+            }
             Bundle args = new Bundle();
             args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
             args.putBoolean("my_profile", true);
@@ -877,6 +929,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         }
 
         tabsViewWrapper.setPadding(0, 0, 0, navigationBarHeight);
+        applyTabsBarGeometry();
 
         final WindowInsetsCompat consumed = isUpdateLayoutVisible ?
             insets.inset(0, 0, 0, navigationBarHeight) : insets;
@@ -927,7 +980,17 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             final boolean nowShown = getUserConfig().showContactsTab;
             final BaseFragment cur = getCurrentVisibleFragment();
             final int target;
-            if (cur instanceof ProfileActivity) {
+            if (org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) {
+                // DevGram: в iOS-режиме бывший слот профиля занят SettingsActivity, а
+                // слот Звонки/Настройки всегда занят CallLogActivity — классификация другая.
+                if (cur instanceof SettingsActivity) {
+                    target = posProfile();
+                } else if (cur instanceof CallLogActivity) {
+                    target = posCallsOrSettings();
+                } else {
+                    target = POSITION_CHATS;
+                }
+            } else if (cur instanceof ProfileActivity) {
                 target = posProfile();
             } else if (cur instanceof CallLogActivity || cur instanceof SettingsActivity) {
                 target = posCallsOrSettings();
@@ -1130,6 +1193,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     private void showAccountChangeHint() {
         if (accountSwitchHintShown) return;
+        // DevGram: в iOS-режиме на месте профиля — таб «Настройки» без долгого тапа для
+        // переключения аккаунта (это не тот жест), подсказку не показываем.
+        if (org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) return;
 
         if (accountSwitchHint == null && HintsController.Hint.AccountSwitchHint.show()) {
             AndroidUtilities.runOnUIThread(() -> {

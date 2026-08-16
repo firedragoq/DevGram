@@ -313,6 +313,7 @@ public class DevGramConfig {
                 setIosProfile(false);
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, false);
                 LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, false);
+                resetContactsTabToHidden();
                 break;
             default:
                 // DevGram — текущий дизайн мода по умолчанию: аватарки полным кругом,
@@ -326,7 +327,24 @@ public class DevGramConfig {
                 setIosProfile(true);
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, true);
                 LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, true);
+                resetContactsTabToHidden();
                 break;
+        }
+    }
+
+    // DevGram: «Контакты» в нижнем меню по умолчанию скрыты везде, кроме iOS-режима (где их
+    // нельзя скрыть) — если раньше их включили вручную или через iOS-пресет, при переключении
+    // на DevGram/«Старый» возвращаем скрытое состояние.
+    private static void resetContactsTabToHidden() {
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                UserConfig userConfig = UserConfig.getInstance(a);
+                boolean contactsWasShown = userConfig.showContactsTab;
+                userConfig.setShowContactsTab(false);
+                if (contactsWasShown) {
+                    NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+                }
+            }
         }
     }
 

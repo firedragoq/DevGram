@@ -464,6 +464,11 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     }
 
     public void updateUserAvatar(int currentAccount) {
+        // DevGram: в iOS-режиме бывший таб профиля — обычный иконочный таб (createMainTab),
+        // без backupImageView (он есть только у createAvatar) — молча выходим.
+        if (backupImageView == null) {
+            return;
+        }
         TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
         AvatarDrawable avatarDrawable = new AvatarDrawable(user);
         backupImageView.setForUserOrChat(user, avatarDrawable);
