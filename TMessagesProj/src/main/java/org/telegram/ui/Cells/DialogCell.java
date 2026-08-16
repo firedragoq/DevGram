@@ -489,6 +489,38 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     protected int overrideSwipeActionStringId;
     protected RLottieDrawable overrideSwipeActionDrawable;
 
+    // DevGram: точные цвета фона свайп-действий из исходников Swiftgram/Telegram-iOS
+    // (submodules/TelegramPresentationData/Sources/DefaultDayPresentationTheme.swift,
+    // itemDisclosureActions: inactive/constructive/neutral2/destructive/accent).
+    private static final int DG_IOS_SWIPE_GRAY = 0xFFBCBCC3;   // inactive — архив, «прочитано»
+    private static final int DG_IOS_SWIPE_GREEN = 0xFF00C900;  // constructive — закрепить/открепить
+    private static final int DG_IOS_SWIPE_ORANGE = 0xFFF09A37; // neutral2 — заглушить/включить звук
+    private static final int DG_IOS_SWIPE_RED = 0xFFFF3824;    // destructive — удалить
+    private static final int DG_IOS_SWIPE_BLUE = 0xFF0088FF;   // accent — «не прочитано»
+
+    // Возвращает iOS-цвет для текущего свайп-действия, либо fallback вне iOS-режима
+    // и для случаев, которых нет в найденном iOS-спеке (архивная папка/PSA/community-ungroup).
+    private int dgIosSwipeColor(int fallback) {
+        if (org.telegram.messenger.DevGramConfig.getDesignMode() != org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS) {
+            return fallback;
+        }
+        if (currentDialogFolderId != 0 || promoDialog || folderId != 0 || ChatObject.isCommunity(chat)) {
+            return fallback;
+        }
+        final int action = SharedConfig.getChatSwipeAction(currentAccount);
+        if (action == SwipeGestureSettingsView.SWIPE_GESTURE_MUTE) {
+            return DG_IOS_SWIPE_ORANGE;
+        } else if (action == SwipeGestureSettingsView.SWIPE_GESTURE_DELETE) {
+            return DG_IOS_SWIPE_RED;
+        } else if (action == SwipeGestureSettingsView.SWIPE_GESTURE_READ) {
+            return (unreadCount > 0 || markUnread) ? DG_IOS_SWIPE_GRAY : DG_IOS_SWIPE_BLUE;
+        } else if (action == SwipeGestureSettingsView.SWIPE_GESTURE_PIN) {
+            return DG_IOS_SWIPE_GREEN;
+        } else {
+            return DG_IOS_SWIPE_GRAY;
+        }
+    }
+
     private int thumbsCount;
     private boolean hasVideoThumb;
     private Paint thumbBackgroundPaint;
@@ -2551,10 +2583,12 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 thumbImage[i].setImageCoords(thumbLeft + (thumbSize + 2) * i, avatarTop + dp(31) + (twoLinesForName ? dp(20) : 0) - (!(useForceThreeLines || SharedConfig.useThreeLinesLayout) && tags != null && !tags.isEmpty() ? dp(9) : 0), dp(18), dp(18));
             }
         } else {
-            // DevGram: в iOS-режиме аватарки в списке чатов крупнее (56dp — как в реальном
-            // Telegram-iOS/Swiftgram; тот же размер уже используется здесь для трёхстрочного
-            // режима), в остальных режимах — как раньше (52dp).
-            final int dgAvatarSize = org.telegram.messenger.DevGramConfig.getDesignMode() == org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS ? 56 : 52;
+            // DevGram: в iOS-режиме аватарки в списке чатов — 60dp, точное значение из
+            // исходников (ChatListItem.swift: avatarDiameter = min(60, ...) при обычном
+            // размере шрифта). Текстовая колонка начинается на фиксированных messagePaddingStart
+            // (72dp) и от размера аватарки не зависит, так что запас остаётся небольшим
+            // (72-11-60=1dp) — тесновато, но без наложения. В остальных режимах — как раньше (52dp).
+            final int dgAvatarSize = org.telegram.messenger.DevGramConfig.getDesignMode() == org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS ? 60 : 52;
             avatarTop = dp(9);
             messageNameTop = dp(31);
             timeTop = dp(16);
@@ -4030,6 +4064,12 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     translationDrawable = Theme.dialogs_unarchiveDrawable;
                 }
             }
+            // DevGram: в iOS-режиме фон свайп-действия — точные цвета из исходников
+            // Swiftgram/Telegram-iOS (itemDisclosureActions в DefaultDayPresentationTheme.swift),
+            // а не приблизительные. Обе стадии свайпа (частичная/докрученная) красим в один
+            // и тот же цвет — двухтоновой докрутки, как в Android, у iOS попросту нет.
+            backgroundColor = dgIosSwipeColor(backgroundColor);
+            revealBackgroundColor = dgIosSwipeColor(revealBackgroundColor);
 
             if (swipeCanceled && lastDrawTranslationDrawable != null) {
                 translationDrawable = lastDrawTranslationDrawable;

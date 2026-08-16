@@ -774,17 +774,38 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         final int actionBarHeight = ActionBar.getCurrentActionBarHeight();
         boolean md3Header = DevGramMaterial3.enabled()
                 && MessagesController.getGlobalMainSettings().getBoolean("dg_md3_title", false);
+        // DevGram: в iOS-режиме аватарка — отдельным кружком справа (как в реальном
+        // Telegram-iOS/Swiftgram), а не слева впритык к заголовку; заголовок и статус
+        // центрируются в оставшемся пространстве между кнопкой назад и аватаркой.
+        final boolean dgAvatarRight = MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false);
         final int avatarInset = md3Header ? 0 : 1;
         final int viewTop = (actionBarHeight - avatarImageView.getMeasuredHeight() - avatarInset * 2) / 2
                 + (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0);
         final int subtitleTop = viewTop + dp(md3Header ? (glassMode ? 26.66f : 27f) : (glassMode ? 23.66f : 24f));
 
-        avatarImageView.layout(avatarInset + leftPadding, avatarInset + viewTop,
-                avatarInset + leftPadding + avatarImageView.getMeasuredWidth(),
+        final int avatarLeftEdge;
+        if (dgAvatarRight && avatarImageView.getVisibility() == VISIBLE) {
+            avatarLeftEdge = getMeasuredWidth() - dp(16) - avatarImageView.getMeasuredWidth();
+        } else {
+            avatarLeftEdge = leftPadding;
+        }
+        avatarImageView.layout(avatarInset + avatarLeftEdge, avatarInset + viewTop,
+                avatarInset + avatarLeftEdge + avatarImageView.getMeasuredWidth(),
                 avatarInset + viewTop + avatarImageView.getMeasuredHeight());
-        int l = leftPadding + (avatarImageView.getVisibility() == VISIBLE
-                ? dp(md3Header ? avatarSizeInDp + (glassMode ? 10.66f : 12f) : (glassMode ? 49.66f : 55f))
-                : dp((glassMode ? 12 : 0) + avatarInset)) + rightAvatarPadding;
+
+        final int l;
+        final int lSub;
+        if (dgAvatarRight) {
+            final int textAreaRight = (avatarImageView.getVisibility() == VISIBLE ? avatarLeftEdge - dp(8) : getMeasuredWidth() - dp(16));
+            l = leftPadding + Math.max(0, (textAreaRight - leftPadding - titleTextView.getMeasuredWidth()) / 2);
+            final int subtitleWidth = subtitleTextView != null ? subtitleTextView.getMeasuredWidth() : (animatedSubtitleTextView != null ? animatedSubtitleTextView.getMeasuredWidth() : 0);
+            lSub = leftPadding + Math.max(0, (textAreaRight - leftPadding - subtitleWidth) / 2);
+        } else {
+            l = leftPadding + (avatarImageView.getVisibility() == VISIBLE
+                    ? dp(md3Header ? avatarSizeInDp + (glassMode ? 10.66f : 12f) : (glassMode ? 49.66f : 55f))
+                    : dp((glassMode ? 12 : 0) + avatarInset)) + rightAvatarPadding;
+            lSub = l;
+        }
         SimpleTextView titleTextLargerCopyView = this.titleTextLargerCopyView.get();
         if (getSubtitleTextView().getVisibility() != GONE) {
             titleTextView.layout(l, viewTop + dp(1.66f) - titleTextView.getPaddingTop(), l + titleTextView.getMeasuredWidth(), viewTop + titleTextView.getTextHeight() + dp(1.66f) - titleTextView.getPaddingTop() + titleTextView.getPaddingBottom());
@@ -800,34 +821,34 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (communityItem != null) {
             float sizeOffset = avatarSizeInDp - 42f;
             communityItem.layout(
-                leftPadding + dp(29f + sizeOffset),
+                avatarLeftEdge + dp(29f + sizeOffset),
                 viewTop + dp(27.33f + sizeOffset),
-                leftPadding + dp(29f + sizeOffset) + communityItem.getMeasuredWidth(),
+                avatarLeftEdge + dp(29f + sizeOffset) + communityItem.getMeasuredWidth(),
                 viewTop + dp(27.33f + sizeOffset) + communityItem.getMeasuredHeight());
         }
         if (timeItem != null) {
             float sizeOffset = avatarSizeInDp - 42f;
             timeItem.layout(
-                leftPadding + dp(19.333f + sizeOffset),
+                avatarLeftEdge + dp(19.333f + sizeOffset),
                 viewTop - dp(8),
-                leftPadding + dp(19.333f + sizeOffset) + timeItem.getMeasuredWidth(),
+                avatarLeftEdge + dp(19.333f + sizeOffset) + timeItem.getMeasuredWidth(),
                 viewTop - dp(8) + timeItem.getMeasuredHeight()
             );
         }
         if (starBgItem != null) {
-            starBgItem.layout(leftPadding + dp(avatarSizeInDp - 14), viewTop + dp(avatarSizeInDp - 18), leftPadding + dp(avatarSizeInDp - 14) + starBgItem.getMeasuredWidth(), viewTop + dp(avatarSizeInDp - 18) + starBgItem.getMeasuredHeight());
+            starBgItem.layout(avatarLeftEdge + dp(avatarSizeInDp - 14), viewTop + dp(avatarSizeInDp - 18), avatarLeftEdge + dp(avatarSizeInDp - 14) + starBgItem.getMeasuredWidth(), viewTop + dp(avatarSizeInDp - 18) + starBgItem.getMeasuredHeight());
         }
         if (starFgItem != null) {
-            starFgItem.layout(leftPadding + dp(avatarSizeInDp - 14), viewTop + dp(avatarSizeInDp - 18), leftPadding + dp(avatarSizeInDp - 14) + starFgItem.getMeasuredWidth(), viewTop + dp(avatarSizeInDp - 18) + starFgItem.getMeasuredHeight());
+            starFgItem.layout(avatarLeftEdge + dp(avatarSizeInDp - 14), viewTop + dp(avatarSizeInDp - 18), avatarLeftEdge + dp(avatarSizeInDp - 14) + starFgItem.getMeasuredWidth(), viewTop + dp(avatarSizeInDp - 18) + starFgItem.getMeasuredHeight());
         }
         if (subtitleTextView != null) {
-            subtitleTextView.layout(l, subtitleTop, l + subtitleTextView.getMeasuredWidth(), subtitleTop + subtitleTextView.getTextHeight());
+            subtitleTextView.layout(lSub, subtitleTop, lSub + subtitleTextView.getMeasuredWidth(), subtitleTop + subtitleTextView.getTextHeight());
         } else if (animatedSubtitleTextView != null) {
-            animatedSubtitleTextView.layout(l, subtitleTop, l + animatedSubtitleTextView.getMeasuredWidth(), subtitleTop + animatedSubtitleTextView.getTextHeight());
+            animatedSubtitleTextView.layout(lSub, subtitleTop, lSub + animatedSubtitleTextView.getMeasuredWidth(), subtitleTop + animatedSubtitleTextView.getTextHeight());
         }
         SimpleTextView subtitleTextLargerCopyView = this.subtitleTextLargerCopyView.get();
         if (subtitleTextLargerCopyView != null) {
-            subtitleTextLargerCopyView.layout(l, subtitleTop, l + subtitleTextLargerCopyView.getMeasuredWidth(), subtitleTop + subtitleTextLargerCopyView.getTextHeight());
+            subtitleTextLargerCopyView.layout(lSub, subtitleTop, lSub + subtitleTextLargerCopyView.getMeasuredWidth(), subtitleTop + subtitleTextLargerCopyView.getTextHeight());
         }
     }
 
