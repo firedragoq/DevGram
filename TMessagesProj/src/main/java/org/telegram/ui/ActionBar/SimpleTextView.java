@@ -1195,6 +1195,14 @@ public class SimpleTextView extends View implements Drawable.Callback {
         }
         if (rightDrawable != null && rightDrawableOutside) {
             int x = Math.min(textOffsetX + textWidth + drawablePadding + (scrollingOffset == 0 ? -nextScrollX : (int) -scrollingOffset) + nextScrollX, getMaxTextWidth() - paddingRight + drawablePadding);
+            // DevGram: outside-иконки считали позицию от левого края бокса (textOffsetX≈0),
+            // не учитывая offsetX, на который calcOffset() сдвигает сам текст при
+            // Gravity.CENTER_HORIZONTAL — из-за этого при центрировании иконка попадала
+            // на середину текста вместо места сразу после него (тот же паттерн уже есть
+            // у не-outside вариантов чуть выше по файлу).
+            if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL) {
+                x += offsetX;
+            }
             int dw = (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
             int dh = (int) (rightDrawable.getIntrinsicHeight() * rightDrawableScale);
             int y;
@@ -1215,6 +1223,9 @@ public class SimpleTextView extends View implements Drawable.Callback {
             );
             if (rightDrawable != null) {
                 x += (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale) + drawablePadding;
+            }
+            if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL) {
+                x += offsetX;
             }
             int dw = (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
             int dh = (int) (rightDrawable2.getIntrinsicHeight() * rightDrawableScale);
@@ -1238,6 +1249,9 @@ public class SimpleTextView extends View implements Drawable.Callback {
             }
             if (rightDrawable2 != null) {
                 x += (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale) + drawablePadding;
+            }
+            if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL) {
+                x += offsetX;
             }
             int dw = (int) (rightDrawable3.getIntrinsicWidth() * rightDrawableScale);
             int dh = (int) (rightDrawable3.getIntrinsicHeight() * rightDrawableScale);
