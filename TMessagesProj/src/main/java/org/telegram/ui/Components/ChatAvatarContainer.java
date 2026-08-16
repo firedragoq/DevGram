@@ -671,17 +671,20 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         final int availableWidth = width - dp((avatarImageView.getVisibility() == VISIBLE ? (md3Header ? 59 : 54) : 0) + 16);
         int avatarInset = md3Header ? 0 : 2;
         avatarImageView.measure(MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - avatarInset, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - avatarInset, MeasureSpec.EXACTLY));
-        // DevGram: в iOS-режиме заголовок/статус центрируются (см. onLayout, dgAvatarRight) —
-        // но SimpleTextView.onMeasure() c AT_MOST-спеком по умолчанию возвращает ПОЛНУЮ ширину
-        // спека, а не фактическую ширину контента (сжимается только при widthWrapContent=true).
-        // Без этого центрирующая математика в onLayout получает измеренную ширину, равную
-        // почти всей доступной области, и «центрирование» превращается в отступ, близкий к
-        // нулю, — короткое имя чата зрительно прижимается к аватарке справа с пустотой слева.
+        // DevGram: в iOS-режиме заголовок/статус центрируются — но не через ручной пересчёт
+        // ширины бокса (пробовал: widthWrapContent + своя центрирующая математика в onLayout —
+        // сломало рендер текста из-за titleTextView.setEllipsizeByGradient(true) +
+        // setRightDrawableOutside(true): при точной подгонке ширины бокса под контент
+        // внутренний градиентный fade-клип (getMaxTextWidth()/clipRect в SimpleTextView) начинал
+        // резать текст раньше времени). Вместо этого переиспользуем уже готовый и проверенный
+        // Gravity.CENTER_HORIZONTAL — сам SimpleTextView.calcOffset() центрирует текст внутри
+        // бокса штатной, давно работающей веткой; ширина бокса остаётся как раньше (вся
+        // доступная область), меняется только выравнивание текста внутри неё.
         final boolean dgAvatarRight = MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false);
-        titleTextView.setWidthWrapContent(dgAvatarRight);
+        titleTextView.setGravity(dgAvatarRight ? Gravity.CENTER_HORIZONTAL : Gravity.LEFT);
         titleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(24 + 8), MeasureSpec.AT_MOST));
         if (subtitleTextView != null) {
-            subtitleTextView.setWidthWrapContent(dgAvatarRight);
+            subtitleTextView.setGravity(dgAvatarRight ? Gravity.CENTER_HORIZONTAL : Gravity.LEFT);
             subtitleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(20), MeasureSpec.AT_MOST));
         } else if (animatedSubtitleTextView != null) {
             animatedSubtitleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(20), MeasureSpec.AT_MOST));
@@ -802,13 +805,17 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
                 avatarInset + avatarLeftEdge + avatarImageView.getMeasuredWidth(),
                 avatarInset + viewTop + avatarImageView.getMeasuredHeight());
 
+        // DevGram: в iOS-режиме бокс заголовка/статуса начинается прямо от leftPadding (как
+        // если бы аватарки в этой строке не было вовсе) — фактическое центрирование текста
+        // внутри этого бокса делает Gravity.CENTER_HORIZONTAL, выставленный в onMeasure().
+        // Ширина бокса (availableWidth в onMeasure) уже учитывает место под аватарку, так что
+        // правый край бокса естественно не заходит на неё, независимо от того, с какой стороны
+        // аватарка физически нарисована.
         final int l;
         final int lSub;
         if (dgAvatarRight) {
-            final int textAreaRight = (avatarImageView.getVisibility() == VISIBLE ? avatarLeftEdge - dp(8) : getMeasuredWidth() - dp(16));
-            l = leftPadding + Math.max(0, (textAreaRight - leftPadding - titleTextView.getMeasuredWidth()) / 2);
-            final int subtitleWidth = subtitleTextView != null ? subtitleTextView.getMeasuredWidth() : (animatedSubtitleTextView != null ? animatedSubtitleTextView.getMeasuredWidth() : 0);
-            lSub = leftPadding + Math.max(0, (textAreaRight - leftPadding - subtitleWidth) / 2);
+            l = leftPadding;
+            lSub = leftPadding;
         } else {
             l = leftPadding + (avatarImageView.getVisibility() == VISIBLE
                     ? dp(md3Header ? avatarSizeInDp + (glassMode ? 10.66f : 12f) : (glassMode ? 49.66f : 55f))
