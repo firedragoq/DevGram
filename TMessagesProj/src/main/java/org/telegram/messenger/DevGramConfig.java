@@ -272,29 +272,39 @@ public class DevGramConfig {
                 editor.putBoolean("dg_centerTitle", true);
                 editor.apply();
                 setIosProfile(true);
+                LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, true);
+                LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, true);
                 break;
             case DESIGN_MODE_OLD:
                 // «Старый» вид: без MD3/«липкой» анимации и стеклянных эффектов — то, что
                 // реально отличает AyuGram/классический Telegram от текущего DevGram, судя по
-                // декомпиляции — не форма аватарок/баблов (там сток), а именно новые
-                // Material3/glass-эффекты, которых в AyuGram просто нет/выключены.
-                editor.putFloat("avatarCornersF", 28f);
+                // декомпиляции и реальным скриншотам — не форма баблов (там сток), а полностью
+                // круглые аватарки (не 28dp, а честный круг) и новые Material3/glass-эффекты,
+                // которых в AyuGram просто нет/выключены. Скриншот чата AyuGram также показал
+                // сплошную белую линию-разделитель под шапкой чата вместо размытия/стекла —
+                // выключаем FLAG_CHAT_BLUR/FLAG_LIQUID_GLASS, чтобы вернуть чёткую границу.
+                editor.putFloat("avatarCornersF", 30f);
                 editor.putBoolean("dg_singleCorner", false);
                 editor.putBoolean("dg_md3", false);
                 editor.putBoolean("dg_gooey", false);
                 editor.putBoolean("dg_centerTitle", false);
                 editor.apply();
                 setIosProfile(false);
+                LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, false);
+                LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, false);
                 break;
             default:
-                // DevGram — текущий дизайн мода по умолчанию.
-                editor.putFloat("avatarCornersF", 28f);
+                // DevGram — текущий дизайн мода по умолчанию: аватарки полным кругом,
+                // без «липкой» (gooey) анимации.
+                editor.putFloat("avatarCornersF", 30f);
                 editor.putBoolean("dg_singleCorner", false);
                 editor.putBoolean("dg_md3", true);
-                editor.putBoolean("dg_gooey", true);
+                editor.putBoolean("dg_gooey", false);
                 editor.putBoolean("dg_centerTitle", false);
                 editor.apply();
                 setIosProfile(true);
+                LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, true);
+                LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, true);
                 break;
         }
     }

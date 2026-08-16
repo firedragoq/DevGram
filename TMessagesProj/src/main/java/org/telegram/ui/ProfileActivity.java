@@ -8449,10 +8449,44 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (v == null) {
             return;
         }
-        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-        gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        gd.setColor(0x3D000000);
-        v.setBackground(gd);
+        // GradientDrawable(OVAL) as a plain background just stretches to the view's actual
+        // bounds - if those aren't square (e.g. the back button / QR icon slot has a wider
+        // touch target than it is tall), the "circle" renders as an uneven, oversized ellipse.
+        // Drawing our own circle clamped to the smaller side and centered guarantees a proper
+        // round pill regardless of the view's bounds.
+        v.setBackground(new DgCenteredCircleDrawable(0x3D000000));
+    }
+
+    // DevGram: круглый фон, зажатый по меньшей стороне и отцентрированный - в отличие от
+    // GradientDrawable(OVAL), не растягивается в эллипс на неквадратных вью.
+    private static class DgCenteredCircleDrawable extends Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        DgCenteredCircleDrawable(int color) {
+            paint.setColor(color);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            Rect b = getBounds();
+            float radius = Math.min(b.width(), b.height()) / 2f;
+            canvas.drawCircle(b.exactCenterX(), b.exactCenterY(), radius, paint);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            paint.setAlpha(alpha);
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter colorFilter) {
+            paint.setColorFilter(colorFilter);
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
     }
 
     // DevGram: обернуть иконку (напр. QR) в круглый полупрозрачный фон
