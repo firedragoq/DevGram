@@ -374,6 +374,10 @@ public class NotificationCenter {
     public static final int memoryLeakFoundException = totalEvents++;
     public static final int callTabsVisibleToggled = totalEvents++;
     public static final int contactsTabVisibleToggled = totalEvents++;
+    // DevGram: смена схемы позиций нижних вкладок целиком (вход/выход из iOS-режима) —
+    // отдельно от callTabsVisibleToggled/contactsTabVisibleToggled, которые рассчитаны на
+    // точечный сдвиг в РАМКАХ одной и той же схемы, а не на замену схемы целиком.
+    public static final int mainTabsSchemeChanged = totalEvents++;
     public static final int devgramMessagesDeleted = totalEvents++;
     public static final int devgramMessageEdited = totalEvents++;
     public static final int contactsPermissionBadgeCheck = totalEvents++;

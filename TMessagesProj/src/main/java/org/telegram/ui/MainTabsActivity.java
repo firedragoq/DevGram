@@ -86,6 +86,8 @@ import me.vkryl.android.animator.FactorAnimator;
 public class MainTabsActivity extends ViewPagerActivity implements NotificationCenter.NotificationCenterDelegate, FactorAnimator.Target {
 
     public static final int TABS_COUNT = 4;
+    // DevGram: стоковая (не-iOS) нумерация позиций — используется только внутри
+    // posChats()/posContacts() ниже, больше нигде напрямую не читать.
     private static final int POSITION_CHATS = 0;
     private static final int POSITION_CONTACTS = 1;
 
@@ -95,16 +97,30 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private static final int INDEX_CALLS = 3;
     private static final int INDEX_PROFILE = 4;
 
+    // DevGram: нумерация позиций ViewPager должна совпадать с видимым порядком вкладок —
+    // иначе свайп между экранами не соответствует порядку кнопок снизу (был баг: свайп
+    // прыгал между Звонками и Настройками, минуя Чаты). В iOS-режиме видимый порядок —
+    // Контакты/Звонки/Чаты/Настройки (см. visualOrder в createView()), и там же Контакты
+    // и Звонки всегда включены (нет скрытия), поэтому позиции в iOS-режиме фиксированные.
+    private int posChats() {
+        return org.telegram.ui.Components.DevGramMaterial3.iosNavigation() ? 2 : POSITION_CHATS;
+    }
+    private int posContacts() {
+        return org.telegram.ui.Components.DevGramMaterial3.iosNavigation() ? 0 : POSITION_CONTACTS;
+    }
     // DevGram: динамические позиции — когда таб «Контакты» скрыт, страниц 3 вместо 4
+    // (не относится к iOS-режиму, там Контакты нельзя скрыть)
     private int posCallsOrSettings() {
+        if (org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) return 1;
         return getUserConfig().showContactsTab ? 2 : 1;
     }
     private int posProfile() {
+        if (org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) return 3;
         return getUserConfig().showContactsTab ? 3 : 2;
     }
     private int indexToPosition(int index) {
-        if (index == INDEX_CHATS) return POSITION_CHATS;
-        if (index == INDEX_CONTACTS) return POSITION_CONTACTS;
+        if (index == INDEX_CHATS) return posChats();
+        if (index == INDEX_CONTACTS) return posContacts();
         if (index == INDEX_SETTINGS || index == INDEX_CALLS) return posCallsOrSettings();
         return posProfile();
     }
@@ -593,15 +609,15 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private void openFolder(int folderId) {
-        if (viewPager.getCurrentPosition() == POSITION_CHATS && dialogsActivity != null) {
+        if (viewPager.getCurrentPosition() == posChats() && dialogsActivity != null) {
             dialogsActivity.scrollToFolder(folderId);
         } else {
             if (dialogsActivity == null) {
                 prepareDialogsActivity(null);
             }
             pendingFolderId = folderId;
-            selectTab(POSITION_CHATS, true);
-            viewPager.scrollToPosition(POSITION_CHATS);
+            selectTab(posChats(), true);
+            viewPager.scrollToPosition(posChats());
         }
     }
 
@@ -726,7 +742,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             if (currentPosition != posProfile()) {
                 dropFragmentAtPosition(posProfile());
             }
-            if (pendingFolderId != null && currentPosition == POSITION_CHATS && dialogsActivity != null) {
+            if (pendingFolderId != null && currentPosition == posChats() && dialogsActivity != null) {
                 dialogsActivity.scrollToFolder(pendingFolderId);
                 pendingFolderId = null;
             }
@@ -758,7 +774,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     @Override
     protected int getStartPosition() {
-        return POSITION_CHATS;
+        return posChats();
     }
 
     private DialogsActivity dialogsActivity;
@@ -786,19 +802,19 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         bundle.putBoolean("hasMainTabs", true);
         dialogsActivity = new DialogsActivity(bundle);
         dialogsActivity.setMainTabsActivityController(new MainTabsActivityControllerImpl());
-        putFragmentAtPosition(POSITION_CHATS, dialogsActivity);
+        putFragmentAtPosition(posChats(), dialogsActivity);
         return dialogsActivity;
     }
 
     @Override
     protected BaseFragment createBaseFragmentAt(int position) {
-        if (position == POSITION_CHATS) {
+        if (position == posChats()) {
             Bundle args = new Bundle();
             args.putBoolean("hasMainTabs", true);
             dialogsActivity = new DialogsActivity(args);
             dialogsActivity.setMainTabsActivityController(new MainTabsActivityControllerImpl());
             return dialogsActivity;
-        } else if (getUserConfig().showContactsTab && position == POSITION_CONTACTS) {
+        } else if (getUserConfig().showContactsTab && position == posContacts()) {
             Bundle args = new Bundle();
             args.putBoolean("needPhonebook", true);
             args.putBoolean("needFinishFragment", false);
@@ -976,26 +992,19 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         } else if (id == NotificationCenter.needSetDayNightTheme) {
             clearAllHiddenFragments();
         } else if (id == NotificationCenter.contactsTabVisibleToggled) {
+            // DevGram: только точечный сдвиг в рамках одной и той же (стоковой) схемы позиций —
+            // смена схемы целиком (вход/выход из iOS-режима) обрабатывается отдельно,
+            // см. mainTabsSchemeChanged ниже.
             // DevGram: остаёмся на текущем табе и сохраняем его состояние/скролл
             final boolean nowShown = getUserConfig().showContactsTab;
             final BaseFragment cur = getCurrentVisibleFragment();
             final int target;
-            if (org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) {
-                // DevGram: в iOS-режиме бывший слот профиля занят SettingsActivity, а
-                // слот Звонки/Настройки всегда занят CallLogActivity — классификация другая.
-                if (cur instanceof SettingsActivity) {
-                    target = posProfile();
-                } else if (cur instanceof CallLogActivity) {
-                    target = posCallsOrSettings();
-                } else {
-                    target = POSITION_CHATS;
-                }
-            } else if (cur instanceof ProfileActivity) {
+            if (cur instanceof ProfileActivity) {
                 target = posProfile();
             } else if (cur instanceof CallLogActivity || cur instanceof SettingsActivity) {
                 target = posCallsOrSettings();
             } else {
-                target = POSITION_CHATS;
+                target = posChats();
             }
             checkUi_contactsTabVisible(nowShown, false);
             // переставляем существующие фрагменты по новым позициям (не пересоздаём -> скролл сохраняется)
@@ -1003,22 +1012,32 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 moveFragment(2, 3); // профиль 2->3
                 moveFragment(1, 2); // звонки/настройки 1->2, позиция 1 (контакты) освобождается
             } else {
-                destroyFragmentAt(POSITION_CONTACTS); // убрать контакты
+                destroyFragmentAt(posContacts());
                 moveFragment(2, 1); // звонки/настройки 2->1
                 moveFragment(3, 2); // профиль 3->2
             }
             rebuildPagerAt(target);
             selectTab(target, false);
         } else if (id == NotificationCenter.callTabsVisibleToggled) {
+            // DevGram: только точечный сдвиг в рамках одной и той же (стоковой) схемы —
+            // смена схемы целиком см. mainTabsSchemeChanged ниже.
             final boolean callTabsVisible = getUserConfig().showCallsTab;
             checkUi_callTabVisible(callTabsVisible, true);
             if (viewPager != null && viewPager.getCurrentPosition() == posCallsOrSettings()) {
-                viewPager.scrollToPosition(POSITION_CHATS);
-                selectTab(POSITION_CHATS, true);
+                viewPager.scrollToPosition(posChats());
+                selectTab(posChats(), true);
                 dropCallsFragmentAfterPageScroll = true;
             } else {
                 dropFragmentAtPosition(posCallsOrSettings());
             }
+        } else if (id == NotificationCenter.mainTabsSchemeChanged) {
+            // DevGram: вход/выход из iOS-режима — полная смена схемы позиций, а не точечный
+            // сдвиг. Чистим кэш фрагментов целиком; кнопки/порядок таб-бара пересоберутся
+            // через clearViews() (см. DevGramCategoryActivity.refreshThenRebuildAppearanceScreens()),
+            // когда пользователь вернётся на этот экран.
+            checkUi_contactsTabVisible(getUserConfig().showContactsTab, false);
+            checkUi_callTabVisible(getUserConfig().showCallsTab, false);
+            rebuildTabs(posChats());
         } else if (id == NotificationCenter.mainUserInfoChanged) {
             if (tabs != null && tabs[INDEX_PROFILE] != null) {
                 tabs[INDEX_PROFILE].updateUserAvatar(currentAccount);
@@ -1042,6 +1061,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             .add(NotificationCenter.updateInterfaces)
             .add(NotificationCenter.callTabsVisibleToggled)
             .add(NotificationCenter.contactsTabVisibleToggled)
+            .add(NotificationCenter.mainTabsSchemeChanged)
             .add(NotificationCenter.mainUserInfoChanged)
             .add(NotificationCenter.contactsPermissionBadgeCheck);
 

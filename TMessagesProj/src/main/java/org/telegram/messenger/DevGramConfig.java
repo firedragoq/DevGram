@@ -258,6 +258,7 @@ public class DevGramConfig {
     // радиус аватарок, MD3-эффекты, «липкая» анимация и т.п.). Пользователь может донастроить
     // каждый пункт вручную после применения пресета — это отправная точка, не жёсткая блокировка.
     public static void applyDesignPreset(int mode) {
+        final boolean wasIos = org.telegram.ui.Components.DevGramMaterial3.iosNavigation();
         setDesignMode(mode);
         SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
         switch (mode) {
@@ -314,6 +315,7 @@ public class DevGramConfig {
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, false);
                 LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, false);
                 resetContactsTabToHidden();
+                resetCallsTabToHidden();
                 break;
             default:
                 // DevGram — текущий дизайн мода по умолчанию: аватарки полным кругом,
@@ -328,7 +330,21 @@ public class DevGramConfig {
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, true);
                 LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, true);
                 resetContactsTabToHidden();
+                resetCallsTabToHidden();
                 break;
+        }
+
+        // DevGram: вход/выход из iOS-режима полностью меняет схему нумерации позиций нижних
+        // вкладок (не точечный сдвиг, как при обычном скрытии/показе Контактов/Звонков) —
+        // шлём отдельное уведомление, чтобы MainTabsActivity сделал чистый пересбор кэша
+        // фрагментов (см. mainTabsSchemeChanged в NotificationCenter/MainTabsActivity).
+        final boolean isIos = org.telegram.ui.Components.DevGramMaterial3.iosNavigation();
+        if (wasIos != isIos) {
+            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                if (UserConfig.getInstance(a).isClientActivated()) {
+                    NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.mainTabsSchemeChanged);
+                }
+            }
         }
     }
 
@@ -343,6 +359,22 @@ public class DevGramConfig {
                 userConfig.setShowContactsTab(false);
                 if (contactsWasShown) {
                     NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+                }
+            }
+        }
+    }
+
+    // DevGram: «Звонки» вместо «Настроек» в общем слоте — тоже только для iOS-режима (там
+    // Звонки всегда включены и их нельзя скрыть). Если включили через iOS-пресет, при
+    // переключении на DevGram/«Старый» возвращаем «Настройки» на их место в этом слоте.
+    private static void resetCallsTabToHidden() {
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                UserConfig userConfig = UserConfig.getInstance(a);
+                boolean callsWasShown = userConfig.showCallsTab;
+                userConfig.setShowCallsTab(false);
+                if (callsWasShown) {
+                    NotificationCenter.getInstance(a).postNotificationName(NotificationCenter.callTabsVisibleToggled);
                 }
             }
         }
