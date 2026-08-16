@@ -1827,17 +1827,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             // not running during this window at all - firstLayout stayed true and layoutReq
             // stayed true no matter how long we waited, even well after dialogsLoaded flipped to
             // true, meaning the hidden-archive scroll-restoration code (and the firstLayout=false
-            // flip that depends on it) never got a chance to execute, fixed offset or not. A
-            // forced requestLayout()+measure()+layout() pass used to live here to force that
-            // traversal, but it was removed because it kept landing mid-animation on a stale
-            // scrollYOffset and leaving a gap - that offset bug has since been fixed at the
-            // source in onMeasure() (skippingHiddenArchiveRow now anchors at 0 instead of a
-            // stale top), so forcing onMeasure() to actually run here is safe again and is what
-            // actually lets it resolve both the empty list and the archive-skip correctly instead
-            // of leaving them stuck until some unrelated navigation forces a fresh traversal.
-            hasVisiblePosition = parentPage.layoutManager != null
-                    && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
-            if ((getChildCount() == 0 || !hasVisiblePosition) && !isComputingLayout()) {
+            // flip that depends on it) never got a chance to execute, fixed offset or not. Gating
+            // this forced pass on getChildCount()==0 turned out to be the wrong condition: by the
+            // time the adapter grows to the real dialog list, children are usually already
+            // populated (scrollBy(0, 0) above handles that on its own), so that check was false
+            // and this whole block silently never ran, even though isLayoutRequested() was still
+            // stuck true (same signal used for the ActionBar title below) - meaning onMeasure()
+            // itself never got a chance to run, and the archive-skip anchoring fix inside it never
+            // got a chance to apply. Trigger this forced pass on that stuck layout request
+            // instead, so it fires whenever it's actually needed rather than only when the list
+            // happens to be completely empty.
+            if ((getChildCount() == 0 || isLayoutRequested()) && !isComputingLayout()) {
                 try {
                     requestLayout();
                     forceLayout();
