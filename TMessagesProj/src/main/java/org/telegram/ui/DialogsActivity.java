@@ -1732,6 +1732,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         private RecyclerView.Adapter observedInitialLayoutAdapter;
         private boolean initialLayoutCheckPosted;
         private int initialLayoutRetryCount;
+        private int initialLayoutConfirmedItemCount = -1;
         private ViewTreeObserver.OnGlobalLayoutListener initialLayoutGlobalListener;
 
         private final RecyclerView.AdapterDataObserver initialLayoutObserver = new RecyclerView.AdapterDataObserver() {
@@ -1813,9 +1814,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 return;
             }
 
+            int itemCount = adapter.getItemCount();
             boolean hasVisiblePosition = parentPage.layoutManager != null
                     && parentPage.layoutManager.findFirstVisibleItemPosition() != RecyclerView.NO_POSITION;
-            if (getChildCount() != 0 && hasVisiblePosition) {
+            // A lone "loading" placeholder row satisfies childCount!=0/hasVisiblePosition just as
+            // well as a real dialog cell does, so this check used to report "already-ok" the
+            // moment that placeholder appeared and never look again - even after the adapter
+            // later grew from that single placeholder item to the real (e.g. 106-item) dialog
+            // list, since the stale placeholder child was still sitting there satisfying the
+            // check. Comparing against the item count we last actually confirmed a layout for
+            // makes sure a later data load re-triggers the forced pass below instead of being
+            // silently swallowed by this early return.
+            if (getChildCount() != 0 && hasVisiblePosition && initialLayoutConfirmedItemCount == itemCount) {
                 logInitialLayoutWatchdog("already-ok");
                 initialLayoutRetryCount = 0;
                 removeInitialLayoutGlobalListener();
@@ -1872,6 +1882,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             } else {
                 logInitialLayoutWatchdog("resolved children=" + getChildCount());
                 initialLayoutRetryCount = 0;
+                initialLayoutConfirmedItemCount = itemCount;
                 removeInitialLayoutGlobalListener();
             }
         }
@@ -2218,6 +2229,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             super.onAttachedToWindow();
             initialLayoutCheckPosted = false;
             initialLayoutRetryCount = 0;
+            initialLayoutConfirmedItemCount = -1;
             scheduleInitialLayoutCheck();
         }
 
@@ -2241,6 +2253,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             firstLayout = true;
             initialLayoutRetryCount = 0;
+            initialLayoutConfirmedItemCount = -1;
             scheduleInitialLayoutCheck();
         }
 
