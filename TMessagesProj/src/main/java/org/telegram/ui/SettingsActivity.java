@@ -719,35 +719,48 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(UItem.asShadow(null));
         }
 
-        // DevGram: настройки мода — первым пунктом (как в exteraGram)
-        items.add(SettingCell.Factory.of(250, 0xFF2AABEE, 0xFF229ED9, R.drawable.settings_devgram, "DevGram", "Настройки мода"));
-        items.add(UItem.asShadow(null));
-
-        // DevGram: в режиме дизайна «iOS» разбиваем этот блок на несколько мелких карточек
-        // (как в Settings.app/Telegram-iOS) вместо одной большой — стоковая exteraGram
-        // группировка (всё одним списком) остаётся для остальных режимов дизайна. Цвета
-        // значков в этом режиме тоже подогнаны под реальные скриншоты Swiftgram/Telegram-iOS
-        // (форма/цвета квадратов там заметно отличаются от нашего дефолтного набора).
+        // DevGram: в режиме дизайна «iOS» полностью повторяем структуру карточек реального
+        // Settings-экрана Telegram-iOS/Swiftgram (сверялись по 3 скриншотам от пользователя):
+        // «Мой профиль» отдельной карточкой, затем DevGram, затем «Избранное/Недавние звонки/
+        // Устройства/Папки», затем «Уведомления/Приватность/Данные/Чат/Энергосбережение/Язык».
+        // Для остальных режимов дизайна порядок и группировка — стоковые exteraGram (как было).
         boolean iosGrouping = org.telegram.messenger.DevGramConfig.getDesignMode() == org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS;
-        IconBackgroundColors accountColor = iosGrouping ? IconBackgroundColors.RED : IconBackgroundColors.BLUE;
-        IconBackgroundColors privacyColor = iosGrouping ? IconBackgroundColors.GRAY : IconBackgroundColors.GREEN;
-        IconBackgroundColors dataColor = iosGrouping ? IconBackgroundColors.GREEN : IconBackgroundColors.BLUE_DEEP;
-        IconBackgroundColors devicesColor = iosGrouping ? IconBackgroundColors.ORANGE : IconBackgroundColors.CYAN;
-        IconBackgroundColors languageColor = iosGrouping ? IconBackgroundColors.BLUE : IconBackgroundColors.PURPLE;
-        items.add(SettingCell.Factory.of(1, accountColor.top, accountColor.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
-        if (iosGrouping) items.add(UItem.asShadow(null));
-        items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
-        items.add(SettingCell.Factory.of(3, privacyColor.top, privacyColor.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
-        items.add(SettingCell.Factory.of(5, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
-        if (iosGrouping) items.add(UItem.asShadow(null));
-        items.add(SettingCell.Factory.of(6, dataColor.top, dataColor.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
-        items.add(SettingCell.Factory.of(7, IconBackgroundColors.BLUE_ALT.top, IconBackgroundColors.BLUE_ALT.bottom, R.drawable.settings_folders, getString(R.string.SettingsFolders), getString(R.string.SettingsFoldersInfo)));
-        items.add(SettingCell.Factory.of(8, devicesColor.top, devicesColor.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
-        items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
-        if (iosGrouping) items.add(UItem.asShadow(null));
-        items.add(SettingCell.Factory.of(10, languageColor.top, languageColor.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
+        if (iosGrouping) {
+            items.add(SettingCell.Factory.of(51, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_account, "Мой профиль"));
+            items.add(UItem.asShadow(null));
 
-        items.add(UItem.asShadow(null));
+            items.add(SettingCell.Factory.of(250, 0xFF2AABEE, 0xFF229ED9, R.drawable.settings_devgram, "DevGram", "Настройки мода"));
+            items.add(UItem.asShadow(null));
+
+            items.add(SettingCell.Factory.of(52, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.outline_saved_24, getString(R.string.SavedMessages)));
+            items.add(SettingCell.Factory.of(53, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.outline_profile_call_24, "Недавние звонки"));
+            items.add(SettingCell.Factory.of(8, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
+            items.add(SettingCell.Factory.of(7, IconBackgroundColors.BLUE_ALT.top, IconBackgroundColors.BLUE_ALT.bottom, R.drawable.settings_folders, getString(R.string.SettingsFolders), getString(R.string.SettingsFoldersInfo)));
+            items.add(UItem.asShadow(null));
+
+            items.add(SettingCell.Factory.of(5, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
+            items.add(SettingCell.Factory.of(3, IconBackgroundColors.GRAY.top, IconBackgroundColors.GRAY.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
+            items.add(SettingCell.Factory.of(6, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
+            items.add(SettingCell.Factory.of(2, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
+            items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
+            items.add(SettingCell.Factory.of(10, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
+            items.add(UItem.asShadow(null));
+        } else {
+            // DevGram: настройки мода — первым пунктом (как в exteraGram)
+            items.add(SettingCell.Factory.of(250, 0xFF2AABEE, 0xFF229ED9, R.drawable.settings_devgram, "DevGram", "Настройки мода"));
+            items.add(UItem.asShadow(null));
+
+            items.add(SettingCell.Factory.of(1, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
+            items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
+            items.add(SettingCell.Factory.of(3, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
+            items.add(SettingCell.Factory.of(5, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
+            items.add(SettingCell.Factory.of(6, IconBackgroundColors.BLUE_DEEP.top, IconBackgroundColors.BLUE_DEEP.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
+            items.add(SettingCell.Factory.of(7, IconBackgroundColors.BLUE_ALT.top, IconBackgroundColors.BLUE_ALT.bottom, R.drawable.settings_folders, getString(R.string.SettingsFolders), getString(R.string.SettingsFoldersInfo)));
+            items.add(SettingCell.Factory.of(8, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
+            items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
+            items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
+            items.add(UItem.asShadow(null));
+        }
 
         if (!getMessagesController().premiumFeaturesBlocked()) {
             items.add(SettingCell.Factory.of(11, 0xFFB659FF, 0xFF617CFF, R.drawable.settings_premium, getString(R.string.TelegramPremium)));
@@ -867,6 +880,21 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         switch (item.id) {
             case 1:
                 presentSettingFragment(new UserInfoActivity());
+                break;
+            case 51: {
+                Bundle args = new Bundle();
+                args.putLong("user_id", getUserConfig().getClientUserId());
+                presentSettingFragment(new ProfileActivity(args));
+                break;
+            }
+            case 52: {
+                Bundle args = new Bundle();
+                args.putLong("user_id", getUserConfig().getClientUserId());
+                presentSettingFragment(new ChatActivity(args));
+                break;
+            }
+            case 53:
+                presentSettingFragment(new CallLogActivity());
                 break;
             case 2:
                 presentSettingFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC));
