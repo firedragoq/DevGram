@@ -671,8 +671,17 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         final int availableWidth = width - dp((avatarImageView.getVisibility() == VISIBLE ? (md3Header ? 59 : 54) : 0) + 16);
         int avatarInset = md3Header ? 0 : 2;
         avatarImageView.measure(MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - avatarInset, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(avatarSizeInDp) - avatarInset, MeasureSpec.EXACTLY));
+        // DevGram: в iOS-режиме заголовок/статус центрируются (см. onLayout, dgAvatarRight) —
+        // но SimpleTextView.onMeasure() c AT_MOST-спеком по умолчанию возвращает ПОЛНУЮ ширину
+        // спека, а не фактическую ширину контента (сжимается только при widthWrapContent=true).
+        // Без этого центрирующая математика в onLayout получает измеренную ширину, равную
+        // почти всей доступной области, и «центрирование» превращается в отступ, близкий к
+        // нулю, — короткое имя чата зрительно прижимается к аватарке справа с пустотой слева.
+        final boolean dgAvatarRight = MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false);
+        titleTextView.setWidthWrapContent(dgAvatarRight);
         titleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(24 + 8), MeasureSpec.AT_MOST));
         if (subtitleTextView != null) {
+            subtitleTextView.setWidthWrapContent(dgAvatarRight);
             subtitleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(20), MeasureSpec.AT_MOST));
         } else if (animatedSubtitleTextView != null) {
             animatedSubtitleTextView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(20), MeasureSpec.AT_MOST));
