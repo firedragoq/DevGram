@@ -591,8 +591,12 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asCheck(ID_GOOEY, "«Липкая» анимация аватарок")
                     .setChecked(gPref("dg_gooey", true)));
             items.add(UItem.asHeader("Интерфейс DevGram"));
-            items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
-                    .setChecked(getUserConfig().showContactsTab));
+            // DevGram: в режиме дизайна iOS «Контакты» всегда показаны в нижнем меню
+            // (как в Settings.app/Telegram-iOS) — тумблер скрытия не показываем.
+            if (!org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) {
+                items.add(UItem.asCheck(ID_SHOW_CONTACTS, "Показывать «Контакты» в нижнем меню")
+                        .setChecked(getUserConfig().showContactsTab));
+            }
             items.add(UItem.asCheck(ID_HIDE_EMOJI_CATEGORIES, "Скрыть категории в поиске эмодзи")
                     .setChecked(DevGramConfig.hideEmojiCategories));
             items.add(UItem.asShadow("Настройки навигации, профилей и панели выбора эмодзи."));

@@ -274,6 +274,13 @@ public class DevGramConfig {
                 setIosProfile(true);
                 LiteMode.toggleFlag(LiteMode.FLAG_CHAT_BLUR, true);
                 LiteMode.toggleFlag(LiteMode.FLAG_LIQUID_GLASS, true);
+                // В iOS-режиме вкладка «Контакты» всегда видна в нижнем меню (как в
+                // Settings.app/Telegram-iOS) — включаем сразу и прячем возможность её скрыть.
+                for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                    if (UserConfig.getInstance(a).isClientActivated()) {
+                        UserConfig.getInstance(a).setShowContactsTab(true);
+                    }
+                }
                 break;
             case DESIGN_MODE_OLD:
                 // «Старый» вид: без MD3/«липкой» анимации и стеклянных эффектов — то, что

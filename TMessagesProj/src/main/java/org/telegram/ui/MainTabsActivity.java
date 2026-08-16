@@ -296,9 +296,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsView = new MainTabsLayout(context, resourceProvider);
         tabsView.setClipChildren(false);
         boolean md3Navigation = org.telegram.ui.Components.DevGramMaterial3.navigationEnabled();
-        int tabsPadding = md3Navigation ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN + 4);
+        boolean iosNavigation = org.telegram.ui.Components.DevGramMaterial3.iosNavigation();
+        int tabsPadding = (md3Navigation || iosNavigation) ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN + 4);
         tabsView.setPadding(tabsPadding, tabsPadding, tabsPadding, tabsPadding);
-        tabsView.setMaxWidth(md3Navigation ? 0 : dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
+        tabsView.setMaxWidth((md3Navigation || iosNavigation) ? 0 : dp(328 + DialogsActivity.MAIN_TABS_MARGIN * 2));
 
         tabs = new GlassTabView[5];
         tabs[INDEX_CHATS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
@@ -357,8 +358,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewBackground = iBlur3FactoryGlass.create(tabsView, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
         // A full-width rectangular M3 bar looks especially heavy over gesture navigation.
         // Keep the M3 item geometry, but present the bar as a rounded 28dp container.
-        tabsViewBackground.setRadius(md3Navigation ? dp(org.telegram.ui.Components.DevGramMaterial3.RADIUS_LARGE_DP) : dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
-        tabsViewBackground.setPadding(md3Navigation ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
+        // DevGram: в iOS-режиме — плоская полоса на всю ширину без скруглений/отступов,
+        // как в Settings.app/Telegram-iOS, вместо плавающей капсулы.
+        tabsViewBackground.setRadius(iosNavigation ? 0 : (md3Navigation ? dp(org.telegram.ui.Components.DevGramMaterial3.RADIUS_LARGE_DP) : dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f)));
+        tabsViewBackground.setPadding(iosNavigation ? 0 : (md3Navigation ? 0 : dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f)));
         tabsView.setBackground(tabsViewBackground);
 
         BlurredBackgroundDrawableViewFactory iBlur3FactoryFade = new BlurredBackgroundDrawableViewFactory(iBlur3SourceColor);
@@ -420,11 +423,15 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             presentFragment(new CallLogActivity(args));
         });
         o.addChecked(UserConfig.getInstance(currentAccount).syncContacts, getString(R.string.SyncContacts), this::forkToggleSyncContacts);
-        o.add(R.drawable.msg_archive_hide, "Скрыть кнопку", () -> {
-            getUserConfig().setShowContactsTab(false);
-            checkUi_contactsTabVisible(false, true);
-            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
-        });
+        // DevGram: в iOS-режиме «Контакты» нельзя скрыть из нижнего меню (как в
+        // Settings.app/Telegram-iOS) — пункт скрытия просто не показываем.
+        if (!org.telegram.ui.Components.DevGramMaterial3.iosNavigation()) {
+            o.add(R.drawable.msg_archive_hide, "Скрыть кнопку", () -> {
+                getUserConfig().setShowContactsTab(false);
+                checkUi_contactsTabVisible(false, true);
+                NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsTabVisibleToggled);
+            });
+        }
         o.setBlur(true);
         o.translate(0, -dp(4));
         o.setGravity(Gravity.LEFT);
