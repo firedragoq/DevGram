@@ -4609,13 +4609,22 @@ public class ChatActivity extends BaseFragment implements
             menu.addItem(edit_quick_reply, R.drawable.group_edit).setContentDescription(LocaleController.getString(R.string.Edit));
         }
 
-        if (UserObject.isBotForumWithEditableTopics(currentUser) && chatMode == 0) {
+        // DevGram: обе иконки сидят ЛЕВЕЕ аватарки/headerItem — она их не перекрывает, а
+        // общий стеклянный фон меню в iOS-режиме гашу (hideGlassMenuPill, см. ниже), так что
+        // без исключения они торчали бы «голыми» без подложки (тот же баг, что был со
+        // звонком). Обе есть чем заменить: topicCreateItem не найден в референсе Swiftgram
+        // вообще, а searchIconItem — просто ярлык к тому же поиску, что уже открывается
+        // тапом/свайпом по заголовку (canSearch()/openSearch() в ChatAvatarContainer ниже).
+        final boolean dgIosHeader = MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false);
+        if (UserObject.isBotForumWithEditableTopics(currentUser) && chatMode == 0 && !dgIosHeader) {
             topicCreateItem = menu.addItem(chat_menu_topic_create, R.drawable.menu_topic_add_30);
         }
 
         if (currentEncryptedChat == null && (chatMode == 0 || chatMode == MODE_SAVED || chatMode == MODE_SUGGESTIONS) && !isReport()) {
-            searchIconItem = menu.addItem(search, isSupportedTags() ? R.drawable.navbar_search_tag : R.drawable.outline_header_search);
-            searchIconItem.setContentDescription(LocaleController.getString(R.string.Search));
+            if (!dgIosHeader) {
+                searchIconItem = menu.addItem(search, isSupportedTags() ? R.drawable.navbar_search_tag : R.drawable.outline_header_search);
+                searchIconItem.setContentDescription(LocaleController.getString(R.string.Search));
+            }
             searchItem = menu.addItem(chat_menu_search, R.drawable.outline_header_search, themeDelegate);
             searchItem.setSearchPaddingStart(7);
             searchItem.setIsSearchField(true);

@@ -2290,7 +2290,13 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 glassDrawableBack.setBounds(0, t, s + p * 2, b);
                 glassDrawableBack.draw(canvas);
             }
-            if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack && !hideGlassMenuPill) {
+            // DevGram: hideGlassMenuPill гасит фон только под «⋮», которую в iOS-режиме
+            // перекрывает аватарка — но та же «пилюля» используется и для панели действий
+            // при выделении сообщений (save/edit/copy/forward/delete и т.д., до 9 иконок),
+            // а аватарка на время выделения сама скрывается (checkUi_avatarContainerVisibility
+            // в ChatActivity) — прикрывать там нечего, и без этой проверки весь ряд иконок
+            // остался бы без подложки.
+            if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack && !(hideGlassMenuPill && !actionModeVisible)) {
                 glassDrawableMenu.setBounds(getWidth() - Math.max(s, menuWidth) - p * 2, t, getWidth(), b);
                 glassDrawableMenu.setAlpha(hasForcedMenuWidth ? 255 : (int) (255 * animatorHasMenuItems.getFloatValue()));
                 glassDrawableMenu.draw(canvas);
