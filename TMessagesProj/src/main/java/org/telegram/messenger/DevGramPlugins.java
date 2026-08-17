@@ -2062,7 +2062,12 @@ public class DevGramPlugins {
         });
     }
 
-    private static void appendPluginHistory(String pluginId, String action, String details, long actorId, String actorName) {
+    // token — токен модератора (RTDB-правило на /plugin_history требует именно admin/mod auth).
+    // Раньше запрос уходил вообще без ?auth= и сервер всегда отклонял запись (403) — история
+    // модераторских действий по факту никогда не сохранялась. Вызовы от обычного пользователя
+    // (заявка на публикацию) токена не имеют — передают null, запись как и раньше не пишется:
+    // это ограничение самого правила (история — только для admin/mod), а не баг этого вызова.
+    private static void appendPluginHistory(String pluginId, String action, String details, long actorId, String actorName, String token) {
         try {
             org.json.JSONObject o = new org.json.JSONObject();
             o.put("action", action);
@@ -2071,7 +2076,11 @@ public class DevGramPlugins {
             o.put("actorName", actorName == null ? "" : actorName);
             o.put("date", System.currentTimeMillis());
             String key = System.currentTimeMillis() + "_" + Math.abs((action + actorId).hashCode());
-            httpVerified("PUT", RTDB + "/plugin_history/" + safeKey(pluginId) + "/" + key + ".json", o.toString());
+            String url = RTDB + "/plugin_history/" + safeKey(pluginId) + "/" + key + ".json";
+            if (token != null && !token.isEmpty()) {
+                url += "?auth=" + token;
+            }
+            httpVerified("PUT", url, o.toString());
         } catch (Throwable e) {
             FileLog.e(e);
         }
@@ -2566,7 +2575,7 @@ public class DevGramPlugins {
             NET_QUEUE.execute(() ->
             {
                 httpVerified("PUT", RTDB + "/plugins_pending/" + key + ".json", body);
-                appendPluginHistory(e.id, e.update ? "update_submitted" : "submitted", e.version, e.submitterId, e.submitterName);
+                appendPluginHistory(e.id, e.update ? "update_submitted" : "submitted", e.version, e.submitterId, e.submitterName, null);
             });
             return 1;
         } catch (Throwable ex) {
@@ -2596,7 +2605,7 @@ public class DevGramPlugins {
                         written = httpVerified("PUT", RTDB + "/plugins_pending/" + key + ".json", entryJson(e).toString());
                     }
                     if (written && nodeHasKey("plugins_pending", key)) {
-                        appendPluginHistory(e.id, e.update ? "update_submitted" : "submitted", e.version, e.submitterId, e.submitterName);
+                        appendPluginHistory(e.id, e.update ? "update_submitted" : "submitted", e.version, e.submitterId, e.submitterName, null);
                         result = 1;
                     }
                 }
@@ -2629,7 +2638,7 @@ public class DevGramPlugins {
                 }
                 httpVerified("DELETE", RTDB + "/plugins_pending/" + key + ".json?auth=" + token, null);
                 httpVerified("DELETE", RTDB + "/plugins_rejected/" + key + ".json?auth=" + token, null);
-                appendPluginHistory(e.id, "approved", e.version, myId(), "Модератор");
+                appendPluginHistory(e.id, "approved", e.version, myId(), "Модератор", token);
             });
             return true;
         } catch (Throwable ex) {
@@ -2644,7 +2653,7 @@ public class DevGramPlugins {
         String raw = readNode(RTDB + "/plugin_backups/" + safeKey(pluginId) + "/" + safeKey(backupKey) + ".json");
         if (raw == null || raw.isEmpty() || "null".equals(raw)) return false;
         final String key = safeKey(pluginId);
-        NET_QUEUE.execute(() -> { httpVerified("PUT", RTDB + "/plugins_catalog/" + key + ".json?auth=" + token, raw); appendPluginHistory(pluginId, "rollback", backupKey, myId(), "Модератор"); });
+        NET_QUEUE.execute(() -> { httpVerified("PUT", RTDB + "/plugins_catalog/" + key + ".json?auth=" + token, raw); appendPluginHistory(pluginId, "rollback", backupKey, myId(), "Модератор", token); });
         return true;
     }
 
@@ -2680,7 +2689,7 @@ public class DevGramPlugins {
             if (hash != null) {
                 httpVerified("PUT", RTDB + "/plugins_blocked/" + hash + ".json?auth=" + token, "\"blocked\"");
             }
-            appendPluginHistory(e.id, block ? "rejected_blocked" : "rejected", reason, myId(), "Модератор");
+            appendPluginHistory(e.id, block ? "rejected_blocked" : "rejected", reason, myId(), "Модератор", token);
             notifyPluginUser(e.submitterId,"publication_rejected","Публикация отклонена",reason,e.id,token);
         });
         return true;
@@ -2698,7 +2707,7 @@ public class DevGramPlugins {
             return false;
         }
         final String safe = safeKey(pluginId);
-        NET_QUEUE.execute(() -> {httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null);notifyPluginUser(entry.submitterId,"plugin_deleted","Плагин удалён из каталога",reason,entry.id,token);appendPluginHistory(entry.id,"deleted",reason,myId(),"Модератор");});
+        NET_QUEUE.execute(() -> {httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null);notifyPluginUser(entry.submitterId,"plugin_deleted","Плагин удалён из каталога",reason,entry.id,token);appendPluginHistory(entry.id,"deleted",reason,myId(),"Модератор",token);});
         return true;
     }
     public static boolean catalogDelete(String pluginId){CatalogEntry e=new CatalogEntry();e.id=pluginId;return catalogDelete(e,"Удалено модератором");}
@@ -2723,7 +2732,7 @@ public class DevGramPlugins {
             if (hash != null) {
                 httpVerified("PUT", RTDB + "/plugins_blocked/" + hash + ".json?auth=" + token, "\"blocked\"");
             }
-            notifyPluginUser(entry.submitterId,"plugin_deleted_blocked","Плагин удалён и заблокирован",reason,entry.id,token);appendPluginHistory(entry.id,"deleted_blocked",reason,myId(),"Модератор");
+            notifyPluginUser(entry.submitterId,"plugin_deleted_blocked","Плагин удалён и заблокирован",reason,entry.id,token);appendPluginHistory(entry.id,"deleted_blocked",reason,myId(),"Модератор",token);
         });
         return true;
     }
@@ -3124,7 +3133,9 @@ public class DevGramPlugins {
 
     private static String firebaseAnonUid() { firebaseAnonToken(); return firebaseAnonUid == null ? "" : firebaseAnonUid; }
 
-    private static synchronized String firebaseAnonToken() {
+    // Package-private (не private): переиспользуется из DevGramStreaks для авторизации
+    // запросов к /streaks (тот же анонимный Firebase-аккаунт на пользователя устройства).
+    static synchronized String firebaseAnonToken() {
         if (firebaseAnonToken != null) return firebaseAnonToken;
         java.net.HttpURLConnection c = null;
         try {

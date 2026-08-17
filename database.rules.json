@@ -8,9 +8,9 @@
       ".write": "auth != null && auth.uid === 'cZUBpCEJWVNAZEuChkG52gdgs0K2'"
     },
     "streaks": {
-      ".read": true,
+      ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null"
       }
     },
     "plugins_verified": {

@@ -60,6 +60,23 @@ public class DevGramStreaks {
         return Long.toString(dialogId);
     }
 
+    // Правило RTDB на /streaks требует auth != null (и на чтение, и на запись) — раньше сюда
+    // ходили вообще без токена, поэтому ЛЮБАЯ запись всегда отклонялась сервером (401,
+    // молча проглатывалось в httpSend), а чтение было полностью открыто кому угодно без
+    // приложения. Анонимный Firebase-токен уже есть в DevGramPlugins (используется для
+    // отзывов/жалоб на плагины) — переиспользуем его здесь же.
+    private static String withAuth(String url) {
+        try {
+            String token = DevGramPlugins.firebaseAnonToken();
+            if (token == null || token.isEmpty()) {
+                return url;
+            }
+            return url + (url.contains("?") ? "&" : "?") + "auth=" + java.net.URLEncoder.encode(token, "UTF-8");
+        } catch (Throwable e) {
+            return url;
+        }
+    }
+
     // Подпись по тапу на огонёк.
     public static CharSequence streakText(CharSequence name, int count) {
         if (name == null) {
@@ -184,7 +201,7 @@ public class DevGramStreaks {
                 } catch (Throwable e) {
                     continue;
                 }
-                String otherJson = httpSend("GET", RTDB_BASE + "/streaks/" + dialogId + "/" + myId + ".json", null);
+                String otherJson = httpSend("GET", withAuth(RTDB_BASE + "/streaks/" + dialogId + "/" + myId + ".json"), null);
                 if (otherJson == null) {
                     continue;
                 }
@@ -214,7 +231,7 @@ public class DevGramStreaks {
                     any = true;
                     final String mm = merged;
                     final long did = dialogId;
-                    httpSend("PUT", RTDB_BASE + "/streaks/" + myId + "/" + did + ".json", "\"" + mm + "\"");
+                    httpSend("PUT", withAuth(RTDB_BASE + "/streaks/" + myId + "/" + did + ".json"), "\"" + mm + "\"");
                 }
             }
             if (any) {
@@ -249,7 +266,7 @@ public class DevGramStreaks {
             if (myId == 0) {
                 return;
             }
-            String json = httpSend("GET", RTDB_BASE + "/streaks/" + myId + ".json", null);
+            String json = httpSend("GET", withAuth(RTDB_BASE + "/streaks/" + myId + ".json"), null);
             if (json == null) {
                 return; // сетевая ошибка — кэш не трогаем
             }
@@ -327,7 +344,7 @@ public class DevGramStreaks {
     // или локальное новее). Fire-and-forget в фоне.
     private static void repushCloud(long myId, String dialogKey, String state) {
         Utilities.globalQueue.postRunnable(() ->
-                httpSend("PUT", RTDB_BASE + "/streaks/" + myId + "/" + dialogKey + ".json", "\"" + state + "\""));
+                httpSend("PUT", withAuth(RTDB_BASE + "/streaks/" + myId + "/" + dialogKey + ".json"), "\"" + state + "\""));
     }
 
     // Серия НАВСЕГДА мертва (не просто «сегодня ещё не продлена», а окончательно, без шанса на
@@ -357,7 +374,7 @@ public class DevGramStreaks {
         long myId = UserConfig.getInstance(account).getClientUserId();
         if (myId != 0) {
             Utilities.globalQueue.postRunnable(() ->
-                    httpSend("DELETE", RTDB_BASE + "/streaks/" + myId + "/" + dialogId + ".json", null));
+                    httpSend("DELETE", withAuth(RTDB_BASE + "/streaks/" + myId + "/" + dialogId + ".json"), null));
         }
     }
 
@@ -442,7 +459,7 @@ public class DevGramStreaks {
         // пишем в облако (под своим id)
         long myId = UserConfig.getInstance(accountId).getClientUserId();
         Utilities.globalQueue.postRunnable(() ->
-                httpSend("PUT", RTDB_BASE + "/streaks/" + myId + "/" + dialogId + ".json", "\"" + newState + "\""));
+                httpSend("PUT", withAuth(RTDB_BASE + "/streaks/" + myId + "/" + dialogId + ".json"), "\"" + newState + "\""));
         if (streakChanged) {
             AndroidUtilities.runOnUIThread(() ->
                     NotificationCenter.getInstance(accountId).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME));
@@ -657,7 +674,7 @@ public class DevGramStreaks {
             p.edit().putString(key(dialogId), newState).apply();
             long myId = UserConfig.getInstance(account).getClientUserId();
             Utilities.globalQueue.postRunnable(() ->
-                    httpSend("PUT", RTDB_BASE + "/streaks/" + myId + "/" + dialogId + ".json", "\"" + newState + "\""));
+                    httpSend("PUT", withAuth(RTDB_BASE + "/streaks/" + myId + "/" + dialogId + ".json"), "\"" + newState + "\""));
             AndroidUtilities.runOnUIThread(() ->
                     NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME));
         } catch (Throwable ignore) {
