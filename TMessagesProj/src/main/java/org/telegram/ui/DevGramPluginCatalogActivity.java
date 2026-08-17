@@ -36,6 +36,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.RadialProgressView;
 import org.telegram.ui.Components.RecyclerListView;
 
 import java.util.ArrayList;
@@ -61,6 +62,7 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private int sortMode;
     private int loadGeneration;
     private boolean destroyed;
+    private RadialProgressView progressView;
 
     @Override
     public View createView(Context context) {
@@ -169,6 +171,13 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         emptyView.setPadding(AndroidUtilities.dp(40), 0, AndroidUtilities.dp(40), 0);
         emptyView.setVisibility(View.GONE);
         listWrap.addView(emptyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+
+        // DevGram: крутящийся индикатор загрузки каталога — раньше при входе был только
+        // текст «Загрузка каталога…» без какой-либо анимации.
+        progressView = new RadialProgressView(context, resourceProvider);
+        progressView.setSize(AndroidUtilities.dp(28));
+        progressView.setVisibility(View.GONE);
+        listWrap.addView(progressView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
 
         container.addView(listWrap, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1f));
 
@@ -308,10 +317,12 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
         else shown.sort((a, b) -> Long.compare(b.updatedAt, a.updatedAt));
         if (adapter != null) adapter.notifyDataSetChanged();
         if (catalogSummary != null) catalogSummary.setText(shown.size() + " из " + all.size());
+        if (progressView != null) {
+            progressView.setVisibility(loading ? View.VISIBLE : View.GONE);
+        }
         if (emptyView != null) {
             if (loading) {
-                emptyView.setText("Загрузка каталога…");
-                emptyView.setVisibility(View.VISIBLE);
+                emptyView.setVisibility(View.GONE);
             } else if (shown.isEmpty()) {
                 emptyView.setText(all.isEmpty()
                         ? "В каталоге пока нет плагинов.\nРазработчики публикуют их из каналов со значком 🧩."
