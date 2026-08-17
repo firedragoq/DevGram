@@ -8454,7 +8454,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         // touch target than it is tall), the "circle" renders as an uneven, oversized ellipse.
         // Drawing our own circle clamped to the smaller side and centered guarantees a proper
         // round pill regardless of the view's bounds.
-        v.setBackground(new DgCenteredCircleDrawable(0x3D000000));
+        // Цвет — было полупрозрачно-чёрным (0x3D000000), на светлом фоне профиля это
+        // рендерилось грязно-серым пятном вместо белой «стеклянной» пилюли, как в реальном
+        // Settings.app/Telegram-iOS. Берём тему (адаптируется под тёмную/светлую тему), как
+        // у остальных белых карточек этого экрана («Изменить фотографию» и т.п.).
+        v.setBackground(new DgCenteredCircleDrawable(getThemedColor(Theme.key_windowBackgroundWhite)));
     }
 
     // DevGram: круглый фон, зажатый по меньшей стороне и отцентрированный - в отличие от

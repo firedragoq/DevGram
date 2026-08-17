@@ -4629,7 +4629,15 @@ public class ChatActivity extends BaseFragment implements
             searchItemVisible = false;
         }
 
-        if (chatMode == 0 && (threadMessageId == 0 || isTopic) && !UserObject.isReplyUser(currentUser) && !isReport()) {
+        // DevGram: в iOS-режиме аватарка перекрывает только область «⋮» (см. ниже,
+        // hideGlassMenuPill), а отдельная кнопка звонка сидит ЛЕВЕЕ, вне зоны аватарки —
+        // без своего стеклянного фона (тоже погашенного hideGlassMenuPill) она повисает
+        // голой иконкой без подложки между аватаркой и капсулой заголовка. В реальном
+        // Telegram-iOS/Swiftgram отдельной кнопки звонка в шапке нет вовсе — звонок только
+        // через меню действий (доступно по долгому тапу на аватарке — headerItem уже
+        // содержит те же call/video_call подпункты, см. ниже).
+        if (chatMode == 0 && (threadMessageId == 0 || isTopic) && !UserObject.isReplyUser(currentUser) && !isReport()
+                && !MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false)) {
             TLRPC.UserFull userFull = null;
             if (currentUser != null) {
                 audioCallIconItem = menu.lazilyAddItem(call, R.drawable.call, themeDelegate);
