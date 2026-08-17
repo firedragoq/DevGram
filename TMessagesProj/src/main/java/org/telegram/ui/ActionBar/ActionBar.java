@@ -2249,7 +2249,13 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             final float middlePillFactor = glassOnlyBack ? 0f : (drawGlassMiddlePill ? 1f : searchFactor);
             if (glassDrawable != null && middlePillFactor > 0f) {
                 final int menuWidthWithPadding = menuWidth + (hasForcedMenuWidth ? (menuWidth > 0 ? p : 0) : (int) (p * animatorHasMenuItems.getFloatValue()));
-                final int rightOffset = lerp(menuWidthWithPadding, Math.max(menuWidthWithPadding, p + s), chatAvatarContainer == null ? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
+                // DevGram: в iOS-режиме (hideGlassMenuPill) «⋮» скрыт, а вместо него у
+                // истинного правого края висит отдельная аватарка (16dp отступ + 42dp сама
+                // аватарка = 58dp), не связанная с шириной меню — обычная формула считает
+                // отступ по ширине меню и подгоняет капсулу с названием почти вплотную к
+                // аватарке (были видны «слипшиеся» друг с другом). Резервируем фиксированное
+                // место под аватарку + такой же зазор p, что и у кнопки назад слева.
+                final int rightOffset = hideGlassMenuPill ? dp(58) + p : lerp(menuWidthWithPadding, Math.max(menuWidthWithPadding, p + s), chatAvatarContainer == null ? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
 
                 final int leftDefault = lerp(hasBackButton ? s + p : 0, s + p, chatAvatarContainer == null? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
                 final int rightDefault = getWidth() - rightOffset;
