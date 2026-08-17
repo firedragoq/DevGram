@@ -134,6 +134,9 @@ public class DevGramAccountCleanupSheet {
         cell.setBackgroundDrawable(Theme.getSelectorDrawable(false));
         cell.setText(text, "", defaultChecked, false);
         cell.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, rp));
+        // Круглый чекбокс (type=4) без явного setCheckBoxColor рисуется дефолтными неинициализированными
+        // цветами — почти чёрным на тёмной теме, галочки не видно. Явно задаём цвета под красную тему листа.
+        cell.setCheckBoxColor(Theme.key_text_RedRegular, Theme.key_windowBackgroundWhiteGrayIcon, Theme.key_checkboxCheck);
         onChange.accept(defaultChecked);
         cell.setOnClickListener(v -> {
             boolean now = !((CheckBoxCell) v).isChecked();
