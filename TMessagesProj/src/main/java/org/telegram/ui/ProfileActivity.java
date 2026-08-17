@@ -8493,14 +8493,18 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
-    // DevGram: обернуть иконку (напр. QR) в круглый полупрозрачный фон
+    // DevGram: обернуть иконку (напр. QR) в круглый фон
     private Drawable dgRoundIcon(Drawable icon) {
         if (icon == null) {
             return null;
         }
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        bg.setColor(0x3D000000);
+        // Было полупрозрачно-чёрным (0x3D000000) — независимая копия той же ошибки, что
+        // была у dgGlassPill (кнопка QR/назад в шапке): на светлом фоне списка рендерилось
+        // грязно-серым кругом с тёмной обводкой вместо белого кружка, как в реальном
+        // Settings.app/Telegram-iOS. Тот же цвет темы, что у белых карточек экрана.
+        bg.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
         int size = dp(36);
         bg.setSize(size, size);
         // InsetDrawable центрирует иконку внутри круга и работает на всех API
