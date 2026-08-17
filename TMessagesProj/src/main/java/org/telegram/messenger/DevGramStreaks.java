@@ -274,6 +274,7 @@ public class DevGramStreaks {
             // только если оно реально свежее (см. cmpFresh: по streakDay, streak, day, out+in).
             try {
                 final long myIdF = myId;
+                final int tnow = today();
                 SharedPreferences.Editor ed = p.edit();
                 // 1) облачные записи -> кэш, но не затираем более свежее локальное
                 if (obj != null) {
@@ -288,7 +289,11 @@ public class DevGramStreaks {
                         }
                     }
                 }
-                // 2) локальные серии, которых нет в облаке -> НЕ удаляем, а до-заливаем
+                // 2) локальные серии, которых нет в облаке. Если серия ещё живая/восстановимая —
+                // «ключа нет» значит PUT не долетел, до-заливаем (self-heal, как раньше). Если же
+                // серия уже НАВСЕГДА мертва (isDeadForever) — значит её удалили как мусор (см.
+                // purgeDeadStreak), и «ключа нет» — это ожидаемо: просто подчищаем и локальную
+                // копию, а не воскрешаем её обратно в облако.
                 for (String existing : new java.util.ArrayList<>(p.getAll().keySet())) {
                     if (existing.indexOf('_') >= 0 || "lastRefresh".equals(existing)) {
                         continue; // мета-ключи (_r/_notified/_reminded, lastRefresh) не трогаем
@@ -296,7 +301,11 @@ public class DevGramStreaks {
                     if (obj == null || !obj.has(existing)) {
                         String lv = p.getString(existing, null);
                         if (lv != null && lv.split(",").length >= 5) {
-                            repushCloud(myIdF, existing, lv);
+                            if (isDeadForever(lv, tnow)) {
+                                ed.remove(existing).remove(existing + "_notified").remove(existing + "_reminded");
+                            } else {
+                                repushCloud(myIdF, existing, lv);
+                            }
                         }
                     }
                 }
@@ -319,6 +328,37 @@ public class DevGramStreaks {
     private static void repushCloud(long myId, String dialogKey, String state) {
         Utilities.globalQueue.postRunnable(() ->
                 httpSend("PUT", RTDB_BASE + "/streaks/" + myId + "/" + dialogKey + ".json", "\"" + state + "\""));
+    }
+
+    // Серия НАВСЕГДА мертва (не просто «сегодня ещё не продлена», а окончательно, без шанса на
+    // восстановление): цепочка порвана (streakDay < t-1) и либо она никогда не доходила до
+    // показа (streak < MIN_SHOWN), либо истекло окно восстановления (7 дней), либо кончились
+    // попытки восстановления. Для такой записи хранить состояние в облаке больше незачем.
+    private static boolean isDeadForever(String state, int t) {
+        try {
+            String[] a = state.split(",");
+            int streak = Integer.parseInt(a[3]);
+            int streakDay = Integer.parseInt(a[4]);
+            int restores = a.length > 5 ? Integer.parseInt(a[5]) : 0;
+            return streakDay < t - 1 && (streak < MIN_SHOWN || streakDay < t - 7 || restores >= MAX_RESTORES);
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    // Стереть навсегда мёртвую серию: и локальный кэш, и облачную запись (иначе она бесполезно
+    // занимает место в Firebase). Вызывается только для isDeadForever() — живые и восстановимые
+    // серии никогда не трогаем (см. комментарий в doSync).
+    private static void purgeDeadStreak(int account, long dialogId, String key) {
+        SharedPreferences p = prefs();
+        if (p != null) {
+            p.edit().remove(key).remove(key + "_notified").remove(key + "_reminded").apply();
+        }
+        long myId = UserConfig.getInstance(account).getClientUserId();
+        if (myId != 0) {
+            Utilities.globalQueue.postRunnable(() ->
+                    httpSend("DELETE", RTDB_BASE + "/streaks/" + myId + "/" + dialogId + ".json", null));
+        }
     }
 
     // «Свежесть» состояния серии для слияния кэш<->облако. Возвращает >0 если a свежее b, <0 если
@@ -544,6 +584,10 @@ public class DevGramStreaks {
                     }
                     p.edit().putInt(dialogId + "_notified", streakDay).apply();
                     notifyLost(account, dialogId, streak);
+                } else if (isDeadForever((String) e.getValue(), t)) {
+                    // огонёк навсегда потух (0 и без шанса на восстановление) — незачем зря
+                    // занимать место в облаке и в локальном кэше, стираем запись целиком.
+                    purgeDeadStreak(account, dialogId, k);
                 }
             } catch (Throwable ignore) {
             }
