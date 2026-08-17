@@ -34,6 +34,18 @@ public class DevGramPlugins {
     // Реестр проверенных плагинов: множество SHA-256 доверенных исходников (из облака).
     private static final String RTDB = "https://devgram-d03e4-default-rtdb.europe-west1.firebasedatabase.app";
     private static final String FIREBASE_API_KEY = "AIzaSyAj-Fq-7707X54Yr8t51mFAkJmCLEKtYoU";
+
+    // Отдельный пул потоков под сетевые запросы DevGram (каталог/бейджи/модерация и т.п.),
+    // чтобы НЕ делить общий Utilities.globalQueue — это ОДИН поток на всё приложение, и на
+    // холодном старте наши HTTP-запросы вставали в очередь ЗА прогревом ядра Telegram, а
+    // ещё и друг за другом (fetchFilters/fetchCatalogFast/fetchModerators выполнялись
+    // последовательно вместо параллельно) — из-за этого каталог плагинов открывался очень
+    // долго. Свой пул с несколькими потоками решает обе проблемы разом.
+    private static final java.util.concurrent.ExecutorService NET_QUEUE = java.util.concurrent.Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r, "DevGramNet");
+        t.setDaemon(true);
+        return t;
+    });
     private static volatile String firebaseAnonToken;
     private static volatile String firebaseAnonUid;
     private static volatile java.util.Set<String> verifiedHashes = new java.util.HashSet<>();
@@ -609,7 +621,7 @@ public class DevGramPlugins {
     // Выполнить Python-функцию в фоновой очереди (не блокирует UI).
     public static void runOnQueue(final com.chaquo.python.PyObject fn) {
         if (fn == null) return;
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             try {
                 fn.call();
             } catch (Throwable e) {
@@ -942,7 +954,7 @@ public class DevGramPlugins {
         if (pendingCrashNotice) {
             pendingCrashNotice = false;
             // сбор отчёта тяжёлый (logcat) — в фоне, затем показ на UI
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 final String report = collectCrashReport();
                 saveCrashReport(report);
                 AndroidUtilities.runOnUIThread(() -> {
@@ -1711,7 +1723,7 @@ public class DevGramPlugins {
 
     // Подтянуть реестр проверенных хешей из облака (на старте).
     public static void fetchVerified() {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             try {
                 java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugins_verified.json").openConnection();
                 c.setConnectTimeout(15000);
@@ -1762,7 +1774,7 @@ public class DevGramPlugins {
         set.add(hash);
         verifiedHashes = set;
         final String h = hash;
-        Utilities.globalQueue.postRunnable(() ->
+        NET_QUEUE.execute(() ->
                 httpVerified("PUT", RTDB + "/plugins_verified/" + h + ".json?auth=" + token, "\"verified\""));
         return true;
     }
@@ -1781,7 +1793,7 @@ public class DevGramPlugins {
         set.remove(hash);
         verifiedHashes = set;
         final String h = hash;
-        Utilities.globalQueue.postRunnable(() ->
+        NET_QUEUE.execute(() ->
                 httpVerified("DELETE", RTDB + "/plugins_verified/" + h + ".json?auth=" + token, null));
         return true;
     }
@@ -1821,7 +1833,7 @@ public class DevGramPlugins {
 
     public static void fetchReviews(String pluginId, ReviewsCallback cb) {
         final String key = safeKey(pluginId == null ? "" : pluginId);
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             java.util.ArrayList<Review> result = new java.util.ArrayList<>();
             java.net.HttpURLConnection c = null;
             try {
@@ -1870,7 +1882,7 @@ public class DevGramPlugins {
             o.put("ownerUid", firebaseAnonUid());
             String url = RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + userId + ".json";
             String body = o.toString();
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 boolean ok = httpVerified("PUT", url, body);
                 if (ok) refreshReviewStats(pluginId);
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
@@ -1881,7 +1893,7 @@ public class DevGramPlugins {
     }
 
     public static void deleteOwnReview(String pluginId, BoolCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             boolean ok = httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + myId() + ".json", null);
             if (ok) refreshReviewStats(pluginId);
             AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
@@ -1894,7 +1906,7 @@ public class DevGramPlugins {
             AndroidUtilities.runOnUIThread(() -> cb.onResult(false));
             return;
         }
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             boolean ok = httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(pluginId) + "/" + reviewUserId + ".json", null);
             if (ok) refreshReviewStats(pluginId);
             AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
@@ -1956,7 +1968,7 @@ public class DevGramPlugins {
             org.json.JSONObject update = new org.json.JSONObject();
             update.put("plugin_review_reports/" + key, o);
             update.put("plugin_review_report_receipts/" + safeKey(pluginId) + "/" + reviewUserId + "/" + ownerUid, receipt);
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 boolean ok = httpVerified("PATCH", RTDB + "/.json?auth=" + token, update.toString());
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
             });
@@ -1966,7 +1978,7 @@ public class DevGramPlugins {
     }
 
     public static void hasReportedReview(String pluginId, long reviewUserId, BoolCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             boolean reported = false;
             java.net.HttpURLConnection c = null;
             try {
@@ -2015,7 +2027,7 @@ public class DevGramPlugins {
             org.json.JSONObject update = new org.json.JSONObject();
             update.put("plugin_reports/" + key, o);
             update.put("plugin_report_receipts/" + safeKey(pluginId == null ? "" : pluginId) + "/" + ownerUid, receipt);
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 boolean ok = httpVerified("PATCH", RTDB + "/.json?auth=" + token, update.toString());
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
             });
@@ -2023,7 +2035,7 @@ public class DevGramPlugins {
     }
 
     public static void hasReportedPlugin(String pluginId, BoolCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             boolean reported = false;
             java.net.HttpURLConnection c = null;
             try {
@@ -2074,7 +2086,7 @@ public class DevGramPlugins {
 
     public static void fetchPluginHistory(String pluginId, HistoryCallback cb) {
         final String id = safeKey(pluginId == null ? "" : pluginId);
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             java.util.ArrayList<HistoryEntry> result = new java.util.ArrayList<>();
             java.net.HttpURLConnection c = null;
             try {
@@ -2107,7 +2119,7 @@ public class DevGramPlugins {
     public interface ReportsCallback { void onResult(java.util.ArrayList<ReviewReport> items); }
 
     public static void fetchReviewReports(ReportsCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             java.util.ArrayList<ReviewReport> result = new java.util.ArrayList<>();
             java.net.HttpURLConnection c = null;
             try {
@@ -2139,7 +2151,7 @@ public class DevGramPlugins {
     }
     public interface PluginReportsCallback { void onResult(java.util.ArrayList<PluginReport> items); }
     public static void fetchPluginReports(PluginReportsCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             java.util.ArrayList<PluginReport> result = new java.util.ArrayList<>(); java.net.HttpURLConnection c = null;
             try {
                 String token = DevGramBadges.getAdminToken();
@@ -2160,14 +2172,14 @@ public class DevGramPlugins {
     }
     public static boolean resolvePluginReport(PluginReport report, boolean hidePlugin, String reason) {
         String token=DevGramBadges.getAdminToken(); if(token==null||report==null)return false;
-        final String why=reason==null?"":reason.trim();Utilities.globalQueue.postRunnable(()->{ if(hidePlugin) { try { org.json.JSONObject o=new org.json.JSONObject(); o.put("hidden",true);o.put("reason",why);o.put("date",System.currentTimeMillis()); httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString()); httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}"); }catch(Throwable e){FileLog.e(e);} } notifyPluginUser(report.reporterId,hidePlugin?"plugin_report_accepted":"plugin_report_rejected",hidePlugin?"Жалоба подтверждена":"Жалоба отклонена",why,report.pluginId,token);httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null); }); return true;
+        final String why=reason==null?"":reason.trim();NET_QUEUE.execute(()->{ if(hidePlugin) { try { org.json.JSONObject o=new org.json.JSONObject(); o.put("hidden",true);o.put("reason",why);o.put("date",System.currentTimeMillis()); httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString()); httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}"); }catch(Throwable e){FileLog.e(e);} } notifyPluginUser(report.reporterId,hidePlugin?"plugin_report_accepted":"plugin_report_rejected",hidePlugin?"Жалоба подтверждена":"Жалоба отклонена",why,report.pluginId,token);httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null); }); return true;
     }
     public static boolean resolvePluginReport(PluginReport report,boolean hidePlugin){return resolvePluginReport(report,hidePlugin,hidePlugin?"Нарушение подтверждено":"Нарушение не подтверждено");}
-    public static boolean resolvePluginReport(PluginReport report,int action,String reason){String token=DevGramBadges.getAdminToken();if(token==null||report==null)return false;final String why=reason==null?"":reason.trim();Utilities.globalQueue.postRunnable(()->{if(action>0){try{org.json.JSONObject o=new org.json.JSONObject();o.put("hidden",true);o.put("reason",why);o.put("date",System.currentTimeMillis());o.put("blocked",action==2);httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString());String raw=readNode(RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json");httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}");if(action==2&&raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){String source=new org.json.JSONObject(raw).optString("source","");String hash=sha256(source);if(!hash.isEmpty())httpVerified("PUT",RTDB+"/plugins_blocked/"+hash+".json?auth="+token,"\"blocked\"");}}catch(Throwable e){FileLog.e(e);}}notifyPluginUser(report.reporterId,action>0?"plugin_report_accepted":"plugin_report_rejected",action>0?"Жалоба подтверждена":"Жалоба отклонена",why,report.pluginId,token);httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null);});return true;}
+    public static boolean resolvePluginReport(PluginReport report,int action,String reason){String token=DevGramBadges.getAdminToken();if(token==null||report==null)return false;final String why=reason==null?"":reason.trim();NET_QUEUE.execute(()->{if(action>0){try{org.json.JSONObject o=new org.json.JSONObject();o.put("hidden",true);o.put("reason",why);o.put("date",System.currentTimeMillis());o.put("blocked",action==2);httpVerified("PUT",RTDB+"/plugins_hidden/"+safeKey(report.pluginId)+".json?auth="+token,o.toString());String raw=readNode(RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json");httpVerified("PATCH",RTDB+"/plugins_catalog/"+safeKey(report.pluginId)+".json?auth="+token,"{\"visible\":false}");if(action==2&&raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){String source=new org.json.JSONObject(raw).optString("source","");String hash=sha256(source);if(!hash.isEmpty())httpVerified("PUT",RTDB+"/plugins_blocked/"+hash+".json?auth="+token,"\"blocked\"");}}catch(Throwable e){FileLog.e(e);}}notifyPluginUser(report.reporterId,action>0?"plugin_report_accepted":"plugin_report_rejected",action>0?"Жалоба подтверждена":"Жалоба отклонена",why,report.pluginId,token);httpVerified("DELETE",RTDB+"/plugin_reports/"+report.key+".json?auth="+token,null);});return true;}
 
     public static boolean resolveReviewReport(ReviewReport report, boolean deleteReview, String reason) {
         String token = DevGramBadges.getAdminToken(); if (token == null || report == null) return false;
-        final String why=reason==null?"":reason.trim();Utilities.globalQueue.postRunnable(() -> {
+        final String why=reason==null?"":reason.trim();NET_QUEUE.execute(() -> {
             if (deleteReview) {
                 httpVerified("DELETE", RTDB + "/plugin_reviews/" + safeKey(report.pluginId) + "/" + report.reviewUserId + ".json?auth=" + token, null);
                 refreshReviewStats(report.pluginId);
@@ -2203,7 +2215,7 @@ public class DevGramPlugins {
     }
 
     private static void refreshCatalogReviewStats(java.util.ArrayList<CatalogEntry> entries, CatalogCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             java.net.HttpURLConnection c = null;
             try {
                 c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugin_reviews.json").openConnection();
@@ -2239,7 +2251,7 @@ public class DevGramPlugins {
         });
     }
     public static void fetchCatalogEntry(String pluginId, CatalogCallback cb) {
-        final String key=safeKey(pluginId==null?"":pluginId);Utilities.globalQueue.postRunnable(()->{java.util.ArrayList<CatalogEntry> out=new java.util.ArrayList<>();try{String raw=readNode(RTDB+"/plugins_catalog/"+key+".json");if(raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){org.json.JSONObject o=new org.json.JSONObject(raw);CatalogEntry e=new CatalogEntry();e.id=o.optString("id",key);e.name=o.optString("name",e.id);e.author=o.optString("author","");e.version=o.optString("version","");e.desc=o.optString("desc","");e.icon=o.optString("icon","");e.channel=o.optString("channel","");e.source=o.optString("source","");e.filter=o.optString("filter","");e.rating=o.optDouble("rating",0);e.reviews=o.optInt("reviews",0);e.submitterId=o.optLong("submitterId",0);e.submittedAt=o.optLong("submittedAt",0);e.updatedAt=o.optLong("updatedAt",0);e.visible=o.optBoolean("visible",true);e.isPackage=o.optBoolean("isPackage",false);e.packageSize=o.optLong("packageSize",0);e.packageSha=o.optString("packageSha","");e.packageChat=o.optLong("packageChat",0);e.packageMsg=o.optInt("packageMsg",0);out.add(e);}}catch(Throwable ex){FileLog.e(ex);}AndroidUtilities.runOnUIThread(()->cb.onResult(out));});
+        final String key=safeKey(pluginId==null?"":pluginId);NET_QUEUE.execute(()->{java.util.ArrayList<CatalogEntry> out=new java.util.ArrayList<>();try{String raw=readNode(RTDB+"/plugins_catalog/"+key+".json");if(raw!=null&&!raw.isEmpty()&&!"null".equals(raw)){org.json.JSONObject o=new org.json.JSONObject(raw);CatalogEntry e=new CatalogEntry();e.id=o.optString("id",key);e.name=o.optString("name",e.id);e.author=o.optString("author","");e.version=o.optString("version","");e.desc=o.optString("desc","");e.icon=o.optString("icon","");e.channel=o.optString("channel","");e.source=o.optString("source","");e.filter=o.optString("filter","");e.rating=o.optDouble("rating",0);e.reviews=o.optInt("reviews",0);e.submitterId=o.optLong("submitterId",0);e.submittedAt=o.optLong("submittedAt",0);e.updatedAt=o.optLong("updatedAt",0);e.visible=o.optBoolean("visible",true);e.isPackage=o.optBoolean("isPackage",false);e.packageSize=o.optLong("packageSize",0);e.packageSha=o.optString("packageSha","");e.packageChat=o.optLong("packageChat",0);e.packageMsg=o.optInt("packageMsg",0);out.add(e);}}catch(Throwable ex){FileLog.e(ex);}AndroidUtilities.runOnUIThread(()->cb.onResult(out));});
     }
 
     // Забрать заявки на модерацию.
@@ -2274,7 +2286,7 @@ public class DevGramPlugins {
 
     // Общий загрузчик списка CatalogEntry из узла RTDB (catalog / pending).
     private static void fetchEntries(final String node, final CatalogCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             final java.util.ArrayList<CatalogEntry> list = new java.util.ArrayList<>();
             java.net.HttpURLConnection c = null;
             try {
@@ -2362,7 +2374,7 @@ public class DevGramPlugins {
             return;
         }
         final String key = safeKey(id.trim());
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             int status = 0;
             if (nodeHasKey("plugins_pending", key)) status = 1;
             else if (catalogEntryIsVisible(key)) status = 2;
@@ -2377,7 +2389,7 @@ public class DevGramPlugins {
 
     public static void canWithdrawPending(String id, BoolCallback cb) {
         final String key = safeKey(id == null ? "" : id);
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             boolean allowed = false;
             java.net.HttpURLConnection c = null;
             try {
@@ -2404,7 +2416,7 @@ public class DevGramPlugins {
                 cb.onResult(false);
                 return;
             }
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 boolean ok = httpVerified("DELETE", RTDB + "/plugins_pending/" + safeKey(id) + ".json", null);
                 AndroidUtilities.runOnUIThread(() -> cb.onResult(ok));
             });
@@ -2417,7 +2429,7 @@ public class DevGramPlugins {
 
     public static void fetchRejectionReason(String id, StringCallback cb) {
         final String key = safeKey(id == null ? "" : id);
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             String reason = "";
             java.net.HttpURLConnection c = null;
             try {
@@ -2439,7 +2451,7 @@ public class DevGramPlugins {
     }
 
     public static void clearRejectedForResubmit(String id) {
-        Utilities.globalQueue.postRunnable(() ->
+        NET_QUEUE.execute(() ->
                 httpVerified("DELETE", RTDB + "/plugins_rejected/" + safeKey(id) + ".json", null));
     }
 
@@ -2551,7 +2563,7 @@ public class DevGramPlugins {
             e.submitterUid = firebaseAnonUid();
             final String body = entryJson(e).toString();
             final String key = safeKey(e.id);
-            Utilities.globalQueue.postRunnable(() ->
+            NET_QUEUE.execute(() ->
             {
                 httpVerified("PUT", RTDB + "/plugins_pending/" + key + ".json", body);
                 appendPluginHistory(e.id, e.update ? "update_submitted" : "submitted", e.version, e.submitterId, e.submitterName);
@@ -2568,7 +2580,7 @@ public class DevGramPlugins {
         if (e == null || e.id == null || e.id.isEmpty()) { AndroidUtilities.runOnUIThread(() -> cb.onResult(0)); return; }
         if (isBlocked(e.source)) { AndroidUtilities.runOnUIThread(() -> cb.onResult(-1)); return; }
         if (!validateCatalogEntry(e).isEmpty()) { AndroidUtilities.runOnUIThread(() -> cb.onResult(-2)); return; }
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             int result = 0;
             try {
                 long userId = myId();
@@ -2604,7 +2616,7 @@ public class DevGramPlugins {
             final String body = entryJson(e).toString();
             final String key = safeKey(e.id);
             final String hash = sha256(e.source == null ? "" : e.source);
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 String previous = readNode(RTDB + "/plugins_catalog/" + key + ".json");
                 if (previous != null && !previous.isEmpty() && !"null".equals(previous))
                     httpVerified("PUT", RTDB + "/plugin_backups/" + key + "/" + System.currentTimeMillis() + ".json?auth=" + token, previous);
@@ -2632,7 +2644,7 @@ public class DevGramPlugins {
         String raw = readNode(RTDB + "/plugin_backups/" + safeKey(pluginId) + "/" + safeKey(backupKey) + ".json");
         if (raw == null || raw.isEmpty() || "null".equals(raw)) return false;
         final String key = safeKey(pluginId);
-        Utilities.globalQueue.postRunnable(() -> { httpVerified("PUT", RTDB + "/plugins_catalog/" + key + ".json?auth=" + token, raw); appendPluginHistory(pluginId, "rollback", backupKey, myId(), "Модератор"); });
+        NET_QUEUE.execute(() -> { httpVerified("PUT", RTDB + "/plugins_catalog/" + key + ".json?auth=" + token, raw); appendPluginHistory(pluginId, "rollback", backupKey, myId(), "Модератор"); });
         return true;
     }
 
@@ -2655,7 +2667,7 @@ public class DevGramPlugins {
             set.add(hash);
             blocked = set;
         }
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             httpVerified("DELETE", RTDB + "/plugins_pending/" + key + ".json?auth=" + token, null);
             try {
                 org.json.JSONObject rejected = entryJson(e);
@@ -2686,7 +2698,7 @@ public class DevGramPlugins {
             return false;
         }
         final String safe = safeKey(pluginId);
-        Utilities.globalQueue.postRunnable(() -> {httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null);notifyPluginUser(entry.submitterId,"plugin_deleted","Плагин удалён из каталога",reason,entry.id,token);appendPluginHistory(entry.id,"deleted",reason,myId(),"Модератор");});
+        NET_QUEUE.execute(() -> {httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null);notifyPluginUser(entry.submitterId,"plugin_deleted","Плагин удалён из каталога",reason,entry.id,token);appendPluginHistory(entry.id,"deleted",reason,myId(),"Модератор");});
         return true;
     }
     public static boolean catalogDelete(String pluginId){CatalogEntry e=new CatalogEntry();e.id=pluginId;return catalogDelete(e,"Удалено модератором");}
@@ -2706,7 +2718,7 @@ public class DevGramPlugins {
             set.add(hash);
             blocked = set;
         }
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             httpVerified("DELETE", RTDB + "/plugins_catalog/" + safe + ".json?auth=" + token, null);
             if (hash != null) {
                 httpVerified("PUT", RTDB + "/plugins_blocked/" + hash + ".json?auth=" + token, "\"blocked\"");
@@ -2737,7 +2749,7 @@ public class DevGramPlugins {
     }
 
     public static void fetchModerators(final ModeratorsCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             final java.util.ArrayList<Moderator> list = new java.util.ArrayList<>();
             final java.util.Set<String> uids = new java.util.HashSet<>();
             final java.util.Set<Long> tgs = new java.util.HashSet<>();
@@ -2834,7 +2846,7 @@ public class DevGramPlugins {
             }
             final String em = email;
             final long tg = tgId;
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 boolean saved = false;
                 try {
                     org.json.JSONObject o = new org.json.JSONObject();
@@ -2877,7 +2889,7 @@ public class DevGramPlugins {
             return;
         }
         modNotifyCached = enabled;
-        Utilities.globalQueue.postRunnable(() ->
+        NET_QUEUE.execute(() ->
                 httpVerified("PUT", RTDB + "/mod_notify/" + uid + ".json?auth=" + token, enabled ? "true" : "false"));
     }
 
@@ -2887,7 +2899,7 @@ public class DevGramPlugins {
         if (uid == null) {
             return;
         }
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             java.net.HttpURLConnection c = null;
             try {
                 c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/mod_notify/" + uid + ".json").openConnection();
@@ -2913,7 +2925,7 @@ public class DevGramPlugins {
             if (cb != null) cb.onResult(false, "нужен вход главного администратора");
             return;
         }
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             boolean removed = httpVerified("DELETE", RTDB + "/moderators/" + uid + ".json?auth=" + token, null);
             if (!removed) {
                 if (cb != null) AndroidUtilities.runOnUIThread(() -> cb.onResult(false, "Firebase не удалил право модератора"));
@@ -2937,7 +2949,7 @@ public class DevGramPlugins {
     }
 
     public static void fetchBlocked() {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             java.net.HttpURLConnection c = null;
             try {
                 c = (java.net.HttpURLConnection) new java.net.URL(RTDB + "/plugins_blocked.json").openConnection();
@@ -2973,7 +2985,7 @@ public class DevGramPlugins {
     }
 
     public static void fetchFilters(final FiltersCallback cb) {
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             final java.util.ArrayList<String> list = new java.util.ArrayList<>();
             java.net.HttpURLConnection c = null;
             try {
@@ -3023,7 +3035,7 @@ public class DevGramPlugins {
         final String key = Integer.toHexString(nm.hashCode() & 0x7fffffff);
         try {
             final String body = org.json.JSONObject.quote(nm);
-            Utilities.globalQueue.postRunnable(() -> {
+            NET_QUEUE.execute(() -> {
                 boolean ok = httpVerified("PUT", RTDB + "/plugins_filters/" + key + ".json?auth=" + token, body);
                 AndroidUtilities.runOnUIThread(() -> callback.run(ok));
             });
@@ -3045,7 +3057,7 @@ public class DevGramPlugins {
             String value = filter == null ? "" : filter.trim();
             if (!value.isEmpty() && unique.add(value)) array.put(value);
         }
-        Utilities.globalQueue.postRunnable(() -> {
+        NET_QUEUE.execute(() -> {
             boolean ok = httpVerified("PUT", RTDB + "/plugins_filters.json?auth=" + token, array.toString());
             AndroidUtilities.runOnUIThread(() -> callback.run(ok));
         });
@@ -3057,7 +3069,7 @@ public class DevGramPlugins {
             return false;
         }
         final String key = Integer.toHexString(name.trim().hashCode() & 0x7fffffff);
-        Utilities.globalQueue.postRunnable(() ->
+        NET_QUEUE.execute(() ->
                 httpVerified("DELETE", RTDB + "/plugins_filters/" + key + ".json?auth=" + token, null));
         return true;
     }
