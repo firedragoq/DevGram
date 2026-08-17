@@ -70,6 +70,6 @@ Release-вариант:
 
 DevGram основан на исходном коде [Telegram for Android](https://github.com/DrKLO/Telegram),
 [Forkgram](https://github.com/forkgram/TelegramAndroid),
-[exteraGram](https://github.com/exteraSquad/exteraGram), [Cherrygram](https://github.com/arslan4k1390/Cherrygram).
+[exteraGram](https://github.com/exteraSquad/exteraGram), [Cherrygram](https://github.com/arslan4k1390/Cherrygram), [AyuGram](https://github.com/AyuGram/AyuGram4A).
 
 Исходный код распространяется по лицензии [GNU GPL v2](LICENSE).
