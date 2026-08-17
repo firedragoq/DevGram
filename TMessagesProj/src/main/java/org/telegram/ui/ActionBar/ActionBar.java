@@ -2241,7 +2241,13 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         if (glassFlatDivider) {
             final boolean isDark = resourcesProvider != null ? resourcesProvider.isDark() : Theme.isCurrentThemeDark();
             glassFlatDividerPaint.setColor(Theme.getColor(isDark ? Theme.key_actionBarDefault : Theme.key_chat_topPanelBackground, resourcesProvider));
-            canvas.drawRect(0, t, getWidth(), b, glassFlatDividerPaint);
+            // DevGram: t/b рассчитаны для позиционирования стеклянных «капсул» внутри
+            // content-области шапки (без учёта statusBarHeight) — для «капсул» это верно,
+            // но сплошная заливка в режиме «Старый» должна закрывать ActionBar целиком,
+            // включая полосу под статус-баром (getHeight() уже включает statusBarHeight,
+            // см. onMeasure), иначе там просвечивает непрокрашенный фон окна — рисуем от
+            // самого верха (y=0), а не от t.
+            canvas.drawRect(0, 0, getWidth(), b, glassFlatDividerPaint);
             if (chatAvatarContainer != null) {
                 chatAvatarContainer.setTranslationX(0);
             }
