@@ -19135,6 +19135,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 if (drawTopic && topicButton != null) {
                     nameWidth += topicButton.width + dp(8);
                 }
+                // DevGram: значок бренда слева от имени — учтён при обрезке текста (см. выше),
+                // но не возвращался обратно в nameWidth здесь. nameWidth ниже уходит в
+                // maxChildWidth (размер пузыря сообщения) — без этой строки пузырь получался
+                // на dp(22) уже, чем реально нужно, и админский/участниковый тег справа
+                // налезал на хвост длинного имени.
+                if (drawDevgramNameBadge) {
+                    nameWidth += dp(22);
+                }
                 if (currentNameStatus != null && !viaBot) {
                     nameWidth += dp(4 + 12 + 4);
                 }
