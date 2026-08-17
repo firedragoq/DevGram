@@ -40,6 +40,7 @@ public class DevGramOtherActivity extends BaseFragment {
     private static final int ID_IMPORT = 21;
     private static final int ID_RESET = 22;
     private static final int ID_DELETE_ACCOUNT = 23;
+    private static final int ID_CLEANUP_ACCOUNT = 24;
     private static final int REQ_IMPORT = 9021;
 
     private static final String CARD_VTB = "2200248804848272";
@@ -108,8 +109,10 @@ public class DevGramOtherActivity extends BaseFragment {
         items.add(UItem.asButton(ID_RESET, R.drawable.msg_reset, "Сбросить настройки"));
         items.add(UItem.asShadow("Экспорт отправит файл .devgram выбранному чату. Импорт покажет отличия и "
                 + "предложит применить."));
+        items.add(UItem.asButton(ID_CLEANUP_ACCOUNT, R.drawable.msg_clearcache, "Очистить аккаунт").red());
         items.add(UItem.asButton(ID_DELETE_ACCOUNT, R.drawable.msg_delete, "Удалить аккаунт").red());
-        items.add(UItem.asShadow(null));
+        items.add(UItem.asShadow("«Очистить аккаунт» удаляет контакты, чаты и группы, но сам аккаунт "
+                + "Telegram остаётся — им можно пользоваться дальше."));
     }
 
     // Серая подпись под реквизитами: часть «Поддержите разработку» кликабельна (цвет как у всего
@@ -160,6 +163,8 @@ public class DevGramOtherActivity extends BaseFragment {
             confirmReset();
         } else if (item.id == ID_DELETE_ACCOUNT) {
             confirmDeleteAccount();
+        } else if (item.id == ID_CLEANUP_ACCOUNT) {
+            DevGramAccountCleanupSheet.show(this);
         }
     }
 
