@@ -253,6 +253,12 @@ public class DevGramPluginCatalogActivity extends BaseFragment {
     private void loadAll() {
         final int generation = ++loadGeneration;
         loading = true;
+        // DevGram: applyFilter() (она же включает индикатор загрузки) раньше вызывалась
+        // только ВНУТРИ асинхронных колбэков fetchFilters/fetchCatalogFast — то есть уже
+        // ПОСЛЕ того, как loading успевал стать false. Индикатор загрузки из-за этого не
+        // показывался вообще ни разу, с самого начала (ни старый текст, ни новая крутилка).
+        // Вызываем сразу, синхронно — до того, как сеть успеет ответить.
+        applyFilter();
         DevGramPlugins.fetchFilters(f -> {
             if (!isLoadActive(generation)) return;
             filters.clear();
