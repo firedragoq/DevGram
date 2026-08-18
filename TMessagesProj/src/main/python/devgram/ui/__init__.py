@@ -1,1 +1,1 @@
-from .settings import Header, Switch, Input, Selector, Button, Text
+from .settings import Header, Switch, Input, Selector, Button, Text, Card

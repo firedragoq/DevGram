@@ -20,6 +20,7 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Cells.PluginSettingsCardCell;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
@@ -64,6 +65,7 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
 
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         rows.clear();
+        Context context = getParentActivity();
         List<String> list = DevGramPlugins.pluginSettings(pluginId);
         for (int i = 0; i < list.size(); i++) {
             String[] r = list.get(i).split("\u001f", -1); // type, key, title
@@ -86,6 +88,22 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
                 // Чисто информационная строка (devgram.ui.Text) — без иконки и без клика,
                 // в отличие от настоящей кнопки (Button), которая та же "button" не должна быть.
                 items.add(UItem.asShadow(title));
+            } else if ("card".equals(type) && context != null) {
+                // Цветная карточка-баннер (devgram.ui.Card): options = "иконкаподзаголовокцвет".
+                String[] parts = options.split("\u0001", -1);
+                String icon = parts.length > 0 ? parts[0] : "";
+                String subtitle = parts.length > 1 ? parts[1] : "";
+                int color;
+                try {
+                    color = parts.length > 2 ? Integer.parseInt(parts[2]) : 0xFF3B82F6;
+                } catch (Throwable e) {
+                    color = 0xFF3B82F6;
+                }
+                PluginSettingsCardCell cell = new PluginSettingsCardCell(context);
+                cell.set(icon, title, subtitle, color);
+                UItem cardItem = UItem.asCustom(cell, 76);
+                cardItem.id = i;
+                items.add(cardItem);
             } else if ("selector".equals(type)) {
                 String value = DevGramPlugins.pluginGet(pluginId, key, "0");
                 int selected = 0; try { selected = Integer.parseInt(value); } catch (Exception ignore) { }
@@ -114,7 +132,7 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
             DevGramPlugins.pluginSet(pluginId, key, on ? "0" : "1");
             DevGramPlugins.pluginSettingChanged(pluginId, key, on ? "0" : "1");
             refresh();
-        } else if ("button".equals(type)) {
+        } else if ("button".equals(type) || "card".equals(type)) {
             DevGramPlugins.pluginSettingClick(pluginId, key);
         } else if ("text".equals(type)) {
             editText(key, title);
