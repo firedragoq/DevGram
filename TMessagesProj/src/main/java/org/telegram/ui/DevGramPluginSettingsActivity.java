@@ -101,9 +101,25 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
                 }
                 PluginSettingsCardCell cell = new PluginSettingsCardCell(context);
                 cell.set(icon, title, subtitle, color);
-                UItem cardItem = UItem.asCustom(cell, 76);
-                cardItem.id = i;
+                // Раньше была подобранная на глаз фиксированная высота (76dp) — не хватало
+                // места, обрезало подпись у любого более длинного текста разработчика плагина.
+                // WRAP_CONTENT — ячейка сама подстраивается под содержимое (без/с подписью,
+                // 1-2 строки подписи и т.п.), без гадания с числом под конкретный текст.
+                UItem cardItem = UItem.asCustom(i, cell);
+                cardItem.intValue = LayoutHelper.WRAP_CONTENT;
                 items.add(cardItem);
+            } else if ("custom_view".equals(type) && context != null) {
+                // devgram.ui.Custom — разработчик плагина сам построил View (java_class/jclass
+                // на Python-стороне) и целиком отвечает за её стиль, размер и клики. Ядро
+                // только встраивает готовую вью в список, ничего не навязывает.
+                View custom = DevGramPlugins.pluginSettingsCustomView(pluginId, i);
+                if (custom != null) {
+                    int heightDp = 0;
+                    try { heightDp = Integer.parseInt(options.trim()); } catch (Throwable ignore) { }
+                    UItem customItem = UItem.asCustom(i, custom);
+                    customItem.intValue = heightDp > 0 ? heightDp : LayoutHelper.WRAP_CONTENT;
+                    items.add(customItem);
+                }
             } else if ("selector".equals(type)) {
                 String value = DevGramPlugins.pluginGet(pluginId, key, "0");
                 int selected = 0; try { selected = Integer.parseInt(value); } catch (Exception ignore) { }

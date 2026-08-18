@@ -33,7 +33,10 @@ public class PluginSettingsCardCell extends FrameLayout {
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
-        addView(card, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL,
+        // WRAP_CONTENT, а не MATCH_PARENT: сама ячейка (родитель) теперь тоже WRAP_CONTENT
+        // (см. DevGramPluginSettingsActivity), match-parent здесь замкнул бы размер сам на себя
+        // и высота карточки могла схлопнуться в 0.
+        addView(card, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.FILL,
                 14, 6, 14, 6));
 
         iconBadge = new FrameLayout(context);

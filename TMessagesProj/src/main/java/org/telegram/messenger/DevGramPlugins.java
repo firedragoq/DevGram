@@ -901,6 +901,19 @@ public class DevGramPlugins {
         return !pluginSettings(pluginId).isEmpty();
     }
 
+    // Живой View для строки devgram.ui.Custom (index — позиция в списке из pluginSettings,
+    // который нужно звать первым, чтобы Python-сторона успела закэшировать сырые объекты).
+    public static android.view.View pluginSettingsCustomView(String pluginId, int index) {
+        try {
+            PyObject view = loader().callAttr("plugin_settings_custom_view", pluginId, index);
+            if (view == null) return null;
+            return view.toJava(android.view.View.class);
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
+        }
+    }
+
     public static void pluginSettingClick(String pluginId, String key) {
         try {
             loader().callAttr("plugin_setting_click", pluginId, key);

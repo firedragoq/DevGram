@@ -491,25 +491,40 @@ def menu_click(plugin_id, label, message_text, dialog_id):
             return
 
 
+_last_settings_objects = {}  # plugin_id -> «сырые» Setting-объекты последнего вызова
+                              # plugin_settings() (нужно, чтобы potом отдать Java живой
+                              # View для devgram.ui.Custom — его нельзя засунуть в строку).
+
 def plugin_settings(plugin_id):
     """Строки настроек плагина: 'type␟key␟title'."""
     for p in _plugins:
         if str(p.id) == str(plugin_id):
             try:
                 res = []
+                raw = []
                 source = p.create_settings() if "create_settings" in type(p).__dict__ else p.settings()
                 for r in (source or []):
-                    if hasattr(r, "as_row"): r = r.as_row()
-                    t = str(r[0])
-                    k = str(r[1]) if len(r) > 1 else ""
-                    title = str(r[2]) if len(r) > 2 else ""
-                    extra = str(r[3]) if len(r) > 3 else ""
+                    raw.append(r)
+                    row = r.as_row() if hasattr(r, "as_row") else r
+                    t = str(row[0])
+                    k = str(row[1]) if len(row) > 1 else ""
+                    title = str(row[2]) if len(row) > 2 else ""
+                    extra = str(row[3]) if len(row) > 3 else ""
                     res.append(_SEP.join([t, k, title, extra]))
+                _last_settings_objects[str(plugin_id)] = raw
                 return res
             except Exception:
                 _log("settings error: " + traceback.format_exc())
             return []
     return []
+
+def plugin_settings_custom_view(plugin_id, index):
+    """Живой Java View для строки devgram.ui.Custom по её индексу в ПОСЛЕДНЕМ списке,
+    отданном plugin_settings() — тот всегда зовётся первым и наполняет кэш заново."""
+    objs = _last_settings_objects.get(str(plugin_id))
+    if not objs or index < 0 or index >= len(objs):
+        return None
+    return getattr(objs[index], "view", None)
 
 
 def plugin_setting_click(plugin_id, key):
