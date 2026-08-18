@@ -82,6 +82,10 @@ public class DevGramPluginSettingsActivity extends BaseFragment {
                 items.add(UItem.asButton(i, R.drawable.msg_edit, title, val.isEmpty() ? "—" : val));
             } else if ("button".equals(type)) {
                 items.add(UItem.asButton(i, R.drawable.msg_settings, title));
+            } else if ("info".equals(type)) {
+                // Чисто информационная строка (devgram.ui.Text) — без иконки и без клика,
+                // в отличие от настоящей кнопки (Button), которая та же "button" не должна быть.
+                items.add(UItem.asShadow(title));
             } else if ("selector".equals(type)) {
                 String value = DevGramPlugins.pluginGet(pluginId, key, "0");
                 int selected = 0; try { selected = Integer.parseInt(value); } catch (Exception ignore) { }

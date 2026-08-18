@@ -12,5 +12,5 @@ class Header(Setting):
 class Switch(Setting): kind = "switch"
 class Input(Setting): kind = "text"
 class Selector(Setting): kind = "selector"
-class Text(Setting): kind = "button"
+class Text(Setting): kind = "info"
 class Button(Setting): kind = "button"
