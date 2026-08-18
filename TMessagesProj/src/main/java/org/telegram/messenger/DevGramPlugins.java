@@ -630,6 +630,17 @@ public class DevGramPlugins {
         });
     }
 
+    // ---- android_utils: графика ----
+    // Chaquopy-мост при вызове конструктора new Canvas(bitmap) НАПРЯМУЮ из Python иногда
+    // резолвит внутренний системный конструктор Canvas(long) вместо публичного
+    // Canvas(Bitmap) — тот на Android 9+ заблокирован политикой скрытых (non-SDK) API
+    // (NoSuchMethodError: Canvas.<init>(J)V). Обычный вызов из скомпилированного Java-кода
+    // (как здесь) этой проблеме не подвержен — javac разрешает перегрузку на этапе
+    // компиляции, без участия рефлексии/hidden-API рантайма.
+    public static android.graphics.Canvas newCanvas(android.graphics.Bitmap bitmap) {
+        return new android.graphics.Canvas(bitmap);
+    }
+
     // ---- android_utils: буфер обмена ----
     public static void copyToClipboard(String text) {
         AndroidUtilities.runOnUIThread(() -> {

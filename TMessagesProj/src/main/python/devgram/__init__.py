@@ -330,6 +330,16 @@ class BasePlugin:
         """Open a Telegram user, group, channel or secret dialog by dialog ID."""
         return bool(_Plugins.openDialog(int(dialog_id)))
 
+    def new_canvas(self, bitmap):
+        """Create an android.graphics.Canvas for the given Bitmap.
+
+        Use this instead of calling jclass('android.graphics.Canvas')(bitmap) directly:
+        constructing Canvas from Python can hit an Android hidden-API restriction
+        (NoSuchMethodError: Canvas.<init>(J)V) where Chaquopy resolves the internal
+        native-pointer constructor instead of the public Canvas(Bitmap) one. This calls
+        `new Canvas(bitmap)` from compiled Java instead, which has no such ambiguity."""
+        return _Plugins.newCanvas(bitmap)
+
     # ---- file_utils (файлы в личной папке плагина) ----
     def read_file(self, name):
         """Прочитать файл из личной папки плагина (или '')."""
