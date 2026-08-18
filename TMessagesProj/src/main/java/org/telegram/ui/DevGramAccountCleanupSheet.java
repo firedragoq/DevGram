@@ -59,6 +59,9 @@ public class DevGramAccountCleanupSheet {
         builder.setApplyBottomPadding(false);
         builder.setCustomView(scroll);
         BottomSheet sheet = builder.create();
+        // BottomSheet по умолчанию НЕ фокусируемый для IME (FLAG_ALT_FOCUSABLE_IM) — поле ввода
+        // «УДАЛИТЬ» на шаге подтверждения иначе никогда не показывало клавиатуру.
+        sheet.setFocusable(true);
 
         FrameLayout optionsStep = new FrameLayout(context);
         FrameLayout confirmStep = new FrameLayout(context);
@@ -200,6 +203,10 @@ public class DevGramAccountCleanupSheet {
         input.setBackgroundDrawable(Theme.createEditTextDrawable(context, true));
         input.setSingleLine(true);
         col.addView(input, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 40, 0, 0, 0, 16));
+        input.postDelayed(() -> {
+            input.requestFocus();
+            AndroidUtilities.showKeyboard(input);
+        }, 150);
 
         TextView confirmBtn = redButton(context, rp, "Очистить аккаунт");
         confirmBtn.setAlpha(0.4f);
