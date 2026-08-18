@@ -340,6 +340,17 @@ class BasePlugin:
         `new Canvas(bitmap)` from compiled Java instead, which has no such ambiguity."""
         return _Plugins.newCanvas(bitmap)
 
+    def paint_color(self, paint, color):
+        """Set an ARGB int color on an android.graphics.Paint.
+
+        Use this instead of paint.setColor(color) directly: Paint has both
+        setColor(int) and setColor(long) overloads (the long one added in API 26
+        for wide-gamut colors). Calling through Chaquopy with a plain Python int
+        can resolve to the long overload, which misinterprets the value as a
+        packed color and throws IllegalArgumentException: Invalid ID: N. This
+        calls Paint.setColor(int) from compiled Java, which has no such ambiguity."""
+        _Plugins.paintSetColor(paint, color)
+
     # ---- file_utils (файлы в личной папке плагина) ----
     def read_file(self, name):
         """Прочитать файл из личной папки плагина (или '')."""

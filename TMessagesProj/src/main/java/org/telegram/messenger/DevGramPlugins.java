@@ -641,6 +641,16 @@ public class DevGramPlugins {
         return new android.graphics.Canvas(bitmap);
     }
 
+    // Paint.setColor существует в двух перегрузках: setColor(int) и setColor(long)
+    // (вторая добавлена в API 26 для wide-gamut Color.pack()). Вызов через Chaquopy
+    // с обычным Python int иногда резолвит long-перегрузку, которая трактует число
+    // как упакованный цвет и лезет за ColorSpace по ID из младших битов — падает
+    // IllegalArgumentException: Invalid ID: N. Обычный вызов из скомпилированного
+    // Java-кода разрешает перегрузку на этапе компиляции и этой проблеме не подвержен.
+    public static void paintSetColor(android.graphics.Paint paint, int color) {
+        paint.setColor(color);
+    }
+
     // ---- android_utils: буфер обмена ----
     public static void copyToClipboard(String text) {
         AndroidUtilities.runOnUIThread(() -> {
