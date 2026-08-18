@@ -651,6 +651,46 @@ public class DevGramPlugins {
         paint.setColor(color);
     }
 
+    // Рисующие методы Canvas (drawRect/drawCircle/drawBitmap/drawText и т.д.) на
+    // современном Android фактически объявлены в скрытом суперклассе BaseCanvas,
+    // а не в самом Canvas. Обычный компилированный вызов canvas.drawRect(...) это
+    // не замечает (invoke-virtual резолвится на этапе компиляции), а Chaquopy при
+    // обращении из Python ищет метод рефлексией по классу-объявителю и упирается
+    // в политику скрытых API (тот же класс проблемы, что и с Canvas(Bitmap) и
+    // Paint.setColor выше). Поэтому весь набор рисующих операций плагинам отдаём
+    // через явные обёртки из скомпилированного Java.
+    public static void canvasDrawRect(android.graphics.Canvas c, float left, float top, float right, float bottom, android.graphics.Paint paint) {
+        c.drawRect(left, top, right, bottom, paint);
+    }
+
+    public static void canvasDrawRoundRect(android.graphics.Canvas c, android.graphics.RectF rect, float rx, float ry, android.graphics.Paint paint) {
+        c.drawRoundRect(rect, rx, ry, paint);
+    }
+
+    public static void canvasDrawCircle(android.graphics.Canvas c, float cx, float cy, float radius, android.graphics.Paint paint) {
+        c.drawCircle(cx, cy, radius, paint);
+    }
+
+    public static void canvasDrawBitmap(android.graphics.Canvas c, android.graphics.Bitmap bitmap, float left, float top, android.graphics.Paint paint) {
+        c.drawBitmap(bitmap, left, top, paint);
+    }
+
+    public static void canvasDrawText(android.graphics.Canvas c, String text, float x, float y, android.graphics.Paint paint) {
+        c.drawText(text, x, y, paint);
+    }
+
+    public static void canvasClipPath(android.graphics.Canvas c, android.graphics.Path path) {
+        c.clipPath(path);
+    }
+
+    public static void canvasSave(android.graphics.Canvas c) {
+        c.save();
+    }
+
+    public static void canvasRestore(android.graphics.Canvas c) {
+        c.restore();
+    }
+
     // ---- android_utils: буфер обмена ----
     public static void copyToClipboard(String text) {
         AndroidUtilities.runOnUIThread(() -> {

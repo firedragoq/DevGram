@@ -351,6 +351,46 @@ class BasePlugin:
         calls Paint.setColor(int) from compiled Java, which has no such ambiguity."""
         _Plugins.paintSetColor(paint, color)
 
+    def canvas_draw_rect(self, canvas, left, top, right, bottom, paint):
+        """canvas.drawRect(left, top, right, bottom, paint), routed through compiled Java.
+
+        Most Canvas draw methods (drawRect, drawCircle, drawBitmap, drawText, ...) are
+        actually declared on a hidden superclass (BaseCanvas) on modern Android. Calling
+        them from compiled Java resolves fine (the compiler links the call directly), but
+        calling canvas.drawRect(...) from Python through Chaquopy resolves the method by
+        reflection on its declaring class and hits Android's hidden-API restriction there.
+        Use these canvas_draw_*/canvas_save/canvas_restore/canvas_clip_path helpers instead
+        of calling Canvas methods directly from plugin code."""
+        _Plugins.canvasDrawRect(canvas, float(left), float(top), float(right), float(bottom), paint)
+
+    def canvas_draw_round_rect(self, canvas, rect, rx, ry, paint):
+        """canvas.drawRoundRect(rect, rx, ry, paint). See canvas_draw_rect for why this exists."""
+        _Plugins.canvasDrawRoundRect(canvas, rect, float(rx), float(ry), paint)
+
+    def canvas_draw_circle(self, canvas, cx, cy, radius, paint):
+        """canvas.drawCircle(cx, cy, radius, paint). See canvas_draw_rect for why this exists."""
+        _Plugins.canvasDrawCircle(canvas, float(cx), float(cy), float(radius), paint)
+
+    def canvas_draw_bitmap(self, canvas, bitmap, left, top, paint):
+        """canvas.drawBitmap(bitmap, left, top, paint). See canvas_draw_rect for why this exists."""
+        _Plugins.canvasDrawBitmap(canvas, bitmap, float(left), float(top), paint)
+
+    def canvas_draw_text(self, canvas, text, x, y, paint):
+        """canvas.drawText(text, x, y, paint). See canvas_draw_rect for why this exists."""
+        _Plugins.canvasDrawText(canvas, text, float(x), float(y), paint)
+
+    def canvas_clip_path(self, canvas, path):
+        """canvas.clipPath(path). See canvas_draw_rect for why this exists."""
+        _Plugins.canvasClipPath(canvas, path)
+
+    def canvas_save(self, canvas):
+        """canvas.save(). See canvas_draw_rect for why this exists."""
+        _Plugins.canvasSave(canvas)
+
+    def canvas_restore(self, canvas):
+        """canvas.restore(). See canvas_draw_rect for why this exists."""
+        _Plugins.canvasRestore(canvas)
+
     # ---- file_utils (файлы в личной папке плагина) ----
     def read_file(self, name):
         """Прочитать файл из личной папки плагина (или '')."""
