@@ -363,25 +363,31 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             devgramBackBadge = new org.telegram.ui.Components.CounterView(getContext(), resourcesProvider);
             devgramBackBadge.setColors(Theme.key_chats_unreadCounterText, Theme.key_chats_unreadCounter);
             devgramBackBadge.setGravity(Gravity.LEFT);
-            addView(devgramBackBadge, LayoutHelper.createFrame(60, 20, Gravity.LEFT | Gravity.TOP));
+            // Свой фон-«таблетку» у CounterView убираем — счётчик должен сидеть ВНУТРИ той же
+            // стеклянной капсулы, что и стрелка (glassDrawableBack, см. dispatchDraw), а не быть
+            // отдельной плашкой рядом с ней. circlePaint публичный, draw() трогает его только под
+            // проверкой `!= null`, так что null тут окончательно и безопасно гасит фон.
+            devgramBackBadge.counterDrawable.circlePaint = null;
+            addView(devgramBackBadge, LayoutHelper.createFrame(40, 20, Gravity.LEFT | Gravity.TOP));
         }
         // DevGram: ActionBar.onMeasure()/onLayout() полностью самостоятельные (не зовут super и не
         // трогают неизвестные им children) — обычный проход измерения/раскладки родителя этот view
         // никогда не заденет, он так и останется 0×0 в (0,0). Меряем и кладём вручную сами, а
         // позицию держим через translationX/Y — она не зависит от того, пройдёт ли этот child
         // когда-нибудь через layout родителя.
-        int w = dp(60);
+        int w = dp(40);
         int h = dp(20);
         devgramBackBadge.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
         devgramBackBadge.layout(0, 0, w, h);
         int additionalTop = occupyStatusBar ? AndroidUtilities.statusBarHeight : 0;
-        // Сама стрелка — круглая кнопка 54dp; бейдж кладём СПРАВА от неё (не поверх), по
-        // вертикальному центру той же высоты, как в референсе Telegram-iOS (там бейдж стоит
-        // рядом со стрелкой на одной линии, а не поверх неё уголком-уведомлением).
+        // Сама стрелка — круглая кнопка 54dp; текст счётчика кладём сразу после неё, по
+        // вертикальному центру той же высоты — общий стеклянный фон под обоими рисует
+        // dispatchDraw (расширяет glassDrawableBack, см. ниже), здесь только текст.
         int buttonHeight = getCurrentActionBarHeight();
-        devgramBackBadge.setTranslationX(dp(54) + dp(4));
+        devgramBackBadge.setTranslationX(dp(54));
         devgramBackBadge.setTranslationY(additionalTop + (buttonHeight - h) / 2f);
         devgramBackBadge.setCount(count, animated);
+        invalidate();
     }
 
     public Drawable getBackButtonDrawable() {
@@ -1503,6 +1509,11 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         } else {
             textLeft = dp(AndroidUtilities.isTablet() ? 26 : 18);
         }
+        // DevGram: см. такую же поправку в onLayout — держим availableWidth заголовка в
+        // соответствии с реальной позицией, когда виден бейдж непрочитанных.
+        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
+            textLeft += dp(44);
+        }
         // textLeft += additionalTextLeft;
 
         if (menu != null && menu.getVisibility() != GONE) {
@@ -1619,6 +1630,12 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             textLeft = glassMode ? dp(76) : dp(AndroidUtilities.isTablet() ? 80 : 72);
         } else {
             textLeft = glassMode ? dp(24) : dp(AndroidUtilities.isTablet() ? 26 : 18);
+        }
+        // DevGram: если виден бейдж непрочитанных на кнопке назад — освобождаем под него место,
+        // иначе заголовок наезжает на счётчик (капсула стрелки в dispatchDraw расширяется на
+        // ту же величину, см. glassDrawableBack).
+        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
+            textLeft += dp(44);
         }
         textLeft += additionalTextLeft;
 
@@ -2327,7 +2344,14 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 chatAvatarContainer.setTranslationX(0);
             }
             if (glassDrawableBack != null && hasBackButton) {
-                glassDrawableBack.setBounds(0, t, s + p * 2, b);
+                // DevGram: если виден бейдж непрочитанных, капсула стрелки расширяется вправо,
+                // чтобы счётчик оказался ВНУТРИ того же стекла, а не рядом отдельной плашкой
+                // (как в референсе Telegram-iOS — там это одна капсула на двоих).
+                int backPillRight = s + p * 2;
+                if (devgramBackBadge != null && devgramBackBadge.getVisibility() == View.VISIBLE) {
+                    backPillRight += dp(40) + dp(4);
+                }
+                glassDrawableBack.setBounds(0, t, backPillRight, b);
                 glassDrawableBack.draw(canvas);
             }
             // DevGram: hideGlassMenuPill гасит фон только под «⋮», которую в iOS-режиме
