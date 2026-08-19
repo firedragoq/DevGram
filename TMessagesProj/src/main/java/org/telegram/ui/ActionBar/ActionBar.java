@@ -361,16 +361,17 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
         if (devgramBackBadge == null) {
             devgramBackBadge = new org.telegram.ui.Components.CounterView(getContext(), resourcesProvider);
-            devgramBackBadge.setColors(Theme.key_chats_unreadCounterText, Theme.key_chats_unreadCounter);
+            // key_chats_unreadCounterText рассчитан на контраст с цветным кружком-фоном — на
+            // тёмном стекле капсулы читался чёрным. key_actionBarDefaultTitle — тот же цвет,
+            // что у заголовка этого же ActionBar, гарантированно светлый в любой теме экрана.
+            devgramBackBadge.setColors(Theme.key_actionBarDefaultTitle, Theme.key_chats_unreadCounter);
             devgramBackBadge.setGravity(Gravity.LEFT);
-            // DevGram: сверился с исходниками Telegram-iOS (NavigationBarBadge.swift) — там это
-            // НЕ слияние со стрелкой в одно стекло, а отдельный маленький значок СО СВОИМ фоном
-            // (радиус 9pt, шрифт 13pt ОБЫЧНОГО начертания, не жирный), наложенный на угол стрелки.
-            // radius/textPaint — публичные поля CounterDrawable, правим напрямую под эти значения.
-            devgramBackBadge.counterDrawable.radius = 9f;
-            devgramBackBadge.counterDrawable.textPaint.setTypeface(android.graphics.Typeface.DEFAULT);
-            devgramBackBadge.counterDrawable.textPaint.setTextSize(AndroidUtilities.dp(12.5f));
-            addView(devgramBackBadge, LayoutHelper.createFrame(40, 18, Gravity.LEFT | Gravity.TOP));
+            // Свой фон-«таблетку» убираем — счётчик должен быть ВНУТРИ той же стеклянной капсулы,
+            // что и стрелка (glassDrawableBack расширяется под него, см. dispatchDraw), а не
+            // отдельным значком рядом. circlePaint публичный, draw() трогает его только под
+            // проверкой `!= null`, так что null тут окончательно и безопасно гасит фон.
+            devgramBackBadge.counterDrawable.circlePaint = null;
+            addView(devgramBackBadge, LayoutHelper.createFrame(40, 20, Gravity.LEFT | Gravity.TOP));
         }
         // DevGram: ActionBar.onMeasure()/onLayout() полностью самостоятельные (не зовут super и не
         // трогают неизвестные им children) — обычный проход измерения/раскладки родителя этот view
@@ -378,17 +379,12 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         // позицию держим через translationX/Y — она не зависит от того, пройдёт ли этот child
         // когда-нибудь через layout родителя.
         int w = dp(40);
-        int h = dp(18);
+        int h = dp(20);
         devgramBackBadge.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
         devgramBackBadge.layout(0, 0, w, h);
         int additionalTop = occupyStatusBar ? AndroidUtilities.statusBarHeight : 0;
-        // dx:16 из исходников iOS отсчитывается от рамки САМОГО глифа стрелки (узкой, ~13-20pt),
-        // а не от всего тап-таргета — у нас backButtonImageView это весь квадрат 54dp, глиф внутри
-        // него отрисован с отступом и уже занимает большую часть этой ширины. Прямое dx:16 отсюда
-        // накладывает бейдж поверх самой стрелки. Кладём его правее всего 54dp-квадрата — так он
-        // гарантированно сбоку от стрелки, а не поверх неё.
         int buttonHeight = getCurrentActionBarHeight();
-        devgramBackBadge.setTranslationX(dp(54) + dp(4));
+        devgramBackBadge.setTranslationX(dp(54));
         devgramBackBadge.setTranslationY(additionalTop + (buttonHeight - h) / 2f);
         devgramBackBadge.setCount(count, animated);
         invalidate();
@@ -1513,6 +1509,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         } else {
             textLeft = dp(AndroidUtilities.isTablet() ? 26 : 18);
         }
+        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
+            textLeft += dp(44);
+        }
         // textLeft += additionalTextLeft;
 
         if (menu != null && menu.getVisibility() != GONE) {
@@ -1629,6 +1628,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             textLeft = glassMode ? dp(76) : dp(AndroidUtilities.isTablet() ? 80 : 72);
         } else {
             textLeft = glassMode ? dp(24) : dp(AndroidUtilities.isTablet() ? 26 : 18);
+        }
+        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
+            textLeft += dp(44);
         }
         textLeft += additionalTextLeft;
 
@@ -2303,6 +2305,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             }
         } else {
             final float middlePillFactor = glassOnlyBack ? 0f : (drawGlassMiddlePill ? 1f : searchFactor);
+            // DevGram: виден ли бейдж непрочитанных — используется и капсулой заголовка (ниже),
+            // и капсулой стрелки (glassDrawableBack), поэтому считаем один раз здесь.
+            final int devgramBadgeExtra = (devgramBackBadge != null && devgramBackBadge.getVisibility() == View.VISIBLE) ? dp(44) : 0;
             if (glassDrawable != null && middlePillFactor > 0f) {
                 final int menuWidthWithPadding = menuWidth + (hasForcedMenuWidth ? (menuWidth > 0 ? p : 0) : (int) (p * animatorHasMenuItems.getFloatValue()));
                 // DevGram: в iOS-режиме (hideGlassMenuPill) «⋮» скрыт, а вместо него у
@@ -2313,7 +2318,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 // место под аватарку + такой же зазор p, что и у кнопки назад слева.
                 final int rightOffset = hideGlassMenuPill ? dp(58) + p : lerp(menuWidthWithPadding, Math.max(menuWidthWithPadding, p + s), chatAvatarContainer == null ? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
 
-                final int leftDefault = lerp(hasBackButton ? s + p : 0, s + p, chatAvatarContainer == null? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
+                final int leftDefault = lerp(hasBackButton ? s + p : 0, s + p, chatAvatarContainer == null? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue()) + devgramBadgeExtra;
                 final int rightDefault = getWidth() - rightOffset;
                 final int widthDefault = rightDefault - leftDefault;
                 final int left, right;
@@ -2337,7 +2342,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 chatAvatarContainer.setTranslationX(0);
             }
             if (glassDrawableBack != null && hasBackButton) {
-                glassDrawableBack.setBounds(0, t, s + p * 2, b);
+                glassDrawableBack.setBounds(0, t, s + p * 2 + devgramBadgeExtra, b);
                 glassDrawableBack.draw(canvas);
             }
             // DevGram: hideGlassMenuPill гасит фон только под «⋮», которую в iOS-режиме
