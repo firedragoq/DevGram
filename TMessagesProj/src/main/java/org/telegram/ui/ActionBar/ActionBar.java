@@ -26,6 +26,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
+import android.graphics.RectF;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
@@ -100,6 +101,8 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     // там нативная back-кнопка показывает счётчик того экрана, куда вернёшься). Живёт только пока
     // включён пресет дизайна «iOS» — см. DevGramConfig.DESIGN_MODE_IOS.
     private org.telegram.ui.Components.CounterView devgramBackBadge;
+    private Paint devgramBadgePillPaint;
+    private final RectF devgramBadgePillRect = new RectF();
     private BackupImageView avatarSearchImageView;
     private Drawable backButtonDrawable;
     private final SimpleTextView[] titleTextView = new SimpleTextView[2];
@@ -2342,7 +2345,23 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 chatAvatarContainer.setTranslationX(0);
             }
             if (glassDrawableBack != null && hasBackButton) {
-                glassDrawableBack.setBounds(0, t, s + p * 2 + devgramBadgeExtra, b);
+                if (devgramBadgeExtra > 0) {
+                    // DevGram: BlurredBackgroundDrawable не растягивается на лету на более
+                    // широкий bounds (блюр-сэмпл остаётся привязан к исходному размеру — при
+                    // просто setBounds() шире расширенная часть рисуется пустой/прозрачной).
+                    // Рисуем свою плоскую заливку той же формы под всю расширенную капсулу
+                    // (видна там, где не дотягивается блюр), а штатный glassDrawableBack
+                    // рисуем поверх на его обычных узких границах — стрелка получает
+                    // настоящий блюр как раньше, шов между ними на тёмном фоне не заметен.
+                    if (devgramBadgePillPaint == null) {
+                        devgramBadgePillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                    }
+                    devgramBadgePillPaint.setColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
+                    float pillRadius = (b - t) / 2f;
+                    devgramBadgePillRect.set(0, t, s + p * 2 + devgramBadgeExtra, b);
+                    canvas.drawRoundRect(devgramBadgePillRect, pillRadius, pillRadius, devgramBadgePillPaint);
+                }
+                glassDrawableBack.setBounds(0, t, s + p * 2, b);
                 glassDrawableBack.draw(canvas);
             }
             // DevGram: hideGlassMenuPill гасит фон только под «⋮», которую в iOS-режиме
