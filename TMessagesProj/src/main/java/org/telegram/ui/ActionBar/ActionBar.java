@@ -361,7 +361,11 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
         if (devgramBackBadge == null) {
             devgramBackBadge = new org.telegram.ui.Components.CounterView(getContext(), resourcesProvider);
-            devgramBackBadge.setColors(Theme.key_chats_unreadCounterText, Theme.key_chats_unreadCounter);
+            // key_chats_unreadCounterText рассчитан на цветной кружок-фон (там нужен контраст
+            // с синим/цветным), а не на тёмное стекло капсулы — тут текст выходил чёрным на
+            // тёмном и был не виден. Берём тот же ключ, что и заголовок этого же ActionBar —
+            // гарантированно светлый и видимый в любой теме этого экрана.
+            devgramBackBadge.setColors(Theme.key_actionBarDefaultTitle, Theme.key_chats_unreadCounter);
             devgramBackBadge.setGravity(Gravity.LEFT);
             // Свой фон-«таблетку» у CounterView убираем — счётчик должен сидеть ВНУТРИ той же
             // стеклянной капсулы, что и стрелка (glassDrawableBack, см. dispatchDraw), а не быть
@@ -2320,7 +2324,11 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 // место под аватарку + такой же зазор p, что и у кнопки назад слева.
                 final int rightOffset = hideGlassMenuPill ? dp(58) + p : lerp(menuWidthWithPadding, Math.max(menuWidthWithPadding, p + s), chatAvatarContainer == null ? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
 
-                final int leftDefault = lerp(hasBackButton ? s + p : 0, s + p, chatAvatarContainer == null? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
+                // DevGram: если виден бейдж непрочитанных, капсула стрелки (glassDrawableBack,
+                // ниже) расширяется вправо на dp(44) — эта капсула (название чата) должна
+                // начинаться настолько же правее, иначе они наезжают друг на друга.
+                final int devgramBadgeExtra = (devgramBackBadge != null && devgramBackBadge.getVisibility() == View.VISIBLE) ? dp(44) : 0;
+                final int leftDefault = lerp(hasBackButton ? s + p : 0, s + p, chatAvatarContainer == null? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue()) + devgramBadgeExtra;
                 final int rightDefault = getWidth() - rightOffset;
                 final int widthDefault = rightDefault - leftDefault;
                 final int left, right;
