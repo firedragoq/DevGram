@@ -375,8 +375,12 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         devgramBackBadge.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
         devgramBackBadge.layout(0, 0, w, h);
         int additionalTop = occupyStatusBar ? AndroidUtilities.statusBarHeight : 0;
-        devgramBackBadge.setTranslationX(dp(30));
-        devgramBackBadge.setTranslationY(additionalTop + dp(2));
+        // Сама стрелка — круглая кнопка 54dp; бейдж кладём СПРАВА от неё (не поверх), по
+        // вертикальному центру той же высоты, как в референсе Telegram-iOS (там бейдж стоит
+        // рядом со стрелкой на одной линии, а не поверх неё уголком-уведомлением).
+        int buttonHeight = getCurrentActionBarHeight();
+        devgramBackBadge.setTranslationX(dp(54) + dp(4));
+        devgramBackBadge.setTranslationY(additionalTop + (buttonHeight - h) / 2f);
         devgramBackBadge.setCount(count, animated);
     }
 
