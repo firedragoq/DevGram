@@ -382,10 +382,14 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         devgramBackBadge.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
         devgramBackBadge.layout(0, 0, w, h);
         int additionalTop = occupyStatusBar ? AndroidUtilities.statusBarHeight : 0;
-        // Позиция — как в NavigationBarImpl.swift: offset (dx:16, dy:2) от рамки САМОЙ стрелки
-        // (т.е. от левого верхнего угла кнопки-стрелки), не по центру всей высоты кнопки.
-        devgramBackBadge.setTranslationX(dp(16));
-        devgramBackBadge.setTranslationY(additionalTop + dp(2));
+        // dx:16 из исходников iOS отсчитывается от рамки САМОГО глифа стрелки (узкой, ~13-20pt),
+        // а не от всего тап-таргета — у нас backButtonImageView это весь квадрат 54dp, глиф внутри
+        // него отрисован с отступом и уже занимает большую часть этой ширины. Прямое dx:16 отсюда
+        // накладывает бейдж поверх самой стрелки. Кладём его правее всего 54dp-квадрата — так он
+        // гарантированно сбоку от стрелки, а не поверх неё.
+        int buttonHeight = getCurrentActionBarHeight();
+        devgramBackBadge.setTranslationX(dp(54) + dp(4));
+        devgramBackBadge.setTranslationY(additionalTop + (buttonHeight - h) / 2f);
         devgramBackBadge.setCount(count, animated);
         invalidate();
     }
