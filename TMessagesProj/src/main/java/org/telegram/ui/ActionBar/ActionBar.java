@@ -366,7 +366,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             // ширина с запасом: CounterView сам меряет текст и рисует от левого паддинга (~5.5dp),
             // не обрезая по границам вью, но родитель (ActionBar — FrameLayout) обрезает дочерний
             // canvas по объявленным LayoutParams — с запасом под 4+ цифры без clipRect-обрезки.
-            addView(devgramBackBadge, LayoutHelper.createFrame(60, 20, Gravity.LEFT | Gravity.TOP, 30, -2, 0, 0));
+            // Margin/gravity здесь ни на что не влияют — фактическую позицию задаёт явный
+            // .layout(...) в onLayout (см. ниже), т.к. ActionBar.onLayout() не зовёт super.
+            addView(devgramBackBadge, LayoutHelper.createFrame(60, 20, Gravity.LEFT | Gravity.TOP));
         }
         devgramBackBadge.setCount(count, animated);
     }
@@ -1606,6 +1608,15 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             textLeft = glassMode ? dp(76) : dp(AndroidUtilities.isTablet() ? 80 : 72);
         } else {
             textLeft = glassMode ? dp(24) : dp(AndroidUtilities.isTablet() ? 26 : 18);
+        }
+        // DevGram: onLayout здесь полностью самостоятельный (не зовёт super.onLayout), поэтому
+        // любой child, не позиционированный вручную явным .layout(...), остаётся на (0,0) —
+        // именно так бейдж непрочитанных улетал в статус-бар поверх часов вместо места у стрелки.
+        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
+            int bw = devgramBackBadge.getMeasuredWidth();
+            int bh = devgramBackBadge.getMeasuredHeight();
+            int bTop = additionalTop + dp(2);
+            devgramBackBadge.layout(dp(30), bTop, dp(30) + bw, bTop + bh);
         }
         textLeft += additionalTextLeft;
 
