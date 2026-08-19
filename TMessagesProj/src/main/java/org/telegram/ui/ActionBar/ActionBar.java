@@ -96,6 +96,10 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     private boolean glassAvatarSquare;
     private INavigationLayout.BackButtonState backButtonState = INavigationLayout.BackButtonState.BACK;
     public ImageView backButtonImageView;
+    // DevGram: бейдж с числом непрочитанных чатов у кнопки «назад» (порт поведения iOS Telegram —
+    // там нативная back-кнопка показывает счётчик того экрана, куда вернёшься). Живёт только пока
+    // включён пресет дизайна «iOS» — см. DevGramConfig.DESIGN_MODE_IOS.
+    private org.telegram.ui.Components.CounterView devgramBackBadge;
     private BackupImageView avatarSearchImageView;
     private Drawable backButtonDrawable;
     private final SimpleTextView[] titleTextView = new SimpleTextView[2];
@@ -342,6 +346,29 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             }
         });
         backButtonImageView.setContentDescription(LocaleController.getString(R.string.AccDescrGoBack));
+    }
+
+    // DevGram: показать/спрятать бейдж непрочитанных на кнопке «назад» (пресет дизайна «iOS»).
+    public void setDevgramBackBadge(int count, boolean animated) {
+        if (count <= 0) {
+            if (devgramBackBadge != null) {
+                devgramBackBadge.setCount(0, animated);
+            }
+            return;
+        }
+        if (backButtonImageView == null) {
+            createBackButtonImage();
+        }
+        if (devgramBackBadge == null) {
+            devgramBackBadge = new org.telegram.ui.Components.CounterView(getContext(), resourcesProvider);
+            devgramBackBadge.setColors(Theme.key_chats_unreadCounterText, Theme.key_chats_unreadCounter);
+            devgramBackBadge.setGravity(Gravity.LEFT);
+            // ширина с запасом: CounterView сам меряет текст и рисует от левого паддинга (~5.5dp),
+            // не обрезая по границам вью, но родитель (ActionBar — FrameLayout) обрезает дочерний
+            // canvas по объявленным LayoutParams — с запасом под 4+ цифры без clipRect-обрезки.
+            addView(devgramBackBadge, LayoutHelper.createFrame(60, 20, Gravity.LEFT | Gravity.TOP, 30, -2, 0, 0));
+        }
+        devgramBackBadge.setCount(count, animated);
     }
 
     public Drawable getBackButtonDrawable() {

@@ -380,6 +380,10 @@ public class NotificationCenter {
     public static final int mainTabsSchemeChanged = totalEvents++;
     public static final int devgramMessagesDeleted = totalEvents++;
     public static final int devgramMessageEdited = totalEvents++;
+    // DevGram: переключатель внешнего вида бабла (хвост/скругление) поменялся, пока чат уже открыт —
+    // уже отрисованные ChatMessageCell кэшируют Path (см. Theme.MessageDrawable.PathDrawParams) и не
+    // перерисуются сами, пока их не проскроллить — шлём это, чтобы открытые чаты сами дёрнули invalidate.
+    public static final int devgramBubbleStyleChanged = totalEvents++;
     public static final int contactsPermissionBadgeCheck = totalEvents++;
     public static final int guardBotDecisionResult = totalEvents++;
     public static final int webBrowserSettingsUpdate = totalEvents++;

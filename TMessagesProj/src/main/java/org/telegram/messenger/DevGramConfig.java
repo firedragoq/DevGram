@@ -346,6 +346,9 @@ public class DevGramConfig {
                 }
             }
         }
+        // Пресет меняет и вид баблов, и бейдж непрочитанных на кнопке «назад» (виден только в
+        // iOS-режиме) — форсируем уже открытые чаты обновиться, не дожидаясь скролла/переоткрытия.
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.devgramBubbleStyleChanged);
     }
 
     // DevGram: «Контакты» в нижнем меню по умолчанию скрыты везде, кроме iOS-режима (где их
@@ -411,6 +414,10 @@ public class DevGramConfig {
     public static void setRemoveMessageTail(boolean v) {
         removeMessageTail = v;
         if (preferences != null) preferences.edit().putBoolean("removeMessageTail", v).apply();
+        // Уже открытые чаты кэшируют Path бабла (Theme.MessageDrawable.PathDrawParams) и сами не
+        // перерисуются, пока их не проскроллить — из-за этого хвост оставался на части сообщений,
+        // а у остальных бабл уже пересчитывался (отсюда же и «съезжающий» левый край).
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.devgramBubbleStyleChanged);
     }
 
     public static void setReplaceEditedWithIcon(boolean v) {

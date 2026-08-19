@@ -3176,6 +3176,7 @@ public class ChatActivity extends BaseFragment implements
 
         getNotificationCenter().addPostponeNotificationsCallback(postponeNotificationsWhileLoadingCallback);
         getNotificationCenter().addObserver(this, NotificationCenter.closeChats);
+        getNotificationCenter().addObserver(this, NotificationCenter.notificationsCountUpdated);
 
         if (chatMode != MODE_SCHEDULED) {
             if (threadMessageId == 0) {
@@ -3445,6 +3446,10 @@ public class ChatActivity extends BaseFragment implements
         if (themeDelegate.isThemeChangeAvailable(false)) {
             globalObserversGroup.add(NotificationCenter.needSetDayNightTheme);
         }
+        // DevGram: тумблер «Убрать хвост» и т.п. меняют форму бабла глобально, но уже отрисованные
+        // ChatMessageCell кэшируют Path (Theme.MessageDrawable.PathDrawParams) и сами не перерисуются,
+        // пока их не проскроллить — форсируем invalidate списка сразу при переключении в настройках.
+        globalObserversGroup.add(NotificationCenter.devgramBubbleStyleChanged);
 
         if (chatInvite != null) {
             int timeout = chatInvite.expires - getConnectionsManager().getCurrentTime();
@@ -3702,6 +3707,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
+        getNotificationCenter().removeObserver(this, NotificationCenter.notificationsCountUpdated);
 
         if (chatMode == 0 && AndroidUtilities.isTablet()) {
             getNotificationCenter().postNotificationName(NotificationCenter.openedChatChanged, dialog_id, getTopicId(), true);
@@ -3997,6 +4003,7 @@ public class ChatActivity extends BaseFragment implements
             actionBar.setBackButtonDrawable(null);
         } else {
             actionBar.setBackButtonDrawable(new BackDrawable(isReport()));
+            updateDevgramBackBadge(false);
         }
 
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -21394,6 +21401,20 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    // DevGram: бейдж непрочитанных на кнопке «назад» — только в пресете дизайна «iOS»
+    // (порт поведения нативной back-кнопки iOS Telegram, см. ActionBar.setDevgramBackBadge).
+    private void updateDevgramBackBadge(boolean animated) {
+        if (actionBar == null) {
+            return;
+        }
+        if (org.telegram.messenger.DevGramConfig.getDesignMode() != org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS) {
+            actionBar.setDevgramBackBadge(0, animated);
+            return;
+        }
+        int count = MessagesStorage.getInstance(currentAccount).getMainUnreadCount();
+        actionBar.setDevgramBackBadge(count, animated);
+    }
+
     @Override
     public void didReceivedNotification(int id, int account, final Object... args) {
         if (id == NotificationCenter.messagesDidLoad) {
@@ -25074,6 +25095,13 @@ public class ChatActivity extends BaseFragment implements
                     themeDelegate.setCurrentTheme(themeDelegate.chatTheme, themeDelegate.wallpaper, true, null);
                 }
             }
+        } else if (id == NotificationCenter.devgramBubbleStyleChanged) {
+            if (chatListView != null) {
+                chatListView.invalidateViews();
+            }
+            updateDevgramBackBadge(true);
+        } else if (id == NotificationCenter.notificationsCountUpdated && account == currentAccount) {
+            updateDevgramBackBadge(true);
         } else if (id == NotificationCenter.chatAvailableReactionsUpdated) {
             long chatId = (long) args[0];
             long topicId = (long) args[1];
