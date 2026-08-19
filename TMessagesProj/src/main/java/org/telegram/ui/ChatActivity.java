@@ -3176,7 +3176,6 @@ public class ChatActivity extends BaseFragment implements
 
         getNotificationCenter().addPostponeNotificationsCallback(postponeNotificationsWhileLoadingCallback);
         getNotificationCenter().addObserver(this, NotificationCenter.closeChats);
-        getNotificationCenter().addObserver(this, NotificationCenter.notificationsCountUpdated);
 
         if (chatMode != MODE_SCHEDULED) {
             if (threadMessageId == 0) {
@@ -3707,7 +3706,6 @@ public class ChatActivity extends BaseFragment implements
         }
 
         getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
-        getNotificationCenter().removeObserver(this, NotificationCenter.notificationsCountUpdated);
 
         if (chatMode == 0 && AndroidUtilities.isTablet()) {
             getNotificationCenter().postNotificationName(NotificationCenter.openedChatChanged, dialog_id, getTopicId(), true);
@@ -4003,7 +4001,6 @@ public class ChatActivity extends BaseFragment implements
             actionBar.setBackButtonDrawable(null);
         } else {
             actionBar.setBackButtonDrawable(new BackDrawable(isReport()));
-            updateDevgramBackBadge(false);
         }
 
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -20475,7 +20472,12 @@ public class ChatActivity extends BaseFragment implements
 
         if (forumTopic != null && avatarContainer != null) {
             avatarContainer.getAvatarImageView().setVisibility(View.VISIBLE);
-            ForumUtilities.setTopicIcon(avatarContainer.getAvatarImageView(), forumTopic, true, true, themeDelegate);
+            // DevGram: в iOS-режиме (dg_centerTitle) аватарка перекрывает «⋮» и рассчитана на
+            // обычный размер аватарки (см. bringToFront/setHideGlassMenuPill ниже в createView) —
+            // "крупная" иконка темы (largeIcon=true, сток) в эти границы не помещается, рисуется
+            // без обрезки по кругу и вылезает поверх/за пределы капсулы.
+            boolean largeIcon = !MessagesController.getGlobalMainSettings().getBoolean("dg_centerTitle", false);
+            ForumUtilities.setTopicIcon(avatarContainer.getAvatarImageView(), forumTopic, true, largeIcon, themeDelegate);
         }
     }
 
@@ -21399,20 +21401,6 @@ public class ChatActivity extends BaseFragment implements
             removeMessageObject(unreadMessageObject);
             unreadMessageObject = null;
         }
-    }
-
-    // DevGram: бейдж непрочитанных на кнопке «назад» — только в пресете дизайна «iOS»
-    // (порт поведения нативной back-кнопки iOS Telegram, см. ActionBar.setDevgramBackBadge).
-    private void updateDevgramBackBadge(boolean animated) {
-        if (actionBar == null) {
-            return;
-        }
-        if (org.telegram.messenger.DevGramConfig.getDesignMode() != org.telegram.messenger.DevGramConfig.DESIGN_MODE_IOS) {
-            actionBar.setDevgramBackBadge(0, animated);
-            return;
-        }
-        int count = MessagesStorage.getInstance(currentAccount).getMainUnreadCount();
-        actionBar.setDevgramBackBadge(count, animated);
     }
 
     @Override
@@ -25099,9 +25087,6 @@ public class ChatActivity extends BaseFragment implements
             if (chatListView != null) {
                 chatListView.invalidateViews();
             }
-            updateDevgramBackBadge(true);
-        } else if (id == NotificationCenter.notificationsCountUpdated && account == currentAccount) {
-            updateDevgramBackBadge(true);
         } else if (id == NotificationCenter.chatAvailableReactionsUpdated) {
             long chatId = (long) args[0];
             long topicId = (long) args[1];

@@ -26,7 +26,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
-import android.graphics.RectF;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
@@ -97,12 +96,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     private boolean glassAvatarSquare;
     private INavigationLayout.BackButtonState backButtonState = INavigationLayout.BackButtonState.BACK;
     public ImageView backButtonImageView;
-    // DevGram: бейдж с числом непрочитанных чатов у кнопки «назад» (порт поведения iOS Telegram —
-    // там нативная back-кнопка показывает счётчик того экрана, куда вернёшься). Живёт только пока
-    // включён пресет дизайна «iOS» — см. DevGramConfig.DESIGN_MODE_IOS.
-    private org.telegram.ui.Components.CounterView devgramBackBadge;
-    private Paint devgramBadgePillPaint;
-    private final RectF devgramBadgePillRect = new RectF();
     private BackupImageView avatarSearchImageView;
     private Drawable backButtonDrawable;
     private final SimpleTextView[] titleTextView = new SimpleTextView[2];
@@ -349,48 +342,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             }
         });
         backButtonImageView.setContentDescription(LocaleController.getString(R.string.AccDescrGoBack));
-    }
-
-    // DevGram: показать/спрятать бейдж непрочитанных на кнопке «назад» (пресет дизайна «iOS»).
-    public void setDevgramBackBadge(int count, boolean animated) {
-        if (count <= 0) {
-            if (devgramBackBadge != null) {
-                devgramBackBadge.setCount(0, animated);
-            }
-            return;
-        }
-        if (backButtonImageView == null) {
-            createBackButtonImage();
-        }
-        if (devgramBackBadge == null) {
-            devgramBackBadge = new org.telegram.ui.Components.CounterView(getContext(), resourcesProvider);
-            // key_chats_unreadCounterText рассчитан на контраст с цветным кружком-фоном — на
-            // тёмном стекле капсулы читался чёрным. key_actionBarDefaultTitle — тот же цвет,
-            // что у заголовка этого же ActionBar, гарантированно светлый в любой теме экрана.
-            devgramBackBadge.setColors(Theme.key_actionBarDefaultTitle, Theme.key_chats_unreadCounter);
-            devgramBackBadge.setGravity(Gravity.LEFT);
-            // Свой фон-«таблетку» убираем — счётчик должен быть ВНУТРИ той же стеклянной капсулы,
-            // что и стрелка (glassDrawableBack расширяется под него, см. dispatchDraw), а не
-            // отдельным значком рядом. circlePaint публичный, draw() трогает его только под
-            // проверкой `!= null`, так что null тут окончательно и безопасно гасит фон.
-            devgramBackBadge.counterDrawable.circlePaint = null;
-            addView(devgramBackBadge, LayoutHelper.createFrame(40, 20, Gravity.LEFT | Gravity.TOP));
-        }
-        // DevGram: ActionBar.onMeasure()/onLayout() полностью самостоятельные (не зовут super и не
-        // трогают неизвестные им children) — обычный проход измерения/раскладки родителя этот view
-        // никогда не заденет, он так и останется 0×0 в (0,0). Меряем и кладём вручную сами, а
-        // позицию держим через translationX/Y — она не зависит от того, пройдёт ли этот child
-        // когда-нибудь через layout родителя.
-        int w = dp(40);
-        int h = dp(20);
-        devgramBackBadge.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
-        devgramBackBadge.layout(0, 0, w, h);
-        int additionalTop = occupyStatusBar ? AndroidUtilities.statusBarHeight : 0;
-        int buttonHeight = getCurrentActionBarHeight();
-        devgramBackBadge.setTranslationX(dp(54));
-        devgramBackBadge.setTranslationY(additionalTop + (buttonHeight - h) / 2f);
-        devgramBackBadge.setCount(count, animated);
-        invalidate();
     }
 
     public Drawable getBackButtonDrawable() {
@@ -1512,9 +1463,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         } else {
             textLeft = dp(AndroidUtilities.isTablet() ? 26 : 18);
         }
-        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
-            textLeft += dp(44);
-        }
         // textLeft += additionalTextLeft;
 
         if (menu != null && menu.getVisibility() != GONE) {
@@ -1631,9 +1579,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             textLeft = glassMode ? dp(76) : dp(AndroidUtilities.isTablet() ? 80 : 72);
         } else {
             textLeft = glassMode ? dp(24) : dp(AndroidUtilities.isTablet() ? 26 : 18);
-        }
-        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
-            textLeft += dp(44);
         }
         textLeft += additionalTextLeft;
 
@@ -2308,9 +2253,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             }
         } else {
             final float middlePillFactor = glassOnlyBack ? 0f : (drawGlassMiddlePill ? 1f : searchFactor);
-            // DevGram: виден ли бейдж непрочитанных — используется и капсулой заголовка (ниже),
-            // и капсулой стрелки (glassDrawableBack), поэтому считаем один раз здесь.
-            final int devgramBadgeExtra = (devgramBackBadge != null && devgramBackBadge.getVisibility() == View.VISIBLE) ? dp(44) : 0;
             if (glassDrawable != null && middlePillFactor > 0f) {
                 final int menuWidthWithPadding = menuWidth + (hasForcedMenuWidth ? (menuWidth > 0 ? p : 0) : (int) (p * animatorHasMenuItems.getFloatValue()));
                 // DevGram: в iOS-режиме (hideGlassMenuPill) «⋮» скрыт, а вместо него у
@@ -2321,7 +2263,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 // место под аватарку + такой же зазор p, что и у кнопки назад слева.
                 final int rightOffset = hideGlassMenuPill ? dp(58) + p : lerp(menuWidthWithPadding, Math.max(menuWidthWithPadding, p + s), chatAvatarContainer == null ? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
 
-                final int leftDefault = lerp(hasBackButton ? s + p : 0, s + p, chatAvatarContainer == null? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue()) + devgramBadgeExtra;
+                final int leftDefault = lerp(hasBackButton ? s + p : 0, s + p, chatAvatarContainer == null? 0f : 1f - animatorAvatarContainerHasAvatar.getFloatValue());
                 final int rightDefault = getWidth() - rightOffset;
                 final int widthDefault = rightDefault - leftDefault;
                 final int left, right;
@@ -2345,22 +2287,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 chatAvatarContainer.setTranslationX(0);
             }
             if (glassDrawableBack != null && hasBackButton) {
-                if (devgramBadgeExtra > 0) {
-                    // DevGram: BlurredBackgroundDrawable не растягивается на лету на более
-                    // широкий bounds (блюр-сэмпл остаётся привязан к исходному размеру — при
-                    // просто setBounds() шире расширенная часть рисуется пустой/прозрачной).
-                    // Рисуем свою плоскую заливку той же формы под всю расширенную капсулу
-                    // (видна там, где не дотягивается блюр), а штатный glassDrawableBack
-                    // рисуем поверх на его обычных узких границах — стрелка получает
-                    // настоящий блюр как раньше, шов между ними на тёмном фоне не заметен.
-                    if (devgramBadgePillPaint == null) {
-                        devgramBadgePillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                    }
-                    devgramBadgePillPaint.setColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
-                    float pillRadius = (b - t) / 2f;
-                    devgramBadgePillRect.set(0, t, s + p * 2 + devgramBadgeExtra, b);
-                    canvas.drawRoundRect(devgramBadgePillRect, pillRadius, pillRadius, devgramBadgePillPaint);
-                }
                 glassDrawableBack.setBounds(0, t, s + p * 2, b);
                 glassDrawableBack.draw(canvas);
             }
