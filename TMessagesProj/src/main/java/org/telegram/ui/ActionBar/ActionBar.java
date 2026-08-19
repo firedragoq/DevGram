@@ -363,13 +363,20 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             devgramBackBadge = new org.telegram.ui.Components.CounterView(getContext(), resourcesProvider);
             devgramBackBadge.setColors(Theme.key_chats_unreadCounterText, Theme.key_chats_unreadCounter);
             devgramBackBadge.setGravity(Gravity.LEFT);
-            // ширина с запасом: CounterView сам меряет текст и рисует от левого паддинга (~5.5dp),
-            // не обрезая по границам вью, но родитель (ActionBar — FrameLayout) обрезает дочерний
-            // canvas по объявленным LayoutParams — с запасом под 4+ цифры без clipRect-обрезки.
-            // Margin/gravity здесь ни на что не влияют — фактическую позицию задаёт явный
-            // .layout(...) в onLayout (см. ниже), т.к. ActionBar.onLayout() не зовёт super.
             addView(devgramBackBadge, LayoutHelper.createFrame(60, 20, Gravity.LEFT | Gravity.TOP));
         }
+        // DevGram: ActionBar.onMeasure()/onLayout() полностью самостоятельные (не зовут super и не
+        // трогают неизвестные им children) — обычный проход измерения/раскладки родителя этот view
+        // никогда не заденет, он так и останется 0×0 в (0,0). Меряем и кладём вручную сами, а
+        // позицию держим через translationX/Y — она не зависит от того, пройдёт ли этот child
+        // когда-нибудь через layout родителя.
+        int w = dp(60);
+        int h = dp(20);
+        devgramBackBadge.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+        devgramBackBadge.layout(0, 0, w, h);
+        int additionalTop = occupyStatusBar ? AndroidUtilities.statusBarHeight : 0;
+        devgramBackBadge.setTranslationX(dp(30));
+        devgramBackBadge.setTranslationY(additionalTop + dp(2));
         devgramBackBadge.setCount(count, animated);
     }
 
@@ -1608,15 +1615,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             textLeft = glassMode ? dp(76) : dp(AndroidUtilities.isTablet() ? 80 : 72);
         } else {
             textLeft = glassMode ? dp(24) : dp(AndroidUtilities.isTablet() ? 26 : 18);
-        }
-        // DevGram: onLayout здесь полностью самостоятельный (не зовёт super.onLayout), поэтому
-        // любой child, не позиционированный вручную явным .layout(...), остаётся на (0,0) —
-        // именно так бейдж непрочитанных улетал в статус-бар поверх часов вместо места у стрелки.
-        if (devgramBackBadge != null && devgramBackBadge.getVisibility() != GONE) {
-            int bw = devgramBackBadge.getMeasuredWidth();
-            int bh = devgramBackBadge.getMeasuredHeight();
-            int bTop = additionalTop + dp(2);
-            devgramBackBadge.layout(dp(30), bTop, dp(30) + bw, bTop + bh);
         }
         textLeft += additionalTextLeft;
 
