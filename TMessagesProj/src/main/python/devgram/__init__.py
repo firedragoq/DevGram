@@ -465,6 +465,16 @@ class BasePlugin:
     def unregister_pills(self):
         _Plugins.unregisterPills(str(self.id))
 
+    def register_panel_tab(self, title, build_view):
+        """Register a custom tab next to Emoji/GIF/Stickers in the message input panel.
+        build_view(context) is called each time the tab is shown/selected and must return
+        a live android.view.View (build a fresh one, don't cache — that's how the tab stays
+        up to date, e.g. showing the currently playing track)."""
+        _Plugins.registerPanelTab(str(self.id), str(title), build_view)
+
+    def unregister_panel_tab(self):
+        _Plugins.unregisterPanelTab(str(self.id))
+
     def asset_path(self, name):
         """Absolute path to an asset bundled under assets/ in a .dgplugin package."""
         if not self._package_root: return ""

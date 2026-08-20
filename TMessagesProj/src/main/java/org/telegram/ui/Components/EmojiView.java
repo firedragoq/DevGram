@@ -94,6 +94,7 @@ import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.CompoundEmoji;
+import org.telegram.messenger.DevGramPlugins;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.EmojiData;
@@ -194,6 +195,11 @@ public class EmojiView extends FrameLayout implements
     private final static int TAB_EMOJI = 0;
     private final static int TAB_GIFS = 1;
     private final static int TAB_STICKERS = 2;
+    // DevGram: вкладка плагина в этой же панели (Эмодзи/GIF/Стикеры/<плагин>) — общий механизм,
+    // любой плагин может зарегистрировать свою через BasePlugin.register_panel_tab (см.
+    // DevGramPlugins.registerPanelTab). Один тип на все такие вкладки, конкретный плагин несёт
+    // Tab.pluginId (могут быть несколько зарегистрированных вкладок от разных плагинов сразу).
+    private final static int TAB_PLUGIN = 3;
 
     public int emojiCacheType = AnimatedEmojiDrawable.CACHE_TYPE_KEYBOARD;
 
@@ -297,6 +303,9 @@ public class EmojiView extends FrameLayout implements
                 currentTabs.add(allTabs.get(i));
             }  if (allTabs.get(i).type == TAB_STICKERS && allowStickers) {
                 currentTabs.add(allTabs.get(i));
+            } if (allTabs.get(i).type == TAB_PLUGIN) {
+                // DevGram: вкладки плагинов не завязаны на allowEmoji/Stickers/Gifs — показываем всегда.
+                currentTabs.add(allTabs.get(i));
             }
         }
         if (typeTabs != null) {
@@ -308,6 +317,20 @@ public class EmojiView extends FrameLayout implements
             if (typeTabs != null) {
                 typeTabs.setViewPager(pager);
             }
+        }
+    }
+
+    // DevGram: перестроить живое содержимое вкладки плагина (см. TAB_PLUGIN) — зовём Python
+    // заново, чтобы получить свежий View, вместо того чтобы держать один статичный экземпляр.
+    private void refreshPluginTab(Tab tab) {
+        if (tab == null || tab.pluginId == null || !(tab.view instanceof FrameLayout)) {
+            return;
+        }
+        FrameLayout container = (FrameLayout) tab.view;
+        View content = DevGramPlugins.buildPanelTabView(tab.pluginId, container.getContext());
+        container.removeAllViews();
+        if (content != null) {
+            container.addView(content, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         }
     }
 
@@ -2333,6 +2356,24 @@ public class EmojiView extends FrameLayout implements
             stickersTabHolder.type = TAB_STICKERS;
             stickersTabHolder.view = stickersContainer;
             allTabs.add(stickersTabHolder);
+
+            // DevGram: вкладки, зарегистрированные плагинами (BasePlugin.register_panel_tab) —
+            // содержимое строится в момент показа/выбора вкладки (см. refreshPluginTab), тут
+            // только создаём контейнер и пробуем наполнить его сразу для первой вкладки.
+            for (String pluginTabId : DevGramPlugins.panelTabPluginIds()) {
+                Tab pluginTabHolder = new Tab();
+                pluginTabHolder.type = TAB_PLUGIN;
+                pluginTabHolder.pluginId = pluginTabId;
+                pluginTabHolder.title = DevGramPlugins.panelTabTitle(pluginTabId);
+                FrameLayout pluginTabContainer = new FrameLayout(context);
+                View pluginTabContent = DevGramPlugins.buildPanelTabView(pluginTabId, context);
+                if (pluginTabContent != null) {
+                    pluginTabContainer.addView(pluginTabContent, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+                }
+                pluginTabHolder.view = pluginTabContainer;
+                allTabs.add(pluginTabHolder);
+            }
+
             stickersSearchGridAdapter = new StickersSearchGridAdapter(context);
             stickersGridView.setAdapter(stickersGridAdapter = new StickersGridAdapter(context));
             stickersGridView.setOnTouchListener((v, event) -> ContentPreviewViewer.getInstance().onTouch(event, stickersGridView, EmojiView.this.getMeasuredHeight(), stickersOnItemClickListener, contentPreviewViewerDelegate, resourcesProvider));
@@ -2746,6 +2787,12 @@ public class EmojiView extends FrameLayout implements
                     saveNewPage();
                     showBackspaceButton(position == 0, true);
                     showStickerSettingsButton(position == 2 && (shouldDrawBackground || shouldDrawStickerSettings), true);
+                    if (position >= 0 && position < currentTabs.size() && currentTabs.get(position).type == TAB_PLUGIN) {
+                        // DevGram: перестраиваем содержимое вкладки плагина при каждом выборе,
+                        // чтобы плагин мог показать актуальное состояние (например, трек,
+                        // который сейчас играет), а не то, что было на момент создания панели.
+                        refreshPluginTab(currentTabs.get(position));
+                    }
                     if (delegate.isSearchOpened()) {
                         if (position == 0) {
                             if (emojiSearchField != null) {
@@ -8604,6 +8651,9 @@ public class EmojiView extends FrameLayout implements
                 case 2:
                     return getString(R.string.AccDescrStickers);
             }
+            if (position >= 0 && position < currentTabs.size() && currentTabs.get(position).type == TAB_PLUGIN) {
+                return currentTabs.get(position).title;
+            }
             return null;
         }
 
@@ -10190,6 +10240,9 @@ public class EmojiView extends FrameLayout implements
     private class Tab {
         int type;
         View view;
+        // DevGram: только для type == TAB_PLUGIN.
+        String title;
+        String pluginId;
     }
 
     private boolean frozen;
