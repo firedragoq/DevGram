@@ -182,6 +182,12 @@ class BasePlugin:
         поддерживается», которая иначе теряется в асинхронной отправке."""
         return str(_Plugins.debugCheckAttachment(str(path)))
 
+    def update_profile_about(self, about):
+        """Обновить био/"о себе" ТЕКУЩЕГО аккаунта (тот же запрос, что штатный экран
+        изменения био). Не создаёт отдельного экрана выбора аккаунта — работает с тем,
+        что сейчас выбран в приложении (UserConfig.selectedAccount)."""
+        _Plugins.updateProfileAbout(str(about))
+
     # ---- богатая отправка (client_utils) ----
     def send_photo(self, dialog_id, path, caption="", entities=None):
         """Отправить фото из файла (path — абсолютный путь). entities — см. send_message."""

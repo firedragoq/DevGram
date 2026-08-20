@@ -479,6 +479,26 @@ public class DevGramPlugins {
         });
     }
 
+    // DevGram: обновить био/"о себе" ТЕКУЩЕГО аккаунта — тот же TL-запрос, что и штатный
+    // ChangeBioActivity (account.updateProfile, flags|=4 под about). Нужен плагинам, которые
+    // транслируют "сейчас играет" в профиль (см. reSwaga "Стрим в профиль").
+    public static void updateProfileAbout(String about) {
+        if (about == null) return;
+        try {
+            int account = UserConfig.selectedAccount;
+            org.telegram.tgnet.tl.TL_account.updateProfile req = new org.telegram.tgnet.tl.TL_account.updateProfile();
+            req.about = about;
+            req.flags |= 4;
+            org.telegram.tgnet.ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
+                if (error != null) {
+                    FileLog.e("DevGram updateProfileAbout: " + error.text);
+                }
+            });
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
     // Короткое всплывающее уведомление (тост).
     public static void toast(String text) {
         if (text == null) {
