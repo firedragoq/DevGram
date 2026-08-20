@@ -939,7 +939,13 @@ public class DevGramPlugins {
                 if (neutralText != null && !neutralText.isEmpty()) {
                     b.setNeutralButton(neutralText, (dialog, which) -> callPythonCallback(neutralCallback));
                 }
-                b.show();
+                org.telegram.ui.ActionBar.AlertDialog dialog = b.show();
+                // DevGram: текст (особенно DEBUG-трейсбеки из плагинов) должен выделяться и
+                // копироваться долгим тапом, а не только скриншотиться — стандартный AlertDialog
+                // это не даёт по умолчанию.
+                if (dialog != null && dialog.getMessageTextView() != null) {
+                    dialog.getMessageTextView().setTextIsSelectable(true);
+                }
             } catch (Throwable e) {
                 FileLog.e(e);
             }
