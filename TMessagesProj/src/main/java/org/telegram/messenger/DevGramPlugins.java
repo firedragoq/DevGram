@@ -388,8 +388,8 @@ public class DevGramPlugins {
     }
 
     // ---- вкладка плагина в панели Эмодзи/GIF/Стикеры (EmojiView.TAB_PLUGIN) ----
-    public static void registerPanelTab(String pluginId, String title, com.chaquo.python.PyObject buildView) {
-        DevGramPanelTabs.register(pluginId, title, buildView);
+    public static void registerPanelTab(String pluginId, String title, com.chaquo.python.PyObject buildView, com.chaquo.python.PyObject actionClick) {
+        DevGramPanelTabs.register(pluginId, title, buildView, actionClick);
     }
 
     public static void unregisterPanelTab(String pluginId) {
@@ -419,6 +419,17 @@ public class DevGramPlugins {
             return null;
         }
         return DevGramPanelTabs.buildView(pluginId, context, dialogId);
+    }
+
+    public static boolean panelTabHasAction(String pluginId) {
+        return pluginId != null && prefs().getBoolean("enabled_" + pluginId, true) && DevGramPanelTabs.hasAction(pluginId);
+    }
+
+    public static void panelTabActionClick(String pluginId, android.view.View anchor, long dialogId) {
+        if (pluginId == null || !prefs().getBoolean("enabled_" + pluginId, true)) {
+            return;
+        }
+        DevGramPanelTabs.triggerAction(pluginId, anchor, dialogId);
     }
 
     public static long myId() {

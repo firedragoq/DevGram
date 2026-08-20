@@ -216,9 +216,11 @@ public class EmojiView extends FrameLayout implements
     private ImageView backspaceButton;
     private ImageView stickerSettingsButton;
     private ImageView searchButton;
+    private ImageView pluginActionButton;
     private AnimatorSet bottomTabContainerAnimation;
     private AnimatorSet backspaceButtonAnimation;
     private AnimatorSet stickersButtonAnimation;
+    private AnimatorSet pluginActionButtonAnimation;
     private float lastBottomScrollDy;
 
     private EmojiTabsStrip emojiTabs;
@@ -2738,6 +2740,32 @@ public class EmojiView extends FrameLayout implements
                 });
             }
 
+            // DevGram: кнопка-действие вкладки плагина (TAB_PLUGIN) — тот же угол, что у
+            // stickerSettingsButton/backspaceButton (они не показываются одновременно с ней,
+            // т.к. те живут только на своих вкладках), просто общий механизм, а не что-то
+            // конкретно про DevWave — какая именно кнопка нажата, решает Python плагина.
+            pluginActionButton = new ImageView(context);
+            pluginActionButton.setImageResource(R.drawable.ic_send);
+            pluginActionButton.setColorFilter(new PorterDuffColorFilter(glassDesign ? getGlassIconColor(0.6f) : getThemedColor(Theme.key_chat_emojiPanelBackspace), PorterDuff.Mode.MULTIPLY));
+            pluginActionButton.setScaleType(ImageView.ScaleType.CENTER);
+            pluginActionButton.setFocusable(true);
+            pluginActionButton.setVisibility(View.GONE);
+            ScaleStateListAnimator.apply(pluginActionButton);
+            bottomTabContainer.addView(pluginActionButton, LayoutHelper.createFrame(48, 48, Gravity.BOTTOM | Gravity.RIGHT, 2, 0, 2, 0));
+            pluginActionButton.setOnClickListener(v -> {
+                if (pager == null) {
+                    return;
+                }
+                int pos = pager.getCurrentItem();
+                if (pos < 0 || pos >= currentTabs.size()) {
+                    return;
+                }
+                Tab t = currentTabs.get(pos);
+                if (t.type == TAB_PLUGIN && t.pluginId != null) {
+                    DevGramPlugins.panelTabActionClick(t.pluginId, pluginActionButton, delegate != null ? delegate.getDialogId() : 0);
+                }
+            });
+
             typeTabs = new PagerSlidingTabStrip(context, resourcesProvider);
             typeTabs.setViewPager(pager);
             typeTabs.setShouldExpand(false);
@@ -2787,11 +2815,16 @@ public class EmojiView extends FrameLayout implements
                     saveNewPage();
                     showBackspaceButton(position == 0, true);
                     showStickerSettingsButton(position == 2 && (shouldDrawBackground || shouldDrawStickerSettings), true);
-                    if (position >= 0 && position < currentTabs.size() && currentTabs.get(position).type == TAB_PLUGIN) {
+                    boolean onPluginTab = position >= 0 && position < currentTabs.size() && currentTabs.get(position).type == TAB_PLUGIN;
+                    if (onPluginTab) {
                         // DevGram: перестраиваем содержимое вкладки плагина при каждом выборе,
                         // чтобы плагин мог показать актуальное состояние (например, трек,
                         // который сейчас играет), а не то, что было на момент создания панели.
-                        refreshPluginTab(currentTabs.get(position));
+                        Tab pluginTab = currentTabs.get(position);
+                        refreshPluginTab(pluginTab);
+                        showPluginActionButton(DevGramPlugins.panelTabHasAction(pluginTab.pluginId), true);
+                    } else {
+                        showPluginActionButton(false, true);
                     }
                     if (delegate.isSearchOpened()) {
                         if (position == 0) {
@@ -5180,6 +5213,47 @@ public class EmojiView extends FrameLayout implements
         }
     }
 
+    // DevGram: та же анимация, что у showStickerSettingsButton — общий угол панели, просто
+    // для вкладки плагина вместо настроек стикеров.
+    private void showPluginActionButton(boolean show, boolean animated) {
+        if (pluginActionButton == null) {
+            return;
+        }
+        if (show && pluginActionButton.getTag() == null || !show && pluginActionButton.getTag() != null) {
+            return;
+        }
+        if (pluginActionButtonAnimation != null) {
+            pluginActionButtonAnimation.cancel();
+            pluginActionButtonAnimation = null;
+        }
+        pluginActionButton.setTag(show ? null : 1);
+        if (animated) {
+            if (show) {
+                pluginActionButton.setVisibility(VISIBLE);
+            }
+            pluginActionButtonAnimation = new AnimatorSet();
+            pluginActionButtonAnimation.playTogether(ObjectAnimator.ofFloat(pluginActionButton, View.ALPHA, show ? 1.0f : 0.0f),
+                    ObjectAnimator.ofFloat(pluginActionButton, View.SCALE_X, show ? 1.0f : 0.0f),
+                    ObjectAnimator.ofFloat(pluginActionButton, View.SCALE_Y, show ? 1.0f : 0.0f));
+            pluginActionButtonAnimation.setDuration(200);
+            pluginActionButtonAnimation.setInterpolator(CubicBezierInterpolator.EASE_OUT);
+            pluginActionButtonAnimation.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (!show) {
+                        pluginActionButton.setVisibility(INVISIBLE);
+                    }
+                }
+            });
+            pluginActionButtonAnimation.start();
+        } else {
+            pluginActionButton.setAlpha(show ? 1.0f : 0.0f);
+            pluginActionButton.setScaleX(show ? 1.0f : 0.0f);
+            pluginActionButton.setScaleY(show ? 1.0f : 0.0f);
+            pluginActionButton.setVisibility(show ? VISIBLE : INVISIBLE);
+        }
+    }
+
     private long shownBottomTabAfterClick;
 
     private final BoolAnimator bottomTabVisibility = new BoolAnimator(0,
@@ -5572,6 +5646,7 @@ public class EmojiView extends FrameLayout implements
     public void switchToGifRecent() {
         showBackspaceButton(false, false);
         showStickerSettingsButton(false, false);
+        showPluginActionButton(false, false);
         pager.setCurrentItem(1, false);
     }
 
@@ -6141,6 +6216,7 @@ public class EmojiView extends FrameLayout implements
         if (currentPage == 0 || forceEmoji || currentTabs.size() == 1) {
             showBackspaceButton(true, false);
             showStickerSettingsButton(false, false);
+            showPluginActionButton(false, false);
             if (pager.getCurrentItem() != 0) {
                 pager.setCurrentItem(0, !forceEmoji);
             }
@@ -6162,6 +6238,7 @@ public class EmojiView extends FrameLayout implements
         } else if (currentPage == 1) {
             showBackspaceButton(false, false);
             showStickerSettingsButton(shouldDrawBackground || shouldDrawStickerSettings, false);
+            showPluginActionButton(false, false);
             if (pager.getCurrentItem() != 2) {
                 pager.setCurrentItem(2, false);
             }
@@ -6180,6 +6257,7 @@ public class EmojiView extends FrameLayout implements
         } else if (currentPage == 2) {
             showBackspaceButton(false, false);
             showStickerSettingsButton(false, false);
+            showPluginActionButton(false, false);
             if (pager.getCurrentItem() != 1) {
                 pager.setCurrentItem(1, false);
             }

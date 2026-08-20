@@ -21,17 +21,22 @@ public final class DevGramPanelTabs {
     private static final class Entry {
         final String title;
         final PyObject buildView;
-        Entry(String title, PyObject buildView) { this.title = title; this.buildView = buildView; }
+        final PyObject actionClick;
+        Entry(String title, PyObject buildView, PyObject actionClick) {
+            this.title = title;
+            this.buildView = buildView;
+            this.actionClick = actionClick;
+        }
     }
 
     private static final Object lock = new Object();
     private static final Map<String, Entry> tabs = new LinkedHashMap<>();
 
-    /** Мост Python: buildView(context) должен вернуть живой android.view.View. */
-    public static void register(String pluginId, String title, PyObject buildView) {
+    /** Мост Python: buildView(context, dialogId) -> View; actionClick(anchorView, dialogId) — может быть null. */
+    public static void register(String pluginId, String title, PyObject buildView, PyObject actionClick) {
         if (pluginId == null) return;
         synchronized (lock) {
-            tabs.put(pluginId, new Entry(title == null ? "" : title, buildView));
+            tabs.put(pluginId, new Entry(title == null ? "" : title, buildView, actionClick));
         }
     }
 
@@ -68,6 +73,27 @@ public final class DevGramPanelTabs {
         } catch (Throwable e) {
             FileLog.e(e);
             return null;
+        }
+    }
+
+    public static boolean hasAction(String pluginId) {
+        synchronized (lock) {
+            Entry e = tabs.get(pluginId);
+            return e != null && e.actionClick != null;
+        }
+    }
+
+    public static void triggerAction(String pluginId, View anchor, long dialogId) {
+        PyObject cb;
+        synchronized (lock) {
+            Entry e = tabs.get(pluginId);
+            cb = e == null ? null : e.actionClick;
+        }
+        if (cb == null) return;
+        try {
+            cb.call(anchor, dialogId);
+        } catch (Throwable e) {
+            FileLog.e(e);
         }
     }
 }

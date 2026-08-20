@@ -465,12 +465,18 @@ class BasePlugin:
     def unregister_pills(self):
         _Plugins.unregisterPills(str(self.id))
 
-    def register_panel_tab(self, title, build_view):
+    def register_panel_tab(self, title, build_view, on_action=None):
         """Register a custom tab next to Emoji/GIF/Stickers in the message input panel.
-        build_view(context) is called each time the tab is shown/selected and must return
-        a live android.view.View (build a fresh one, don't cache — that's how the tab stays
-        up to date, e.g. showing the currently playing track)."""
-        _Plugins.registerPanelTab(str(self.id), str(title), build_view)
+        build_view(context, dialog_id) is called each time the tab is shown/selected and
+        must return a live android.view.View (build a fresh one, don't cache — that's how
+        the tab stays up to date, e.g. showing the currently playing track). dialog_id is
+        the chat the panel is currently attached to.
+        on_action(anchor_view, dialog_id), if given, wires a ready-made button in the same
+        corner of the panel as the built-in tab buttons (like reSwaga's send arrow) — no
+        core changes needed for this, it's a generic slot. If you want your own button(s)
+        inside the tab instead (any position, any look), just add them in build_view and
+        skip on_action entirely."""
+        _Plugins.registerPanelTab(str(self.id), str(title), build_view, on_action)
 
     def unregister_panel_tab(self):
         _Plugins.unregisterPanelTab(str(self.id))
