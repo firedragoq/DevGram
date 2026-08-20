@@ -144,12 +144,37 @@ class BasePlugin:
         """Имя чата/канала по id (или '')."""
         return _Plugins.chatName(int(cid))
 
-    def send_message(self, dialog_id, text, reply_to=0):
-        """Отправить текст в диалог. reply_to — id сообщения для ответа (0 = без ответа)."""
-        if reply_to:
+    def send_message(self, dialog_id, text, reply_to=0, entities=None):
+        """Отправить текст в диалог. reply_to — id сообщения для ответа (0 = без ответа).
+        entities — java.util.ArrayList<TLRPC.MessageEntity> (жирный текст/текстовые ссылки),
+        построенный самим плагином через jclass; см. BasePlugin.text_link_entity/bold_entity."""
+        if entities is not None:
+            _Plugins.sendMessageEntities(int(dialog_id), str(text), entities)
+        elif reply_to:
             _Plugins.sendMessageReply(int(dialog_id), str(text), int(reply_to))
         else:
             _Plugins.sendMessage(int(dialog_id), str(text))
+
+    @staticmethod
+    def new_entities_list():
+        """Пустой java.util.ArrayList под message entities для send_message/send_photo."""
+        return jclass("java.util.ArrayList")()
+
+    @staticmethod
+    def bold_entity(offset, length):
+        """TL_messageEntityBold — offset/length в UTF-16 code units (для строк без
+        суррогатных пар — эмодзи и т.п. — совпадает с обычной len())."""
+        e = jclass("org.telegram.tgnet.TLRPC$TL_messageEntityBold")()
+        e.offset, e.length = int(offset), int(length)
+        return e
+
+    @staticmethod
+    def text_link_entity(offset, length, url):
+        """TL_messageEntityTextUrl — кликабельный текст с произвольной подписью (как
+        markdown [текст](ссылка)); offset/length — см. bold_entity."""
+        e = jclass("org.telegram.tgnet.TLRPC$TL_messageEntityTextUrl")()
+        e.offset, e.length, e.url = int(offset), int(length), str(url)
+        return e
 
     def debug_check_attachment(self, path):
         """DEBUG: прогнать файл через те же проверки, что делает клиент перед отправкой
@@ -158,9 +183,12 @@ class BasePlugin:
         return str(_Plugins.debugCheckAttachment(str(path)))
 
     # ---- богатая отправка (client_utils) ----
-    def send_photo(self, dialog_id, path, caption=""):
-        """Отправить фото из файла (path — абсолютный путь)."""
-        _Plugins.sendPhoto(int(dialog_id), str(path), str(caption))
+    def send_photo(self, dialog_id, path, caption="", entities=None):
+        """Отправить фото из файла (path — абсолютный путь). entities — см. send_message."""
+        if entities is not None:
+            _Plugins.sendPhotoEntities(int(dialog_id), str(path), str(caption), entities)
+        else:
+            _Plugins.sendPhoto(int(dialog_id), str(path), str(caption))
 
     def send_file(self, dialog_id, path, caption=""):
         """Отправить файл (видео/аудио/документ — тип определяется автоматически)."""
@@ -465,7 +493,7 @@ class BasePlugin:
     def unregister_pills(self):
         _Plugins.unregisterPills(str(self.id))
 
-    def register_panel_tab(self, title, build_view, on_action=None):
+    def register_panel_tab(self, title, build_view, on_action=None, icon_path=None):
         """Register a custom tab next to Emoji/GIF/Stickers in the message input panel.
         build_view(context, dialog_id) is called each time the tab is shown/selected and
         must return a live android.view.View (build a fresh one, don't cache — that's how
@@ -475,8 +503,14 @@ class BasePlugin:
         corner of the panel as the built-in tab buttons (like reSwaga's send arrow) — no
         core changes needed for this, it's a generic slot. If you want your own button(s)
         inside the tab instead (any position, any look), just add them in build_view and
-        skip on_action entirely."""
-        _Plugins.registerPanelTab(str(self.id), str(title), build_view, on_action)
+        skip on_action entirely.
+        icon_path, if given (an absolute path, e.g. from self.asset_path('icon.png')), makes
+        the tab show that icon instead of the title text — same behaviour as the built-in
+        Emoji/GIF/Stickers icon tabs. Re-registering (e.g. every on_load()) is normal and
+        cheap — the icon/title/callbacks simply get replaced, nothing needs to be undone
+        first for this to "persist" across app restarts."""
+        _Plugins.registerPanelTab(str(self.id), str(title), build_view, on_action,
+                                   None if not icon_path else str(icon_path))
 
     def unregister_panel_tab(self):
         _Plugins.unregisterPanelTab(str(self.id))

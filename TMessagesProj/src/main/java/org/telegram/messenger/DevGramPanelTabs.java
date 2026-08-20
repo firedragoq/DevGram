@@ -1,6 +1,10 @@
 package org.telegram.messenger;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.view.View;
 
 import com.chaquo.python.PyObject;
@@ -22,10 +26,12 @@ public final class DevGramPanelTabs {
         final String title;
         final PyObject buildView;
         final PyObject actionClick;
-        Entry(String title, PyObject buildView, PyObject actionClick) {
+        final String iconPath; // абсолютный путь к PNG (asset_path плагина) или null
+        Entry(String title, PyObject buildView, PyObject actionClick, String iconPath) {
             this.title = title;
             this.buildView = buildView;
             this.actionClick = actionClick;
+            this.iconPath = iconPath;
         }
     }
 
@@ -33,10 +39,10 @@ public final class DevGramPanelTabs {
     private static final Map<String, Entry> tabs = new LinkedHashMap<>();
 
     /** Мост Python: buildView(context, dialogId) -> View; actionClick(anchorView, dialogId) — может быть null. */
-    public static void register(String pluginId, String title, PyObject buildView, PyObject actionClick) {
+    public static void register(String pluginId, String title, PyObject buildView, PyObject actionClick, String iconPath) {
         if (pluginId == null) return;
         synchronized (lock) {
-            tabs.put(pluginId, new Entry(title == null ? "" : title, buildView, actionClick));
+            tabs.put(pluginId, new Entry(title == null ? "" : title, buildView, actionClick, iconPath));
         }
     }
 
@@ -94,6 +100,28 @@ public final class DevGramPanelTabs {
             cb.call(anchor, dialogId);
         } catch (Throwable e) {
             FileLog.e(e);
+        }
+    }
+
+    // DevGram: иконка вкладки — простой путь к PNG (self.asset_path(...) на Python-стороне),
+    // не колбэк — картинка не зависит от контекста чата и грузится/масштабируется целиком тут,
+    // без обратного похода в Python на каждую перестройку EmojiView (та вызывается часто).
+    public static Drawable icon(String pluginId, Context context) {
+        String path;
+        synchronized (lock) {
+            Entry e = tabs.get(pluginId);
+            path = e == null ? null : e.iconPath;
+        }
+        if (path == null || path.isEmpty()) return null;
+        try {
+            Bitmap raw = BitmapFactory.decodeFile(path);
+            if (raw == null) return null;
+            int size = AndroidUtilities.dp(24);
+            Bitmap scaled = Bitmap.createScaledBitmap(raw, size, size, true);
+            return new BitmapDrawable(context.getResources(), scaled);
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
         }
     }
 }

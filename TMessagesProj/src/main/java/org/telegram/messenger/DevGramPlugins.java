@@ -388,8 +388,8 @@ public class DevGramPlugins {
     }
 
     // ---- вкладка плагина в панели Эмодзи/GIF/Стикеры (EmojiView.TAB_PLUGIN) ----
-    public static void registerPanelTab(String pluginId, String title, com.chaquo.python.PyObject buildView, com.chaquo.python.PyObject actionClick) {
-        DevGramPanelTabs.register(pluginId, title, buildView, actionClick);
+    public static void registerPanelTab(String pluginId, String title, com.chaquo.python.PyObject buildView, com.chaquo.python.PyObject actionClick, String iconPath) {
+        DevGramPanelTabs.register(pluginId, title, buildView, actionClick, iconPath);
     }
 
     public static void unregisterPanelTab(String pluginId) {
@@ -432,6 +432,13 @@ public class DevGramPlugins {
         DevGramPanelTabs.triggerAction(pluginId, anchor, dialogId);
     }
 
+    public static android.graphics.drawable.Drawable buildPanelTabIcon(String pluginId, android.content.Context context) {
+        if (pluginId == null || !prefs().getBoolean("enabled_" + pluginId, true)) {
+            return null;
+        }
+        return DevGramPanelTabs.icon(pluginId, context);
+    }
+
     public static long myId() {
         return UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
     }
@@ -446,6 +453,25 @@ public class DevGramPlugins {
                 int account = UserConfig.selectedAccount;
                 SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(
                         text, dialogId, null, null, null, true, null, null, null, true, 0, 0, null, false);
+                SendMessagesHelper.getInstance(account).sendMessage(params);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    // DevGram: то же самое, но с готовым списком entities (жирный текст/текстовые ссылки
+    // и т.п.) — плагин строит их сам через jclass на TLRPC.TL_messageEntity* классы, тут
+    // просто прокидываем список в SendMessageParams.of вместо null.
+    public static void sendMessageEntities(long dialogId, String text, ArrayList<TLRPC.MessageEntity> entities) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                int account = UserConfig.selectedAccount;
+                SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(
+                        text, dialogId, null, null, null, true, entities, null, null, true, 0, 0, null, false);
                 SendMessagesHelper.getInstance(account).sendMessage(params);
             } catch (Throwable e) {
                 FileLog.e(e);
@@ -580,12 +606,17 @@ public class DevGramPlugins {
     // ---- client_utils: богатая отправка ----
     // Отправить фото из файла (path — абсолютный путь), с подписью.
     public static void sendPhoto(long dialogId, String path, String caption) {
+        sendPhotoEntities(dialogId, path, caption, null);
+    }
+
+    // DevGram: то же, что sendPhoto, но с entities для подписи (жирный текст/текстовые ссылки).
+    public static void sendPhotoEntities(long dialogId, String path, String caption, ArrayList<TLRPC.MessageEntity> entities) {
         if (path == null || path.isEmpty()) return;
         AndroidUtilities.runOnUIThread(() -> {
             try {
                 AccountInstance ai = AccountInstance.getInstance(UserConfig.selectedAccount);
                 SendMessagesHelper.prepareSendingPhoto(ai, path, null, dialogId, null, null, null,
-                        caption, null, null, null, 0, null, true, 0, 0, null, 0);
+                        caption, entities, null, null, 0, null, true, 0, 0, null, 0);
             } catch (Throwable e) {
                 FileLog.e(e);
             }

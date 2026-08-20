@@ -2367,6 +2367,7 @@ public class EmojiView extends FrameLayout implements
                 pluginTabHolder.type = TAB_PLUGIN;
                 pluginTabHolder.pluginId = pluginTabId;
                 pluginTabHolder.title = DevGramPlugins.panelTabTitle(pluginTabId);
+                pluginTabHolder.icon = DevGramPlugins.buildPanelTabIcon(pluginTabId, context);
                 FrameLayout pluginTabContainer = new FrameLayout(context);
                 View pluginTabContent = DevGramPlugins.buildPanelTabView(pluginTabId, context, delegate != null ? delegate.getDialogId() : 0);
                 if (pluginTabContent != null) {
@@ -8716,8 +8717,14 @@ public class EmojiView extends FrameLayout implements
         }
 
         public Drawable getPageIconDrawable(int position) {
+            // DevGram: если плагин задал свою иконку для вкладки (см. Tab.icon,
+            // BasePlugin.register_panel_tab(..., icon_path=...)) — вкладка рисуется значком
+            // без текста (так уже устроен PagerSlidingTabStrip.addIconTab), для остальных
+            // (Эмодзи/GIF/Стикеры, плагины без иконки) — как раньше, обычным текстом.
+            if (position >= 0 && position < currentTabs.size() && currentTabs.get(position).type == TAB_PLUGIN) {
+                return currentTabs.get(position).icon;
+            }
             return null;
-//            return tabIcons[position];
         }
 
         public CharSequence getPageTitle(int position) {
@@ -10321,6 +10328,7 @@ public class EmojiView extends FrameLayout implements
         // DevGram: только для type == TAB_PLUGIN.
         String title;
         String pluginId;
+        Drawable icon; // если плагин задал свою иконку — вкладка рисуется как значок, без текста
     }
 
     private boolean frozen;
