@@ -217,6 +217,11 @@ public class EmojiView extends FrameLayout implements
     private ImageView stickerSettingsButton;
     private ImageView searchButton;
     private ImageView pluginActionButton;
+    // DevGram: позиция сейчас открытой вкладки плагина (currentTabs), -1 если открыта не
+    // плагинская вкладка — используется, чтобы кнопка-смайлик снизу чата (которая сейчас
+    // показывает иконку плагина) при повторном тапе открывала панель СРАЗУ на этой вкладке,
+    // а не на Эмодзи/GIF/Стикеры по обычной логике onOpen().
+    private int devgramActivePluginPosition = -1;
     private AnimatorSet bottomTabContainerAnimation;
     private AnimatorSet backspaceButtonAnimation;
     private AnimatorSet stickersButtonAnimation;
@@ -2830,11 +2835,13 @@ public class EmojiView extends FrameLayout implements
                         Tab pluginTab = currentTabs.get(position);
                         refreshPluginTab(pluginTab);
                         showPluginActionButton(DevGramPlugins.panelTabHasAction(pluginTab.pluginId), true);
+                        devgramActivePluginPosition = position;
                         if (delegate != null) {
                             delegate.onPluginTabIconChanged(pluginTab.icon);
                         }
                     } else {
                         showPluginActionButton(false, true);
+                        devgramActivePluginPosition = -1;
                         if (delegate != null) {
                             delegate.onPluginTabIconChanged(null);
                         }
@@ -6217,6 +6224,19 @@ public class EmojiView extends FrameLayout implements
 
     public void setForseMultiwindowLayout(boolean value) {
         forseMultiwindowLayout = value;
+    }
+
+    // DevGram: открыть панель сразу на той вкладке плагина, что была активна в прошлый раз
+    // (см. devgramActivePluginPosition) — обычный onOpen() ничего не знает про вкладки
+    // плагинов и всегда уводит на Эмодзи/GIF/Стикеры. Возвращает false, если открывать
+    // нечего (вкладка плагина сейчас не активна) — тогда вызывающий код сам зовёт onOpen().
+    public boolean openDevgramPluginTab() {
+        if (pager == null || devgramActivePluginPosition < 0 || devgramActivePluginPosition >= currentTabs.size()
+                || currentTabs.get(devgramActivePluginPosition).type != TAB_PLUGIN) {
+            return false;
+        }
+        pager.setCurrentItem(devgramActivePluginPosition, false);
+        return true;
     }
 
     public void onOpen(boolean forceEmoji, boolean groupEmojiHintWasVisible) {

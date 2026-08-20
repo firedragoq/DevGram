@@ -2780,7 +2780,12 @@ public class ChatActivityEnterView extends FrameLayout implements
             }
             if (!isPopupShowing() || currentPopupContentType != 0) {
                 showPopup(1, POPUP_CONTENT_EMOJI_KEYBOARD);
-                emojiView.onOpen(messageEditText != null && messageEditText.length() > 0, parentFragment != null && parentFragment.groupEmojiPackHintWasVisible());
+                // DevGram: если кнопка сейчас показывает иконку вкладки плагина (см.
+                // devgramPluginTabIcon/onPluginTabIconChanged) — открываем панель сразу на
+                // ней, а не на Эмодзи по умолчанию (onOpen() ничего не знает про плагины).
+                if (devgramPluginTabIcon == null || !emojiView.openDevgramPluginTab()) {
+                    emojiView.onOpen(messageEditText != null && messageEditText.length() > 0, parentFragment != null && parentFragment.groupEmojiPackHintWasVisible());
+                }
             } else {
                 if (searchingType != 0) {
                     setSearchingTypeInternal(0, true);
