@@ -151,6 +151,12 @@ class BasePlugin:
         else:
             _Plugins.sendMessage(int(dialog_id), str(text))
 
+    def debug_check_attachment(self, path):
+        """DEBUG: прогнать файл через те же проверки, что делает клиент перед отправкой
+        (exists/length/isInternalUri) — помогает понять причину «Вложение не
+        поддерживается», которая иначе теряется в асинхронной отправке."""
+        return str(_Plugins.debugCheckAttachment(str(path)))
+
     # ---- богатая отправка (client_utils) ----
     def send_photo(self, dialog_id, path, caption=""):
         """Отправить фото из файла (path — абсолютный путь)."""

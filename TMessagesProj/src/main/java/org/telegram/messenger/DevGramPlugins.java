@@ -504,6 +504,34 @@ public class DevGramPlugins {
         });
     }
 
+    // DEBUG: прогоняет файл через те же проверки, что делает
+    // SendMessagesHelper.prepareSendingDocumentInternal ПЕРЕД отправкой (exists/length/
+    // isInternalUri) — тот код асинхронный и глотает причину отказа молча (просто
+    // показывает нейтральный «Вложение не поддерживается»), а тут можно увидеть точную
+    // причину до вызова send_photo/send_file.
+    public static String debugCheckAttachment(String path) {
+        try {
+            if (path == null || path.isEmpty()) return "path is null/empty";
+            java.io.File f = new java.io.File(path);
+            StringBuilder sb = new StringBuilder();
+            sb.append("path=").append(path).append("\n");
+            sb.append("exists=").append(f.exists()).append("\n");
+            sb.append("length=").append(f.length()).append("\n");
+            sb.append("canonicalPath=");
+            try {
+                sb.append(f.getCanonicalPath());
+            } catch (Throwable e) {
+                sb.append("<error: ").append(e).append(">");
+            }
+            sb.append("\n");
+            sb.append("isInternalUri=").append(AndroidUtilities.isInternalUri(android.net.Uri.fromFile(f))).append("\n");
+            sb.append("packageName=").append(ApplicationLoader.applicationContext.getPackageName());
+            return sb.toString();
+        } catch (Throwable e) {
+            return "debugCheckAttachment crashed: " + e;
+        }
+    }
+
     // ---- client_utils: богатая отправка ----
     // Отправить фото из файла (path — абсолютный путь), с подписью.
     public static void sendPhoto(long dialogId, String path, String caption) {
