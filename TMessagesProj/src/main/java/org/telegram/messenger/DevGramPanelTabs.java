@@ -55,7 +55,7 @@ public final class DevGramPanelTabs {
         }
     }
 
-    public static View buildView(String pluginId, Context context) {
+    public static View buildView(String pluginId, Context context, long dialogId) {
         PyObject cb;
         synchronized (lock) {
             Entry e = tabs.get(pluginId);
@@ -63,7 +63,7 @@ public final class DevGramPanelTabs {
         }
         if (cb == null) return null;
         try {
-            PyObject v = cb.call(context);
+            PyObject v = cb.call(context, dialogId);
             return v == null ? null : v.toJava(View.class);
         } catch (Throwable e) {
             FileLog.e(e);

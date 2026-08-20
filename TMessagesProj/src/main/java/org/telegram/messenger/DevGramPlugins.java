@@ -397,15 +397,28 @@ public class DevGramPlugins {
     }
 
     public static List<String> panelTabPluginIds() {
-        return DevGramPanelTabs.pluginIds();
+        // DevGram: register_panel_tab() зовётся один раз в on_load() и не отписывается при
+        // выключении плагина тумблером (set_enabled лишь ставит флаг p.enabled, сам плагин
+        // остаётся «загружен» — тот же принцип, что у menu_items()/пилюль). Поэтому фильтруем
+        // тут же, по факту чтения списка, а не полагаемся на unregisterPanelTab().
+        List<String> res = new ArrayList<>();
+        for (String id : DevGramPanelTabs.pluginIds()) {
+            if (prefs().getBoolean("enabled_" + id, true)) {
+                res.add(id);
+            }
+        }
+        return res;
     }
 
     public static String panelTabTitle(String pluginId) {
         return DevGramPanelTabs.title(pluginId);
     }
 
-    public static android.view.View buildPanelTabView(String pluginId, android.content.Context context) {
-        return DevGramPanelTabs.buildView(pluginId, context);
+    public static android.view.View buildPanelTabView(String pluginId, android.content.Context context, long dialogId) {
+        if (!prefs().getBoolean("enabled_" + pluginId, true)) {
+            return null;
+        }
+        return DevGramPanelTabs.buildView(pluginId, context, dialogId);
     }
 
     public static long myId() {

@@ -327,7 +327,7 @@ public class EmojiView extends FrameLayout implements
             return;
         }
         FrameLayout container = (FrameLayout) tab.view;
-        View content = DevGramPlugins.buildPanelTabView(tab.pluginId, container.getContext());
+        View content = DevGramPlugins.buildPanelTabView(tab.pluginId, container.getContext(), delegate != null ? delegate.getDialogId() : 0);
         container.removeAllViews();
         if (content != null) {
             container.addView(content, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
@@ -2366,7 +2366,7 @@ public class EmojiView extends FrameLayout implements
                 pluginTabHolder.pluginId = pluginTabId;
                 pluginTabHolder.title = DevGramPlugins.panelTabTitle(pluginTabId);
                 FrameLayout pluginTabContainer = new FrameLayout(context);
-                View pluginTabContent = DevGramPlugins.buildPanelTabView(pluginTabId, context);
+                View pluginTabContent = DevGramPlugins.buildPanelTabView(pluginTabId, context, delegate != null ? delegate.getDialogId() : 0);
                 if (pluginTabContent != null) {
                     pluginTabContainer.addView(pluginTabContent, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
                 }
