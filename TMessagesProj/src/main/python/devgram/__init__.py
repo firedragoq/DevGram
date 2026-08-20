@@ -340,6 +340,17 @@ class BasePlugin:
         `new Canvas(bitmap)` from compiled Java instead, which has no such ambiguity."""
         return _Plugins.newCanvas(bitmap)
 
+    def new_file_output_stream(self, path):
+        """Create a java.io.FileOutputStream for the given path (str).
+
+        Use this instead of calling jclass('java.io.FileOutputStream')(path) directly:
+        FileOutputStream has a hidden package-private constructor
+        FileOutputStream(FileDescriptor, boolean), and Chaquopy can resolve THAT one
+        instead of the public FileOutputStream(String) one, raising NoSuchMethodError.
+        This calls `new FileOutputStream(path)` from compiled Java instead, which has
+        no such ambiguity."""
+        return _Plugins.newFileOutputStream(str(path))
+
     def paint_color(self, paint, color):
         """Set an ARGB int color on an android.graphics.Paint.
 

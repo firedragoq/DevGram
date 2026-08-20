@@ -641,6 +641,15 @@ public class DevGramPlugins {
         return new android.graphics.Canvas(bitmap);
     }
 
+    // FileOutputStream(String) — та же беда: у класса есть скрытый пакетный конструктор
+    // FileOutputStream(FileDescriptor, boolean), и Chaquopy при вызове new FileOutputStream(path)
+    // из Python иногда резолвит именно его вместо публичного FileOutputStream(String) —
+    // NoSuchMethodError на несуществующий (для вызывающего) не-static метод. Обычный вызов
+    // из скомпилированного Java-кода перегрузку разрешает на этапе компиляции корректно.
+    public static java.io.FileOutputStream newFileOutputStream(String path) throws java.io.FileNotFoundException {
+        return new java.io.FileOutputStream(path);
+    }
+
     // Paint.setColor существует в двух перегрузках: setColor(int) и setColor(long)
     // (вторая добавлена в API 26 для wide-gamut Color.pack()). Вызов через Chaquopy
     // с обычным Python int иногда резолвит long-перегрузку, которая трактует число
