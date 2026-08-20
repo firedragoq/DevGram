@@ -598,6 +598,9 @@ public class ChatActivityEnterView extends FrameLayout implements
     private ActionBarPopupWindow.ActionBarPopupWindowLayout sendPopupLayout;
     private ImageView cancelBotButton;
     private ChatActivityEnterViewAnimatedIconView emojiButton;
+    // DevGram: иконка вкладки плагина (EmojiView.EmojiViewDelegate.onPluginTabIconChanged) —
+    // пока не null, подменяет собой обычную Lottie-анимацию кнопки-смайлика снизу чата.
+    private Drawable devgramPluginTabIcon;
     private ImageView deleteRichDraftButton;
     @Nullable
     private ImageView expandStickersButton;
@@ -12561,6 +12564,12 @@ public class ChatActivityEnterView extends FrameLayout implements
             }
 
             @Override
+            public void onPluginTabIconChanged(Drawable icon) {
+                devgramPluginTabIcon = icon;
+                setEmojiButtonImage(false, true);
+            }
+
+            @Override
             public int getThreadId() {
                 return getThreadMessageId();
             }
@@ -13054,6 +13063,14 @@ public class ChatActivityEnterView extends FrameLayout implements
 
     private void setEmojiButtonImage(boolean byOpen, boolean animated) {
         if (emojiButton == null) {
+            return;
+        }
+        // DevGram: пока открыта вкладка плагина со своей иконкой — показываем её вместо
+        // обычной Lottie-анимации смайлик/клавиатура/стикеры/GIF; как только вкладку сменят
+        // (icon станет null через onPluginTabIconChanged), этот блок просто перестаёт
+        // выполняться и ниже снова работает обычная логика.
+        if (!byOpen && devgramPluginTabIcon != null) {
+            emojiButton.setImageDrawable(devgramPluginTabIcon);
             return;
         }
         boolean showingRecordInterface = recordInterfaceState == 1 || (recordedAudioPanel != null && recordedAudioPanel.getVisibility() == View.VISIBLE);

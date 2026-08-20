@@ -553,6 +553,12 @@ public class EmojiView extends FrameLayout implements
             return 0;
         }
 
+        // DevGram: зовётся при выборе/уходе с вкладки плагина, у которой задан Tab.icon —
+        // icon != null, пока эта вкладка открыта (кнопка-смайлик внизу чата может подменить
+        // на неё свою иконку), icon == null при уходе на любую другую вкладку/закрытии панели.
+        default void onPluginTabIconChanged(Drawable icon) {
+        }
+
         default int getThreadId() {
             return 0;
         }
@@ -2824,8 +2830,14 @@ public class EmojiView extends FrameLayout implements
                         Tab pluginTab = currentTabs.get(position);
                         refreshPluginTab(pluginTab);
                         showPluginActionButton(DevGramPlugins.panelTabHasAction(pluginTab.pluginId), true);
+                        if (delegate != null) {
+                            delegate.onPluginTabIconChanged(pluginTab.icon);
+                        }
                     } else {
                         showPluginActionButton(false, true);
+                        if (delegate != null) {
+                            delegate.onPluginTabIconChanged(null);
+                        }
                     }
                     if (delegate.isSearchOpened()) {
                         if (position == 0) {
@@ -8717,13 +8729,10 @@ public class EmojiView extends FrameLayout implements
         }
 
         public Drawable getPageIconDrawable(int position) {
-            // DevGram: если плагин задал свою иконку для вкладки (см. Tab.icon,
-            // BasePlugin.register_panel_tab(..., icon_path=...)) — вкладка рисуется значком
-            // без текста (так уже устроен PagerSlidingTabStrip.addIconTab), для остальных
-            // (Эмодзи/GIF/Стикеры, плагины без иконки) — как раньше, обычным текстом.
-            if (position >= 0 && position < currentTabs.size() && currentTabs.get(position).type == TAB_PLUGIN) {
-                return currentTabs.get(position).icon;
-            }
+            // DevGram: вкладка плагина всегда текстом (пользователь явно попросил вернуть
+            // подпись вместо значка) — Tab.icon, если задан, используется в другом месте:
+            // подменяет иконку самой кнопки-смайлика снизу чата, когда эта вкладка открыта
+            // (см. onPageSelected → delegate.onPluginTabIconChanged).
             return null;
         }
 
