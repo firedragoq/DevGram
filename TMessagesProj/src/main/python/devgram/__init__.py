@@ -400,6 +400,17 @@ class BasePlugin:
         """Записать файл в личную папку плагина."""
         _Plugins.writeData(self.id, str(name), str(content))
 
+    def plugin_files_dir(self):
+        """Абсолютный путь к личной папке плагина на внешнем хранилище приложения.
+
+        Используйте эту папку (не tempfile/системный temp) для файлов, которые затем
+        отправляются через send_photo/send_file: tempfile.mkstemp() создаёт файл во
+        внутреннем кэше приложения (/data/data/<package>/...), а Android-клиент
+        блокирует отправку любого файла с таким путём как «неподдерживаемое вложение»
+        (защита от отправки внутренних файлов приложения). Эта папка — снаружи, под
+        защиту не попадает."""
+        return str(_Plugins.pluginFilesDirPath(self.id))
+
     # ---- диалоги / bulletins ----
     def bulletin(self, text, kind="info", duration=2750, button=None, callback=None):
         """Показать Telegram-плашку. kind: info/success/error."""

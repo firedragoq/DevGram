@@ -745,6 +745,17 @@ public class DevGramPlugins {
         }
     }
 
+    // Абсолютный путь к личной папке плагина (внешнее хранилище приложения, НЕ /data/data/...).
+    // Нужен плагинам, которые сами пишут бинарные файлы (например, рендерят картинку) и потом
+    // отправляют их через send_photo/send_file: tempfile.mkstemp() из Python-песочницы Chaquopy
+    // создаёт файл во внутреннем кэше (/data/data/<package>/...), а AndroidUtilities.isInternalUri()
+    // блокирует отправку ЛЮБОГО файла с таким путём как «Вложение не поддерживается» — это защита
+    // от отправки внутренних файлов приложения, но она же ловит и легитимные временные файлы
+    // плагина. Эта папка (getExternalFilesDir) под защиту не попадает.
+    public static String pluginFilesDirPath(String pluginId) {
+        return pluginDataDir(pluginId).getAbsolutePath();
+    }
+
     public static void writeData(String pluginId, String name, String content) {
         try {
             File f = new File(pluginDataDir(pluginId), name.replaceAll("[^a-zA-Z0-9_.\\-]", "_"));
