@@ -222,6 +222,11 @@ public class EmojiView extends FrameLayout implements
     // показывает иконку плагина) при повторном тапе открывала панель СРАЗУ на этой вкладке,
     // а не на Эмодзи/GIF/Стикеры по обычной логике onOpen().
     private int devgramActivePluginPosition = -1;
+    // DevGram: id последней ВЫБРАННОЙ вкладки плагина — статик (глобальный), чтобы иконка
+    // на кнопке-смайлике переживала смену чата. Инстанс-поле devgramActivePluginPosition и
+    // EnterView.devgramPluginTabIcon пересоздаются на каждый чат и теряли состояние; это —
+    // единый источник правды «какая вкладка плагина активна» между всеми EmojiView/EnterView.
+    public static String devgramLastPluginTabId = null;
     private AnimatorSet bottomTabContainerAnimation;
     private AnimatorSet backspaceButtonAnimation;
     private AnimatorSet stickersButtonAnimation;
@@ -2836,12 +2841,14 @@ public class EmojiView extends FrameLayout implements
                         refreshPluginTab(pluginTab);
                         showPluginActionButton(DevGramPlugins.panelTabHasAction(pluginTab.pluginId), true);
                         devgramActivePluginPosition = position;
+                        devgramLastPluginTabId = pluginTab.pluginId;
                         if (delegate != null) {
                             delegate.onPluginTabIconChanged(pluginTab.icon);
                         }
                     } else {
                         showPluginActionButton(false, true);
                         devgramActivePluginPosition = -1;
+                        devgramLastPluginTabId = null;
                         if (delegate != null) {
                             delegate.onPluginTabIconChanged(null);
                         }
@@ -6231,11 +6238,29 @@ public class EmojiView extends FrameLayout implements
     // плагинов и всегда уводит на Эмодзи/GIF/Стикеры. Возвращает false, если открывать
     // нечего (вкладка плагина сейчас не активна) — тогда вызывающий код сам зовёт onOpen().
     public boolean openDevgramPluginTab() {
-        if (pager == null || devgramActivePluginPosition < 0 || devgramActivePluginPosition >= currentTabs.size()
-                || currentTabs.get(devgramActivePluginPosition).type != TAB_PLUGIN) {
+        if (pager == null || currentTabs == null) {
             return false;
         }
-        pager.setCurrentItem(devgramActivePluginPosition, false);
+        int pos = devgramActivePluginPosition;
+        // В свежем EmojiView (новый чат) плагинская вкладка ещё не выбиралась, поэтому
+        // devgramActivePluginPosition = -1 — ищем её позицию по глобальному id последней
+        // выбранной вкладки плагина, чтобы тап по иконке всё равно открыл именно её.
+        if (pos < 0 || pos >= currentTabs.size() || currentTabs.get(pos).type != TAB_PLUGIN) {
+            pos = -1;
+            if (devgramLastPluginTabId != null) {
+                for (int i = 0; i < currentTabs.size(); i++) {
+                    Tab t = currentTabs.get(i);
+                    if (t.type == TAB_PLUGIN && devgramLastPluginTabId.equals(t.pluginId)) {
+                        pos = i;
+                        break;
+                    }
+                }
+            }
+        }
+        if (pos < 0 || pos >= currentTabs.size() || currentTabs.get(pos).type != TAB_PLUGIN) {
+            return false;
+        }
+        pager.setCurrentItem(pos, false);
         return true;
     }
 

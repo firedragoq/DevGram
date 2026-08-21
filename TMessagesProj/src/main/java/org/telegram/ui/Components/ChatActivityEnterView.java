@@ -2783,7 +2783,8 @@ public class ChatActivityEnterView extends FrameLayout implements
                 // DevGram: если кнопка сейчас показывает иконку вкладки плагина (см.
                 // devgramPluginTabIcon/onPluginTabIconChanged) — открываем панель сразу на
                 // ней, а не на Эмодзи по умолчанию (onOpen() ничего не знает про плагины).
-                if (devgramPluginTabIcon == null || !emojiView.openDevgramPluginTab()) {
+                boolean showingPluginIcon = devgramPluginTabIcon != null || EmojiView.devgramLastPluginTabId != null;
+                if (!showingPluginIcon || !emojiView.openDevgramPluginTab()) {
                     emojiView.onOpen(messageEditText != null && messageEditText.length() > 0, parentFragment != null && parentFragment.groupEmojiPackHintWasVisible());
                 }
             } else {
@@ -13074,9 +13075,19 @@ public class ChatActivityEnterView extends FrameLayout implements
         // обычной Lottie-анимации смайлик/клавиатура/стикеры/GIF; как только вкладку сменят
         // (icon станет null через onPluginTabIconChanged), этот блок просто перестаёт
         // выполняться и ниже снова работает обычная логика.
-        if (!byOpen && devgramPluginTabIcon != null) {
-            emojiButton.setImageDrawable(devgramPluginTabIcon);
-            return;
+        if (!byOpen) {
+            Drawable pluginIcon = devgramPluginTabIcon;
+            if (pluginIcon == null && EmojiView.devgramLastPluginTabId != null) {
+                // новый чат: инстанс-иконка ещё не выставлена (панель тут не открывали) —
+                // берём по глобальному состоянию, чтобы кнопка сразу показывала иконку
+                // активной вкладки плагина. Если плагин выключили — вернётся null и ниже
+                // отработает обычная Lottie-иконка (само-восстановление).
+                pluginIcon = org.telegram.messenger.DevGramPlugins.buildPanelTabIcon(EmojiView.devgramLastPluginTabId, getContext());
+            }
+            if (pluginIcon != null) {
+                emojiButton.setImageDrawable(pluginIcon);
+                return;
+            }
         }
         boolean showingRecordInterface = recordInterfaceState == 1 || (recordedAudioPanel != null && recordedAudioPanel.getVisibility() == View.VISIBLE);
         if (showingRecordInterface) {
