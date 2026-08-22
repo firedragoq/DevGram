@@ -135,7 +135,10 @@ public class DevGramTelemetry {
         try {
             java.io.StringWriter sw = new java.io.StringWriter();
             e.printStackTrace(new java.io.PrintWriter(sw));
-            String trace = sw.toString();
+            // Разбивка памяти в начало трейса — для OOM это решающая улика (где сидит память:
+            // java-куча, графика/битмапы или нативная), а стек OOM показывает лишь место
+            // неудачной аллокации-жертвы, а не причину.
+            String trace = "[mem] " + memorySummary() + "\n\n" + sw.toString();
             if (trace.length() > 8000) {
                 trace = trace.substring(0, 8000);
             }
@@ -152,6 +155,38 @@ public class DevGramTelemetry {
             fos.write(o.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
             fos.close();
         } catch (Throwable ignore) {
+        }
+    }
+
+    // Краткая разбивка памяти на момент краша (всё в МБ). Для OOM показывает, что именно
+    // держит кучу: java_used (объекты), native (нативные аллокации), graphics (битмапы/GPU).
+    private static String memorySummary() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            Runtime rt = Runtime.getRuntime();
+            long max = rt.maxMemory() / 1048576L;
+            long used = (rt.totalMemory() - rt.freeMemory()) / 1048576L;
+            long nativeHeap = android.os.Debug.getNativeHeapAllocatedSize() / 1048576L;
+            sb.append("java_used=").append(used).append("MB/").append(max).append("MB");
+            sb.append(" native=").append(nativeHeap).append("MB");
+            try {
+                android.os.Debug.MemoryInfo mi = new android.os.Debug.MemoryInfo();
+                android.os.Debug.getMemoryInfo(mi);
+                sb.append(" graphics=").append(memStatMb(mi, "summary.graphics"));
+                sb.append(" total_pss=").append(memStatMb(mi, "summary.total-pss"));
+            } catch (Throwable ignore) {
+            }
+        } catch (Throwable e) {
+            return "?";
+        }
+        return sb.toString();
+    }
+
+    private static String memStatMb(android.os.Debug.MemoryInfo mi, String key) {
+        try {
+            return (Long.parseLong(mi.getMemoryStat(key)) / 1024L) + "MB";
+        } catch (Throwable e) {
+            return "?";
         }
     }
 
