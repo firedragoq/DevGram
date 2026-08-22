@@ -1666,10 +1666,33 @@ public class PushListenerController {
     @Keep
     public interface IPushListenerServiceProvider {
         boolean hasServices();
+        boolean needsPushToken();
         String getLogTitle();
         void onRequestPushToken();
         @PushType
         int getPushType();
+    }
+
+    private static boolean hasUnregisteredAccount() {
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            UserConfig userConfig = UserConfig.getInstance(a);
+            if (userConfig.isClientActivated() && !userConfig.registeredForPush) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean isUnifiedPushActive() {
+        if (SharedConfig.disableUnifiedPush) {
+            return false;
+        }
+        try {
+            IPushListenerServiceProvider provider = ApplicationLoader.getPushProvider();
+            return provider instanceof UnifiedPushListenerServiceProvider && provider.hasServices() && !provider.needsPushToken() && UnifiedPushService.isRegistrationFresh();
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     public final static class GooglePushListenerServiceProvider implements IPushListenerServiceProvider {
@@ -1678,6 +1701,11 @@ public class PushListenerController {
         private Boolean hasServices;
 
         private GooglePushListenerServiceProvider() {}
+
+        @Override
+        public boolean needsPushToken() {
+            return TextUtils.isEmpty(SharedConfig.pushString) || hasUnregisteredAccount();
+        }
 
         @Override
         public String getLogTitle() {
@@ -1754,6 +1782,21 @@ public class PushListenerController {
         }
 
         @Override
+        public boolean needsPushToken() {
+            if (SharedConfig.disableUnifiedPush) {
+                return false;
+            }
+            try {
+                if (UnifiedPush.getAckDistributor(ApplicationLoader.applicationContext) == null) {
+                    return true;
+                }
+            } catch (Throwable e) {
+                return true;
+            }
+            return TextUtils.isEmpty(SharedConfig.pushString) || hasUnregisteredAccount();
+        }
+
+        @Override
         public String getLogTitle() {
             return "UnifiedPush";
         }
@@ -1792,6 +1835,7 @@ public class PushListenerController {
                                 "default",
                                 "DevGram Simple Push",
                                 null);
+                        UnifiedPushService.awaitRegistrationAnswer();
                     } catch (Throwable e) {
                         FileLog.e(e);
                     }

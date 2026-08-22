@@ -425,6 +425,29 @@ public class ApplicationLoader extends Application {
         org.osmdroid.config.Configuration.getInstance().setOsmdroidBasePath(new File(getCacheDir(),"osmdroid"));
     }
 
+    private static final String LEGACY_KEEP_ALIVE_ACTION = "org.telegram.start";
+
+    private static void cancelLegacyKeepAliveAlarms(int pendingIntentFlags) {
+        try {
+            AlarmManager am = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
+            PendingIntent keepAlive = PendingIntent.getBroadcast(applicationContext, 0, new Intent(applicationContext, AppStartReceiver.class).setAction(LEGACY_KEEP_ALIVE_ACTION), pendingIntentFlags | PendingIntent.FLAG_NO_CREATE);
+            if (keepAlive != null) {
+                am.cancel(keepAlive);
+                keepAlive.cancel();
+            }
+            PendingIntent undeliverable = PendingIntent.getBroadcast(applicationContext, 0, new Intent(applicationContext, NotificationsService.class), pendingIntentFlags | PendingIntent.FLAG_NO_CREATE);
+            if (undeliverable != null) {
+                am.cancel(undeliverable);
+                undeliverable.cancel();
+            }
+            if (pendingIntent != null) {
+                am.cancel(pendingIntent);
+                pendingIntent = null;
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
     public static void startPushService() {
         SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
         boolean enabled;
@@ -450,43 +473,20 @@ public class ApplicationLoader extends Application {
             pendingIntentFlags = PendingIntent.FLAG_MUTABLE;
         }
         if (enabled) {
-            boolean unifiedPushActive = false;
-            try {
-                unifiedPushActive = getPushProvider() == PushListenerController.UnifiedPushListenerServiceProvider.INSTANCE
-                        && !SharedConfig.disableUnifiedPush
-                        && org.unifiedpush.android.connector.UnifiedPush.getAckDistributor(applicationContext) != null;
-            } catch (Throwable ignore) {
-            }
+            // DevGram: если активен UnifiedPush-дистрибьютор — держать собственный watchdog
+            // не нужно, соединение переключается на UnifiedPush (порт фичи Forkgram
+            // «automatic switching between UnifiedPush and the background connection»).
+            // Иначе решает тумблер «Keep-Alive Service»: foreground-сервис держит соединение
+            // и фоновые загрузки. Старые повторяющиеся будильники в любом случае снимаем.
+            final boolean unifiedPushActive = PushListenerController.isUnifiedPushActive();
+            cancelLegacyKeepAliveAlarms(pendingIntentFlags);
             if (unifiedPushActive) {
                 Log.d("DevGram", "UnifiedPush is active, skipping push service watchdog");
                 try {
                     applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
-                    AlarmManager alarm = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
-                    if (pendingIntent != null) {
-                        alarm.cancel(pendingIntent);
-                    }
                 } catch (Throwable ignore) {
                 }
                 return;
-            }
-            // DevGram: решает тумблер «Keep-Alive Service» (как в оф. Telegram/ExteraGram).
-            // Вкл -> foreground-сервис держит соединение и фоновые загрузки (с уведомлением).
-            // Выкл -> сервиса нет (пуши через FCM/UnifiedPush, фоновая загрузка встаёт).
-            Log.d("TFOSS", "Trying to start push service every minute");
-            AlarmManager am = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
-            Intent i = new Intent(applicationContext, NotificationsService.class);
-            try {
-            pendingIntent = PendingIntent.getBroadcast(applicationContext, 0, i, pendingIntentFlags);
-
-            am.cancel(pendingIntent);
-            am.setInexactRepeating(
-                AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + AlarmManager.INTERVAL_FIFTEEN_MINUTES,
-                AlarmManager.INTERVAL_FIFTEEN_MINUTES,
-                pendingIntent
-            );
-            } catch (Throwable ignore) {
-                Log.d("DevGram", "Failed to set intent");
             }
             try {
                 Log.d("TFOSS", "Starting push service...");
