@@ -142,6 +142,27 @@ public class DevGramPlugins {
             "        return text.replace(\":love:\", \"❤️\").replace(\":shrug:\", \"¯\\\\_(ツ)_/¯\")",
             "");
 
+    // true, если hello.py совпадает с исходным демо (его можно спокойно удалить). Если
+    // пользователь переписал файл под тем же именем — вернёт false, и мы его не тронем.
+    private static boolean isUntouchedSample(File f) {
+        try {
+            byte[] data = new byte[(int) f.length()];
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            try {
+                int off = 0, r;
+                while (off < data.length && (r = in.read(data, off, data.length - off)) > 0) {
+                    off += r;
+                }
+            } finally {
+                in.close();
+            }
+            String content = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+            return content.trim().equals(SAMPLE.trim());
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
     // Папка плагинов (внешняя files-папка — видна в файловом менеджере разработчику).
     public static File pluginsDir() {
         Context ctx = ApplicationLoader.applicationContext;
@@ -241,15 +262,14 @@ public class DevGramPlugins {
         initHooks();            // инициализируем Pine до загрузки плагинов (on_load может хукать)
         try {
             File dir = pluginsDir();
-            // при первом запуске кладём пример
+            // Раньше при первом запуске сюда клали демо-плагин hello.py («Привет DevGram»).
+            // Больше не кладём и один раз подчищаем его у тех, у кого он уже лежит — но ТОЛЬКО
+            // если файл не редактировали (содержимое совпадает с исходным SAMPLE), чтобы не
+            // удалить плагин, который пользователь мог переписать под себя под тем же именем.
             File sample = new File(dir, "hello.py");
-            if (!sample.exists() && dir.list() != null && dir.list().length == 0) {
-                try {
-                    java.io.FileWriter w = new java.io.FileWriter(sample);
-                    w.write(SAMPLE);
-                    w.close();
-                } catch (Throwable ignore) {
-                }
+            if (sample.exists() && isUntouchedSample(sample)) {
+                //noinspection ResultOfMethodCallIgnored
+                sample.delete();
             }
             int n = loader().callAttr("load_dir", dir.getAbsolutePath()).toInt();
             applySavedEnabled();    // восстановить вкл/выкл, сохранённые пользователем
