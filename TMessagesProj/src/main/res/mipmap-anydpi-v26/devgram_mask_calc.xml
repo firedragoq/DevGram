@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DevGram: adaptive-иконка маскировки «Калькулятор» -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/devgram_mask_calc_bg" />
+    <foreground android:drawable="@drawable/devgram_mask_calc_fg" />
+</adaptive-icon>

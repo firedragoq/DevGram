@@ -1628,6 +1628,11 @@ public class DownloadController extends BaseController implements NotificationCe
 
     }
 
+    // DevGram: троттл bulletin «Сообщение не найдено» — при скачивании удалённого/недоступного
+    // медиа сервер циклически отдаёт FILE_REFERENCE_EXPIRED, клиент ретраит, и каждый провал
+    // спамил новое окно. Показываем максимум одно окно раз в 3 сек.
+    private static long devgramLastNotFoundBulletin;
+
     public void onDownloadFail(MessageObject parentObject, int reason) {
         if (parentObject == null) {
             return;
@@ -1647,7 +1652,11 @@ public class DownloadController extends BaseController implements NotificationCe
             if (removed) {
                 getNotificationCenter().postNotificationName(NotificationCenter.onDownloadingFilesChanged);
                 if (reason == 0) {
-                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_ERROR, LocaleController.formatString("MessageNotFound", R.string.MessageNotFound));
+                    long now = System.currentTimeMillis();
+                    if (now - devgramLastNotFoundBulletin > 3000) {
+                        devgramLastNotFoundBulletin = now;
+                        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_ERROR, LocaleController.formatString("MessageNotFound", R.string.MessageNotFound));
+                    }
                 } else if (reason == -1) {
                     LaunchActivity.checkFreeDiscSpaceStatic(2);
                 }

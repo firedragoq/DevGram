@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DevGram: fallback иконки «Калькулятор» для API 24-25 (нет adaptive-icon) -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/devgram_mask_calc_full" />

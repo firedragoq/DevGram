@@ -162,6 +162,7 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_DIVIDER_STYLE = 60;
     private static final int ID_GLASS_OUTLINE = 61;
     private static final int ID_PILL_STACK = 62;
+    private static final int ID_DISGUISE = 63; // DevGram: маскировка (иконка + имя приложения)
 
     // Варианты для строк-селекторов (как в exteraGram)
     private static final String[] ACTIONBAR_TITLE_OPTIONS = {"Название приложения", "Имя пользователя", "Имя", "Чаты"};
@@ -624,6 +625,12 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .setChecked(org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_CHAT_BLUR)));
             items.add(UItem.asShadow("Меню сообщения и панель реакций становятся матовым стеклом. "
                     + "Стеклу нужно размытие — включите «Принудительное размытие»."));
+
+            // — Маскировка — подмена иконки и названия приложения в списке приложений.
+            items.add(UItem.asHeader("Маскировка"));
+            items.add(UItem.asButton(ID_DISGUISE, "Иконка и название", disguiseCurrentTitle()));
+            items.add(UItem.asShadow("В списке приложений DevGram будет выглядеть как выбранное приложение "
+                    + "(например, «Калькулятор»). Само приложение не меняется."));
         } else if (category == CATEGORY_CHATS) {
             // Порядок и состав повторяют ChatsPreferencesActivity ExteraGram.
             items.add(UItem.asHeader("Стикеры"));
@@ -978,6 +985,49 @@ public class DevGramCategoryActivity extends BaseFragment {
         showDialog(b.create());
     }
 
+    // DevGram: подпись под пунктом «Маскировка» — имя текущей маски или «Выключена».
+    private String disguiseCurrentTitle() {
+        if (!org.telegram.messenger.DevGramDisguise.isDisguised()) {
+            return "Выключена";
+        }
+        return org.telegram.messenger.LocaleController.getString(org.telegram.messenger.DevGramDisguise.current().title);
+    }
+
+    // DevGram: диалог выбора маскировки (иконка + имя приложения).
+    private void showDisguiseDialog() {
+        if (getParentActivity() == null) return;
+        java.util.List<LauncherIconController.LauncherIcon> masks = org.telegram.messenger.DevGramDisguise.masks();
+        LauncherIconController.LauncherIcon cur = org.telegram.messenger.DevGramDisguise.current();
+        boolean disguised = org.telegram.messenger.DevGramDisguise.isDisguised();
+        // Пункт 0 — снять маскировку; далее по одному на каждую маску. «• » помечает активную.
+        String[] titles = new String[masks.size() + 1];
+        titles[0] = (disguised ? "" : "• ") + org.telegram.messenger.LocaleController.getString(R.string.DevGramDisguiseNone);
+        for (int i = 0; i < masks.size(); i++) {
+            String name = org.telegram.messenger.LocaleController.getString(masks.get(i).title);
+            titles[i + 1] = (masks.get(i) == cur ? "• " : "") + name;
+        }
+        org.telegram.ui.ActionBar.AlertDialog.Builder b =
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
+        b.setTitle(org.telegram.messenger.LocaleController.getString(R.string.DevGramDisguise));
+        b.setItems(titles, (dialog, which) -> {
+            if (which == 0) {
+                org.telegram.messenger.DevGramDisguise.clear();
+            } else {
+                org.telegram.messenger.DevGramDisguise.apply(masks.get(which - 1));
+            }
+            refreshListImmediately();
+            String plain = which == 0
+                    ? org.telegram.messenger.LocaleController.getString(R.string.DevGramDisguiseNone)
+                    : org.telegram.messenger.LocaleController.getString(masks.get(which - 1).title);
+            org.telegram.ui.Components.BulletinFactory.of(this)
+                    .createSimpleBulletin(R.raw.done,
+                            which == 0 ? "Маскировка снята" : "Приложение замаскировано под «" + plain + "»")
+                    .show();
+        });
+        b.setNegativeButton(org.telegram.messenger.LocaleController.getString(R.string.Cancel), null);
+        showDialog(b.create());
+    }
+
     private void onItemClick(UItem item, View view, int position, float x, float y) {
         if (item.id == ID_GHOST_MASTER) {
             DevGramConfig.toggleGhostMode();
@@ -1098,6 +1148,9 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setUseSystemEmoji(!DevGramConfig.isUseSystemEmoji());
         } else if (item.id == ID_FORCE_SNOW) {
             DevGramConfig.setForceSnow(!DevGramConfig.forceSnow);
+        } else if (item.id == ID_DISGUISE) {
+            showDisguiseDialog();
+            return;
         } else if (item.id == ID_CHAT_BLUR) {
             org.telegram.messenger.SharedConfig.toggleChatBlur();
         } else if (item.id == ID_SINGLE_CORNER) {

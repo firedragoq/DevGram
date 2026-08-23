@@ -41,13 +41,17 @@ public class LauncherIconController {
         AQUA("AquaIcon", R.drawable.icon_4_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconAqua),
         PREMIUM("PremiumIcon", R.drawable.icon_3_background_sa, R.mipmap.icon_3_foreground_sa, R.string.AppIconPremium, true),
         TURBO("TurboIcon", R.drawable.icon_5_background_sa, R.mipmap.icon_5_foreground_sa, R.string.AppIconTurbo, true),
-        NOX("NoxIcon", R.mipmap.icon_2_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconNox, true);
+        NOX("NoxIcon", R.mipmap.icon_2_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconNox, true),
+        // DevGram: маскировка — alias с собственным android:label (меняет и иконку, и имя приложения).
+        // disguise=true => не показывается в стоковом premium-селекторе иконок, только в разделе «Маскировка».
+        CALCULATOR("CalculatorIcon", R.drawable.devgram_mask_calc_bg, R.drawable.devgram_mask_calc_fg, R.string.DevGramMaskCalculator, false, true);
 
         public final String key;
         public final int background;
         public final int foreground;
         public final int title;
         public final boolean premium;
+        public final boolean disguise; // DevGram
 
         private ComponentName componentName;
 
@@ -59,15 +63,20 @@ public class LauncherIconController {
         }
 
         LauncherIcon(String key, int background, int foreground, int title) {
-            this(key, background, foreground, title, false);
+            this(key, background, foreground, title, false, false);
         }
 
         LauncherIcon(String key, int background, int foreground, int title, boolean premium) {
+            this(key, background, foreground, title, premium, false);
+        }
+
+        LauncherIcon(String key, int background, int foreground, int title, boolean premium, boolean disguise) {
             this.key = key;
             this.background = background;
             this.foreground = foreground;
             this.title = title;
             this.premium = premium;
+            this.disguise = disguise;
         }
     }
 }
