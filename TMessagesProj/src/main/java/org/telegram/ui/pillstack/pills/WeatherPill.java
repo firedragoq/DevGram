@@ -75,13 +75,34 @@ public class WeatherPill extends BasePill implements NotificationCenter.Notifica
     public boolean onPillLongClicked() {
         final BaseFragment fragment = LaunchActivity.getSafeLastFragment();
         if (fragment == null) return false;
-        ItemOptions.makeOptions(fragment, this)
+        final String curCity = org.telegram.ui.Stories.recorder.Weather.getManualCity();
+        final boolean hasCity = !android.text.TextUtils.isEmpty(curCity);
+        ItemOptions options = ItemOptions.makeOptions(fragment, this)
                 .add(R.drawable.msg_retry, "Обновить", () -> onUpdateData(true))
-                .add(R.drawable.msg_settings, "Настройки", () -> fragment.presentFragment(new PillStackPreferencesActivity()))
+                .add(R.drawable.msg_map, hasCity ? "Город: " + curCity : "Выбрать город", () -> showCitySearch(fragment));
+        if (hasCity) {
+            options.add(R.drawable.msg_location, "Обратно по геолокации", () -> {
+                org.telegram.ui.Stories.recorder.Weather.clearManualCity();
+                onUpdateData(true);
+            });
+        }
+        options.add(R.drawable.msg_settings, "Настройки", () -> fragment.presentFragment(new PillStackPreferencesActivity()))
                 .setDrawScrim(false)
                 .setDimAlpha(0)
                 .show();
         return true;
+    }
+
+    // DevGram: экран поиска города — ввод названия → список найденных → выбор.
+    private void showCitySearch(BaseFragment fragment) {
+        if (fragment.getParentActivity() == null) return;
+        org.telegram.ui.DevGramWeatherCitySheet sheet =
+                new org.telegram.ui.DevGramWeatherCitySheet(fragment.getParentActivity(), this::onUpdateData0);
+        sheet.show();
+    }
+
+    private void onUpdateData0() {
+        onUpdateData(true);
     }
 
     @Override

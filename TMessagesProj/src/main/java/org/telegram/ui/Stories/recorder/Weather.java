@@ -301,33 +301,117 @@ public class Weather {
         }
     }
 
+    // DevGram: ручной город для виджета погоды. Если задан — погода берётся по его
+    // координатам, без постоянной геолокации. Пусто — авто по гео.
+    public static String getManualCity() {
+        return MessagesController.getGlobalMainSettings().getString("dg_weatherCity", "");
+    }
+
+    public static void setManualCity(String name, double lat, double lng) {
+        MessagesController.getGlobalMainSettings().edit()
+                .putString("dg_weatherCity", name == null ? "" : name.trim())
+                .putString("dg_weatherCityLat", Double.toString(lat))
+                .putString("dg_weatherCityLng", Double.toString(lng))
+                .apply();
+    }
+
+    public static void clearManualCity() {
+        MessagesController.getGlobalMainSettings().edit()
+                .remove("dg_weatherCity").remove("dg_weatherCityLat").remove("dg_weatherCityLng").apply();
+    }
+
+    private static double manualCoord(String key) {
+        try {
+            return Double.parseDouble(MessagesController.getGlobalMainSettings().getString(key, "NaN"));
+        } catch (Exception e) {
+            return Double.NaN;
+        }
+    }
+
+    // Результат поиска города (для экрана выбора).
+    public static class CityResult {
+        public final String title;   // «Москва»
+        public final String subtitle; // «Московская область, Россия»
+        public final double lat, lng;
+        public CityResult(String title, String subtitle, double lat, double lng) {
+            this.title = title; this.subtitle = subtitle; this.lat = lat; this.lng = lng;
+        }
+    }
+
+    // Поиск городов по запросу (в фоне, без запроса геолокации) — до 6 вариантов.
+    public static void searchCity(String query, Utilities.Callback<java.util.List<CityResult>> whenGot) {
+        Utilities.globalQueue.postRunnable(() -> {
+            java.util.List<CityResult> out = new java.util.ArrayList<>();
+            try {
+                android.location.Geocoder geocoder = new android.location.Geocoder(
+                        ApplicationLoader.applicationContext, LocaleController.getInstance().getCurrentLocale());
+                java.util.List<android.location.Address> list = geocoder.getFromLocationName(query, 6);
+                if (list != null) {
+                    for (android.location.Address a : list) {
+                        if (!a.hasLatitude() || !a.hasLongitude()) continue;
+                        String title = a.getLocality();
+                        if (TextUtils.isEmpty(title)) title = a.getSubAdminArea();
+                        if (TextUtils.isEmpty(title)) title = a.getAdminArea();
+                        if (TextUtils.isEmpty(title)) title = a.getFeatureName();
+                        if (TextUtils.isEmpty(title)) continue;
+                        StringBuilder sub = new StringBuilder();
+                        if (!TextUtils.isEmpty(a.getAdminArea()) && !a.getAdminArea().equals(title)) sub.append(a.getAdminArea());
+                        if (!TextUtils.isEmpty(a.getCountryName())) {
+                            if (sub.length() > 0) sub.append(", ");
+                            sub.append(a.getCountryName());
+                        }
+                        out.add(new CityResult(title, sub.toString(), a.getLatitude(), a.getLongitude()));
+                    }
+                }
+            } catch (Throwable ignore) {
+            }
+            AndroidUtilities.runOnUIThread(() -> whenGot.run(out));
+        });
+    }
+
     public static void fetch(boolean withProgress, Utilities.Callback<State> whenFetched) {
         if (whenFetched == null) return;
+        final String city = getManualCity();
+        if (!TextUtils.isEmpty(city)) {
+            // Ручной город: используем сохранённые координаты — гео-разрешения не нужны.
+            double lat = manualCoord("dg_weatherCityLat");
+            double lng = manualCoord("dg_weatherCityLng");
+            if (!Double.isNaN(lat) && !Double.isNaN(lng)) {
+                fetchAtLocation(lat, lng, withProgress, whenFetched);
+                return;
+            }
+            whenFetched.run(null);
+            return;
+        }
         getUserLocation(withProgress, location -> {
             if (location == null) {
                 whenFetched.run(null);
                 return;
             }
-
-            Activity activity = LaunchActivity.instance;
-            if (activity == null) activity = AndroidUtilities.findActivity(ApplicationLoader.applicationContext);
-            if (activity == null || activity.isFinishing()) {
-                whenFetched.run(null);
-                return;
-            }
-
-            final AlertDialog progressDialog = withProgress ? new AlertDialog(activity, AlertDialog.ALERT_TYPE_SPINNER, new DarkThemeResourceProvider()) : null;
-            if (withProgress) progressDialog.showDelayed(200);
-            Runnable cancel = fetch(location.getLatitude(), location.getLongitude(), weather -> {
-                if (withProgress) {
-                    progressDialog.dismissUnless(350);
-                }
-                whenFetched.run(weather);
-            });
-            if (withProgress && cancel != null) {
-                progressDialog.setOnCancelListener(di -> cancel.run());
-            }
+            fetchAtLocation(location.getLatitude(), location.getLongitude(), withProgress, whenFetched);
         });
+    }
+
+    // Общая часть: получить погоду по готовым координатам (с прогресс-диалогом при надобности).
+    private static void fetchAtLocation(double lat, double lng, boolean withProgress, Utilities.Callback<State> whenFetched) {
+        Activity activity = LaunchActivity.instance;
+        if (activity == null) activity = AndroidUtilities.findActivity(ApplicationLoader.applicationContext);
+        if (activity == null || activity.isFinishing()) {
+            whenFetched.run(null);
+            return;
+        }
+
+        final AlertDialog progressDialog = withProgress ? new AlertDialog(activity, AlertDialog.ALERT_TYPE_SPINNER, new DarkThemeResourceProvider()) : null;
+        if (withProgress) progressDialog.showDelayed(200);
+        Runnable cancel = fetch(lat, lng, weather -> {
+            if (withProgress) {
+                progressDialog.dismissUnless(350);
+            }
+            whenFetched.run(weather);
+        });
+        if (withProgress && cancel != null) {
+            progressDialog.setOnCancelListener(di -> cancel.run());
+        }
     }
 
     private static String cacheKey;
