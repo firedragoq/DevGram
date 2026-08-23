@@ -2550,13 +2550,10 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
 
     private void setRoundRadiusInternal(int[] value, boolean applyAvatarShape) {
         if (applyAvatarShape) {
+            // 12.9.3: форма углов аватара вынесена в AndroidUtilities.avatarShapedRadius
             final int corners = AndroidUtilities.avatarCornersType();
-            if (corners == AndroidUtilities.AVATAR_CORNERS_SQUARE) {
-                java.util.Arrays.fill(value, 0);
-            } else if (corners == AndroidUtilities.AVATAR_CORNERS_FORUM) {
-                for (int a = 0; a < value.length; a++) {
-                    value[a] = Math.round(value[a] * 0.64f);
-                }
+            for (int a = 0; a < value.length; a++) {
+                value[a] = AndroidUtilities.avatarShapedRadius(corners, value[a]);
             }
         }
 

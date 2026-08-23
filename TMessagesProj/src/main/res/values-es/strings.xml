@@ -16,7 +16,7 @@
     <string name="ForkSectionBots">Bots y navegador</string>
     <string name="ForkSectionSystem">Sistema y actualizaciones</string>
     <string name="WebSocketTransport">Conectar por WebSocket</string>
-    <string name="WebSocketTransportInfo">Canaliza el tráfico de DevGram a través de una conexión WebSocket cifrada (WSS). Puede ayudar cuando la conexión normal está limitada o bloqueada. Deja el dominio vacío para usar repetidores públicos actualizados automáticamente, o introduce tu propio dominio para mayor fiabilidad. Desactívalo si la conexión deja de funcionar.</string>
+    <string name="WebSocketTransportInfo">Canaliza el tráfico de Telegram a través de una conexión WebSocket cifrada (WSS). Puede ayudar cuando la conexión normal está limitada o bloqueada. Deja el dominio vacío para usar repetidores públicos actualizados automáticamente, o introduce tu propio dominio para mayor fiabilidad. Los repetidores públicos son gestionados por terceros y pueden ver tu dirección IP y los metadatos de conexión, pero no el contenido de tus mensajes. Desactívalo si la conexión deja de funcionar.</string>
     <string name="WebSocketDomain">Dominio WebSocket</string>
     <string name="WebSocketDomainAuto">Automático</string>
     <string name="ForkSectionBackup">Copia de seguridad</string>
@@ -108,6 +108,10 @@
     <string name="RearVideoMessages">Cámara trasera en mensajes de video</string>
     <string name="ReplaceForward">Reemplazar reenvío original</string>
     <string name="HideSensitiveData">Ocultar datos sensibles</string>
+    <string name="HideSensitivePhone">Ocultar número de teléfono</string>
+    <string name="HideSensitiveUsername">Ocultar nombre de usuario</string>
+    <string name="HideSensitiveBio">Ocultar biografía</string>
+    <string name="HideSensitiveId">Ocultar ID de la cuenta</string>
     <string name="SystemCamera">Usar cámara del sistema para fotos</string>
     <string name="SystemCameraInfo">Solo en el diálogo de adjuntos</string>
     <string name="MentionByName">Mencionar usuario por nombre</string>

@@ -25,6 +25,7 @@ import org.telegram.SQLite.SQLiteDatabase;
 import org.telegram.SQLite.SQLitePreparedStatement;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.AppGlobalConfig;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BillingController;
 import org.telegram.messenger.BirthdayController;
@@ -738,6 +739,18 @@ public class StarsController {
         }, 0).show();
     }
 
+    private boolean isInvoiceBillingDisabled(TLRPC.InputPeer purposePeer) {
+        return AppGlobalConfig.getInstance(currentAccount).starsSpendTopUpInvoiceDisabled.get() && purposePeer != null;
+    }
+
+    public boolean canBuy(TLRPC.InputPeer purposePeer) {
+        if (purposePeer != null && isInvoiceBillingDisabled(purposePeer)) {
+            return false;
+        }
+
+        return true;
+    }
+
     public void buy(
         Activity activity,
         TL_stars.TL_starsTopupOption option,
@@ -758,7 +771,8 @@ public class StarsController {
             return;
         }
 
-        if (BuildVars.useInvoiceBilling()) {
+        final boolean isInvoiceBillingDisabled = isInvoiceBillingDisabled(purposePeer);
+        if (BuildVars.useInvoiceBilling() && !isInvoiceBillingDisabled) {
             final TLRPC.TL_inputStorePaymentStarsTopup purpose = new TLRPC.TL_inputStorePaymentStarsTopup();
             purpose.stars = option.stars;
             purpose.amount = option.amount;
@@ -825,10 +839,9 @@ public class StarsController {
             return;
         }
 
-        final TLRPC.TL_inputStorePaymentStarsTopup payload = new TLRPC.TL_inputStorePaymentStarsTopup();
-        payload.stars = option.stars;
-        payload.currency = option.currency;
-        payload.amount = option.amount;
+        if (whenDone != null) {
+            whenDone.run(false, "INVOICE DISABLED");
+        }
     }
 
     public void buyGift(Activity activity, TL_stars.TL_starsGiftOption option, long user_id, Utilities.Callback2<Boolean, String> whenDone) {

@@ -16,7 +16,7 @@
     <string name="ForkSectionBots">Боти та браузер</string>
     <string name="ForkSectionSystem">Система та оновлення</string>
     <string name="WebSocketTransport">Підключення через WebSocket</string>
-    <string name="WebSocketTransportInfo">Тунелює трафік DevGram через зашифроване з\'єднання WebSocket (WSS). Може допомогти, коли звичайне з\'єднання сповільнюють або блокують. Залиште поле домену порожнім, щоб використовувати автоматично оновлювані публічні релеї, або вкажіть власний домен для стабільності. Вимкніть, якщо з\'єднання перестало працювати.</string>
+    <string name="WebSocketTransportInfo">Тунелює трафік Telegram через зашифроване з\'єднання WebSocket (WSS). Може допомогти, коли звичайне з\'єднання сповільнюють або блокують. Залиште поле домену порожнім, щоб використовувати автоматично оновлювані публічні релеї, або вкажіть власний домен для стабільності. Публічні релеї належать третім особам і бачать вашу IP-адресу та метадані з\'єднання, але не вміст повідомлень. Вимкніть, якщо з\'єднання перестало працювати.</string>
     <string name="WebSocketDomain">Домен WebSocket</string>
     <string name="WebSocketDomainAuto">Автоматично</string>
     <string name="ForkSectionBackup">Резервна копія</string>
@@ -108,6 +108,10 @@
     <string name="RearVideoMessages">Задня камера у відеоповідомленнях</string>
     <string name="ReplaceForward">Замінити оригінальне пересилання</string>
     <string name="HideSensitiveData">Сховати чутливі дані</string>
+    <string name="HideSensitivePhone">Сховати номер телефону</string>
+    <string name="HideSensitiveUsername">Сховати ім\'я користувача</string>
+    <string name="HideSensitiveBio">Сховати «Про себе»</string>
+    <string name="HideSensitiveId">Сховати ID акаунта</string>
     <string name="SystemCamera">Використовувати системну камеру для фото</string>
     <string name="SystemCameraInfo">Тільки в діалозі прикріплень</string>
     <string name="MentionByName">Згадати користувача за іменем</string>

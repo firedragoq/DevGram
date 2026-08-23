@@ -478,7 +478,15 @@ public class ApplicationLoader extends Application {
             // «automatic switching between UnifiedPush and the background connection»).
             // Иначе решает тумблер «Keep-Alive Service»: foreground-сервис держит соединение
             // и фоновые загрузки. Старые повторяющиеся будильники в любом случае снимаем.
-            final boolean unifiedPushActive = PushListenerController.isUnifiedPushActive();
+            // 12.9.3: активность UnifiedPush определяем штатно — по наличию ack-дистрибьютора
+            // (с учётом нашего тумблера отключения UnifiedPush).
+            boolean unifiedPushActive = false;
+            if (!SharedConfig.disableUnifiedPush) {
+                try {
+                    unifiedPushActive = org.unifiedpush.android.connector.UnifiedPush.getAckDistributor(applicationContext) != null;
+                } catch (Throwable ignore) {
+                }
+            }
             cancelLegacyKeepAliveAlarms(pendingIntentFlags);
             if (unifiedPushActive) {
                 Log.d("DevGram", "UnifiedPush is active, skipping push service watchdog");
@@ -594,15 +602,15 @@ public class ApplicationLoader extends Application {
         HandlerThread thread = null;
         try {
             final NetworkRequest request = new NetworkRequest.Builder()
-                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
-                    .build();
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
+                .build();
             final ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
                 @Override
                 public void onCapabilitiesChanged(@NonNull Network network, @NonNull NetworkCapabilities networkCapabilities) {
                     constrainedNetwork = network;
                     setBandwidthConstrained(!networkCapabilities.hasCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
-                            || networkCapabilities.hasTransport(TRANSPORT_SATELLITE));
+                        || networkCapabilities.hasTransport(TRANSPORT_SATELLITE));
                 }
 
                 @Override

@@ -51,8 +51,8 @@ public final class AccountOrder {
             ids.add(UserConfig.getInstance(account).getClientUserId());
         }
         MessagesController.getGlobalMainSettings().edit()
-                .putString(KEY_ORDER, TextUtils.join(SEPARATOR, ids))
-                .apply();
+            .putString(KEY_ORDER, TextUtils.join(SEPARATOR, ids))
+            .apply();
     }
 
     private static int compareByLoginTime(int account1, int account2) {

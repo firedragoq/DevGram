@@ -38,7 +38,7 @@ object ForkOfflineTranslate {
         else -> serverMethod
     }
 
-    private val bindLock = Object()
+    private val bindLock = Any()
     @Volatile private var service: ITranslationService? = null
     private var connection: ServiceConnection? = null
     private var bindLatch: CountDownLatch? = null

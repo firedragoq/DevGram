@@ -29,7 +29,7 @@ import java.util.function.Consumer
 class AidlTranscriber(private val servicePackage: String) : OfflineTranscriber {
 
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val bindLock = Object()
+    private val bindLock = Any()
 
     @Volatile
     private var service: ITranscriptionService? = null

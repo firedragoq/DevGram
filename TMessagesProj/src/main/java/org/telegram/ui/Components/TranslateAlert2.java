@@ -665,7 +665,7 @@ public class TranslateAlert2 extends BottomSheet implements NotificationCenter.N
                 HttpURLConnection connection = null;
                 try {
                     final String rawText = Uri.decode(text);
-                    String[] results = ForkTranslate.Translate(
+                    String[] results = ForkTranslate.translate(
                             "auto",
                             toLng,
                             userAgents,

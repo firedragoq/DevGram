@@ -1079,7 +1079,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
             ImageReceiver imageReceiver = animatedEmojiDrawable != null ? animatedEmojiDrawable.getImageReceiver() : this.imageReceiver;
 
-            int r = /*isMetaballWorking && !hasStories ? roundRadiusCollapse : */roundRadiusExpand;
+            int r = AndroidUtilities.avatarShapedRadius(/*isMetaballWorking && !hasStories ? roundRadiusCollapse : */roundRadiusExpand);
             if (r > 0) {
                 clipPath.rewind();
                 AndroidUtilities.rectTmp.set(inset, inset, thisWidth - inset, thisHeight - inset);
@@ -3942,6 +3942,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         TLRPC.User user = getUserConfig().getCurrentUser();
                         if (user == null) return;
                         ItemOptions itemOptions = ItemOptions.makeOptions(this, actionsView);
+                        itemOptions.setLongPressSelectionEnabled(false);
                         itemOptions.setGravity(Gravity.LEFT);
                         itemOptions.add(R.drawable.msg_qrcode, getString(R.string.QrCode), () -> {
                             Bundle args = new Bundle();
@@ -7239,6 +7240,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
             ItemOptions.makeOptions(this, view)
                     .setScrimViewBackground(bg)
+                    .setLongPressSelectionEnabled(false)
                     .addIf(!self, R.drawable.msg_discussion, getString(R.string.SendMessage), () -> {
                         presentFragment(ChatActivity.of(user.id));
                     })
@@ -7510,6 +7512,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
             final ItemOptions o = ItemOptions.makeOptions(this, view);
             o.setScrimViewBackground(listView.getClipBackground(view));
+            o.setLongPressSelectionEnabled(false);
             if (position == phoneRow) {
                 if (userInfo != null && userInfo.phone_calls_available) {
                     o.add(R.drawable.msg_calls, getString(R.string.CallViaTelegram), () -> {
@@ -7605,6 +7608,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                 ItemOptions.makeOptions(this, view)
                     .setScrimViewBackground(listView.getClipBackground(view))
+                    .setLongPressSelectionEnabled(false)
                     .add(R.drawable.msg_copy, getString(R.string.Copy), () -> {
                         AndroidUtilities.addToClipboard(finalText);
                         if (position == bioRow) {
@@ -10777,16 +10781,24 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     setAvatarRow = rowCount++;
                     setAvatarSectionRow = rowCount++;
                 }
-                if (SharedConfig.hideSensitiveData()) {
-                    numberSectionRow = -1;
-                    numberRow = -1;
-                    setUsernameRow = -1;
-                    bioRow = -1;
-                } else {
+                final boolean hidePhone = SharedConfig.hideSensitivePhone();
+                final boolean hideUsername = SharedConfig.hideSensitiveUsername();
+                final boolean hideId = SharedConfig.hideSensitiveId();
+                final boolean hideBio = SharedConfig.hideSensitiveBio();
+                if (!hidePhone || !hideUsername || !hideId || !hideBio) {
                     numberSectionRow = rowCount++;
+                }
+                if (!hidePhone) {
                     numberRow = rowCount++;
+                }
+                if (!hideUsername) {
                     setUsernameRow = rowCount++;
-                    if (DevGramGeneralConfig.getShowIdAndDc() != 0) idRow = rowCount++;
+                }
+                // DevGram: показ ID/DC гейтится нашей настройкой showIdAndDc И апстрим-флагом hideId
+                if (!hideId && DevGramGeneralConfig.getShowIdAndDc() != 0) {
+                    idRow = rowCount++;
+                }
+                if (!hideBio) {
                     bioRow = rowCount++;
                 }
 
@@ -10873,13 +10885,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 infoStartRow = rowCount;
                 boolean hideOwnPhone = DevGramGeneralConfig.isHidePhoneNumber()
                         && user != null && user.id == getUserConfig().getClientUserId();
-                if (!hideOwnPhone && !isBot && (hasPhone || !hasInfo) && !(myProfile && SharedConfig.hideSensitiveData())) {
+                if (!hideOwnPhone && !isBot && (hasPhone || !hasInfo) && !(myProfile && SharedConfig.hideSensitivePhone())) {
                     phoneRow = rowCount++;
                 }
-                if (userInfo != null && !TextUtils.isEmpty(userInfo.about) && !(myProfile && SharedConfig.hideSensitiveData())) {
+                if (userInfo != null && !TextUtils.isEmpty(userInfo.about) && !(myProfile && SharedConfig.hideSensitiveBio())) {
                     userInfoRow = rowCount++;
                 }
-                if (user != null && username != null && !(myProfile && SharedConfig.hideSensitiveData())) {
+                if (user != null && username != null && !(myProfile && SharedConfig.hideSensitiveUsername())) {
                     usernameRow = rowCount++;
                 }
                 if (userInfo != null) {
@@ -10896,7 +10908,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         noteRow = rowCount++;
                     }
                 }
-                if (!(myProfile && SharedConfig.hideSensitiveData())) {
+                if (!(myProfile && SharedConfig.hideSensitiveId())) {
                     if (DevGramGeneralConfig.getShowIdAndDc() != 0) idRow = rowCount++;
                 }
                 if (actionsView == null && userId != getUserConfig().getClientUserId()) {
@@ -15290,6 +15302,65 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     new SearchResult(402, getString(R.string.AskAQuestion), getString(R.string.SettingsHelp), R.drawable.msg2_help, () -> f.showDialog(AlertsCreator.createSupportAlert(f, null))).withLink("tg://settings/ask-question"),
                     new SearchResult(403, getString(R.string.TelegramFAQ), getString(R.string.SettingsHelp), R.drawable.msg2_help, () -> Browser.openUrl(f.getParentActivity(), getString(R.string.TelegramFaqUrl))).withLink("tg://settings/faq"),
                     new SearchResult(404, getString(R.string.PrivacyPolicy), getString(R.string.SettingsHelp), R.drawable.msg2_help, () -> Browser.openUrl(f.getParentActivity(), getString(R.string.PrivacyPolicyUrl))).withLink("tg://settings/privacy-policy"),
+
+                    new SearchResult(1000, getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity())),
+                    new SearchResult(1001, getString(R.string.HideSensitiveData), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_SENSITIVE_DATA))),
+                    new SearchResult(1002, getString(R.string.ForceBlockScreenshots), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_FORCE_BLOCK_SCREENSHOTS))),
+                    new SearchResult(1003, getString(R.string.ShowNotificationContent), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_SHOW_NOTIFICATION_CONTENT))),
+                    new SearchResult(1004, getString(R.string.DropScreenshotCaption), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DROP_SCREENSHOT_CAPTION))),
+                    new SearchResult(1005, getString(R.string.HiddenAccounts), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDDEN_ACCOUNTS))),
+                    new SearchResult(1006, getString(R.string.HideInAppHints), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_IN_APP_HINTS))),
+                    new SearchResult(1007, getString(R.string.HideBottomButton), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_BOTTOM_BUTTON))),
+                    new SearchResult(1008, getString(R.string.EditAdminRank), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_CUSTOM_TITLE))),
+                    new SearchResult(1009, getString(R.string.AvatarShape), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_AVATAR_CORNERS))),
+                    new SearchResult(1010, getString(R.string.SyncPins), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_SYNC_PINS))),
+                    new SearchResult(1011, getString(R.string.UnmutedOnTop), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_UNMUTED_ON_TOP))),
+                    new SearchResult(1012, getString(R.string.OpenArchiveOnPull), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_OPEN_ARCHIVE_ON_PULL))),
+                    new SearchResult(1013, getString(R.string.HideStoriesInArchive), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_STORIES_IN_ARCHIVE))),
+                    new SearchResult(1014, getString(R.string.DisableThumbsInDialogList), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_THUMBS_IN_DIALOG_LIST))),
+                    new SearchResult(1015, getString(R.string.DisableGlobalSearch), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_GLOBAL_SEARCH))),
+                    new SearchResult(1016, getString(R.string.HideContactsInDialogs), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_CONTACTS_IN_DIALOGS))),
+                    new SearchResult(1017, getString(R.string.EnableLastSeenDots), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_ENABLE_LAST_SEEN_DOTS))),
+                    new SearchResult(1018, getString(R.string.ReplaceForward), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_REPLACE_FORWARD))),
+                    new SearchResult(1019, getString(R.string.MentionByName), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_MENTION_BY_NAME))),
+                    new SearchResult(1020, getString(R.string.HideSendAs), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_SEND_AS))),
+                    new SearchResult(1021, getString(R.string.DisableLinkPreviewByDefault), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_LINK_PREVIEW_BY_DEFAULT))),
+                    new SearchResult(1022, getString(R.string.AddDeleteAllUnpinnedMessages), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DELETE_ALL_UNPINNED))),
+                    new SearchResult(1023, getString(R.string.DisableSlideToNextChannel), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_SLIDE_TO_NEXT_CHANNEL))),
+                    new SearchResult(1024, getString(R.string.FormatWithSeconds), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_FORMAT_WITH_SECONDS))),
+                    new SearchResult(1025, getString(R.string.HideAiEditor), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_AI_EDITOR))),
+                    new SearchResult(1026, getString(R.string.DisableQuickReaction), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_QUICK_REACTION))),
+                    new SearchResult(1027, getString(R.string.HideMessageReactions), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_MESSAGE_REACTIONS))),
+                    new SearchResult(1028, getString(R.string.HideSavedMessagesTags), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_HIDE_SAVED_MESSAGES_TAGS))),
+                    new SearchResult(1029, getString(R.string.DisableLockedAnimatedEmoji), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_LOCKED_ANIMATED_EMOJI))),
+                    new SearchResult(1030, getString(R.string.FullRecentStickers), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_FULL_RECENT_STICKERS))),
+                    new SearchResult(1031, getString(R.string.ShowArchivedStickers), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_SHOW_ARCHIVED_STICKERS))),
+                    new SearchResult(1032, getString(R.string.StickerSize), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_STICKER_SIZE))),
+                    new SearchResult(1033, getString(R.string.InAppCamera), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_INAPP_CAMERA))),
+                    new SearchResult(1034, getString(R.string.SystemCamera), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_SYSTEM_CAMERA))),
+                    new SearchResult(1035, getString(R.string.PhotoHasSticker), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_PHOTO_HAS_STICKER))),
+                    new SearchResult(1036, getString(R.string.DisableMotionPhoto), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_MOTION_PHOTO))),
+                    new SearchResult(1037, getString(R.string.DisableFlipPhotos), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_FLIP_PHOTOS))),
+                    new SearchResult(1038, getString(R.string.RearVideoMessages), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_REAR_VIDEO_MESSAGES))),
+                    new SearchResult(1039, getString(R.string.DisablePlayVisibleVideoOnVolume), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_PLAY_VISIBLE_VIDEO_ON_VOLUME))),
+                    new SearchResult(1040, getString(R.string.DisableRecentFilesAttachment), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_RECENT_FILES_ATTACHMENT))),
+                    new SearchResult(1041, getString(R.string.VoiceMessageQuality), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_VOICE_QUALITY))),
+                    new SearchResult(1042, getString(R.string.DisableAutoplayNextVoice), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_AUTOPLAY_NEXT_VOICE))),
+                    new SearchResult(1043, getString(R.string.OfflineTranscription), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_OFFLINE_STT))),
+                    new SearchResult(1044, getString(R.string.CloudflareEnableSTT), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_CLOUDFLARE_ENABLE_STT))),
+                    new SearchResult(1045, getString(R.string.CloudflareCredentials), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_CLOUDFLARE_CREDENTIALS))),
+                    new SearchResult(1046, getString(R.string.TranslationEngine), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_TRANSLATION_PROVIDER))),
+                    new SearchResult(1047, getString(R.string.BotSkipShare), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_BOT_SKIP_SHARE))),
+                    new SearchResult(1048, getString(R.string.BotSkipFullscreen), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_BOT_SKIP_FULLSCREEN))),
+                    new SearchResult(1049, getString(R.string.DisableParametersFromBotLinks), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_PARAMETERS_FROM_BOT_LINKS))),
+                    new SearchResult(1050, getString(R.string.DisableDefaultInAppBrowser), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_DEFAULT_IN_APP_BROWSER))),
+                    new SearchResult(1051, getString(R.string.UnifiedPush), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_UNIFIED_PUSH))),
+                    new SearchResult(1057, getString(R.string.DisableUnifiedPush), "disableUnifiedPushRow", getString(R.string.NotificationsAndSounds), R.drawable.msg_notifications, () -> f.presentFragment(new NotificationsSettingsActivity().highlightUnifiedPush())),
+                    new SearchResult(1052, getString(R.string.UpdateCheckInterval), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_UPDATE_CHECK_INTERVAL))),
+                    new SearchResult(1053, getString(R.string.DisableTabletMode), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_DISABLE_TABLET_MODE))),
+                    new SearchResult(1054, getString(R.string.LockPremium), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_LOCK_PREMIUM))),
+                    new SearchResult(1055, getString(R.string.ExportSettings), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_EXPORT_SETTINGS))),
+                    new SearchResult(1056, getString(R.string.ImportSettings), getString(R.string.ForkSettingsTitle), R.drawable.menu_fork, () -> f.presentFragment(new ForkSettingsActivity().highlight(ForkSettingsActivity.ID_IMPORT_SETTINGS))),
             };
         }
 
@@ -16744,6 +16815,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private boolean editNotes(View view, int position) {
         final ItemOptions o = ItemOptions.makeOptions(this, view);
         o.setScrimViewBackground(listView.getClipBackground(view));
+        o.setLongPressSelectionEnabled(false);
         o.addIf(userInfo != null, R.drawable.msg_copy, getString(R.string.Copy), () -> {
             if (userInfo == null) return;
             final CharSequence text = MessageObject.formatTextWithEntities(userInfo.note, false);
@@ -16821,6 +16893,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         final ItemOptions itemOptions = ItemOptions.makeOptions(this, cell);
         itemOptions.setScrimViewBackground(listView.getClipBackground(cell));
+        itemOptions.setLongPressSelectionEnabled(false);
         itemOptions.setGravity(Gravity.LEFT);
 
         if (position == bizLocationRow && userFull.business_location != null) {

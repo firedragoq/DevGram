@@ -16,7 +16,7 @@
     <string name="ForkSectionBots">Bot e browser</string>
     <string name="ForkSectionSystem">Sistema e aggiornamenti</string>
     <string name="WebSocketTransport">Connessione tramite WebSocket</string>
-    <string name="WebSocketTransportInfo">Incanala il traffico di DevGram attraverso una connessione WebSocket crittografata (WSS). Può essere utile quando la connessione normale è rallentata o bloccata. Lascia vuoto il dominio per usare relay pubblici aggiornati automaticamente, oppure inserisci il tuo dominio per maggiore affidabilità. Disattiva se la connessione smette di funzionare.</string>
+    <string name="WebSocketTransportInfo">Incanala il traffico di Telegram attraverso una connessione WebSocket crittografata (WSS). Può essere utile quando la connessione normale è rallentata o bloccata. Lascia vuoto il dominio per usare relay pubblici aggiornati automaticamente, oppure inserisci il tuo dominio per maggiore affidabilità. I relay pubblici sono gestiti da terze parti e possono vedere il tuo indirizzo IP e i metadati della connessione, ma non il contenuto dei tuoi messaggi. Disattiva se la connessione smette di funzionare.</string>
     <string name="WebSocketDomain">Dominio WebSocket</string>
     <string name="WebSocketDomainAuto">Automatico</string>
     <string name="ForkSectionBackup">Backup</string>
@@ -108,6 +108,10 @@
     <string name="RearVideoMessages">Fotocamera posteriore nei messaggi video</string>
     <string name="ReplaceForward">Sostituisci l\'inoltro originale</string>
     <string name="HideSensitiveData">Nascondi dati sensibili</string>
+    <string name="HideSensitivePhone">Nascondi numero di telefono</string>
+    <string name="HideSensitiveUsername">Nascondi nome utente</string>
+    <string name="HideSensitiveBio">Nascondi biografia</string>
+    <string name="HideSensitiveId">Nascondi ID account</string>
     <string name="SystemCamera">Usa la fotocamera di sistema per le foto</string>
     <string name="SystemCameraInfo">Solo nel dialogo degli allegati</string>
     <string name="MentionByName">Menziona utente per nome</string>

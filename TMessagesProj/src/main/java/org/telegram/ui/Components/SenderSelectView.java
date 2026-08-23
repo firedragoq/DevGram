@@ -78,6 +78,7 @@ public class SenderSelectView extends View {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(MeasureSpec.makeMeasureSpec(getLayoutParams().width, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(getLayoutParams().height, MeasureSpec.EXACTLY));
         avatarImage.setImageCoords(0, 0, getMeasuredWidth(), getMeasuredHeight());
+        avatarImage.setRoundRadius(Math.min(getMeasuredWidth(), getMeasuredHeight()) / 2);
     }
 
     @Override

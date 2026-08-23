@@ -16,7 +16,7 @@
     <string name="ForkSectionBots">Bots und Browser</string>
     <string name="ForkSectionSystem">System und Updates</string>
     <string name="WebSocketTransport">Verbindung über WebSocket</string>
-    <string name="WebSocketTransportInfo">Leitet den DevGram-Datenverkehr über eine verschlüsselte WebSocket-Verbindung (WSS). Kann helfen, wenn die normale Verbindung gedrosselt oder blockiert wird. Lass das Domain-Feld leer, um automatisch aktualisierte öffentliche Relays zu verwenden, oder gib deine eigene Domain für mehr Zuverlässigkeit ein. Deaktivieren, wenn die Verbindung nicht mehr funktioniert.</string>
+    <string name="WebSocketTransportInfo">Leitet den Telegram-Datenverkehr über eine verschlüsselte WebSocket-Verbindung (WSS). Kann helfen, wenn die normale Verbindung gedrosselt oder blockiert wird. Lass das Domain-Feld leer, um automatisch aktualisierte öffentliche Relays zu verwenden, oder gib deine eigene Domain für mehr Zuverlässigkeit ein. Öffentliche Relays werden von Dritten betrieben und sehen deine IP-Adresse und Verbindungs-Metadaten, aber nicht den Inhalt deiner Nachrichten. Deaktivieren, wenn die Verbindung nicht mehr funktioniert.</string>
     <string name="WebSocketDomain">WebSocket-Domain</string>
     <string name="WebSocketDomainAuto">Automatisch</string>
     <string name="ForkSectionBackup">Sicherung</string>
@@ -108,6 +108,10 @@
     <string name="RearVideoMessages">Rückkamera in Video-Nachrichten</string>
     <string name="ReplaceForward">Ursprüngliche Weiterleitung ersetzen</string>
     <string name="HideSensitiveData">Empfindliche Daten ausblenden</string>
+    <string name="HideSensitivePhone">Telefonnummer ausblenden</string>
+    <string name="HideSensitiveUsername">Benutzernamen ausblenden</string>
+    <string name="HideSensitiveBio">Bio ausblenden</string>
+    <string name="HideSensitiveId">Konto-ID ausblenden</string>
     <string name="SystemCamera">Systemkamera für Fotos verwenden</string>
     <string name="SystemCameraInfo">Nur im Anhangs-Dialog</string>
     <string name="MentionByName">Benutzer beim Namen erwähnen</string>

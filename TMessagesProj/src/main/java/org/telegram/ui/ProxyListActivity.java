@@ -641,12 +641,16 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
 
     private void showWebSocketDomainDialog() {
         SharedPreferences preferences = MessagesController.getGlobalMainSettings();
-        org.telegram.messenger.forkgram.ForkDialogs.CreateFieldAlert(getParentActivity(), getString(R.string.WebSocketDomain), preferences.getString("webSocketDomain", ""), (result) -> {
-            result = result.trim();
-            preferences.edit().putString("webSocketDomain", result).commit();
+        org.telegram.messenger.forkgram.ForkDialogs.createFieldAlert(getParentActivity(), getString(R.string.WebSocketDomain), preferences.getString("webSocketDomain", ""), (result) -> {
+            String domain = ConnectionsManager.normalizeWebSocketDomain(result);
+            if (domain.isEmpty() && !result.trim().isEmpty()) {
+                org.telegram.ui.Components.BulletinFactory.of(this).createErrorBulletin(getString(R.string.InvalidFormatError)).show();
+                return null;
+            }
+            preferences.edit().putString("webSocketDomain", domain).commit();
             updateRows(true);
             if (preferences.getBoolean("webSocketTransport", false)) {
-                ConnectionsManager.setWebSocketEnabled(true, result);
+                ConnectionsManager.setWebSocketEnabled(true, domain);
             }
             return null;
         });

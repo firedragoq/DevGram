@@ -16,7 +16,7 @@
     <string name="ForkSectionBots">Bots en browser</string>
     <string name="ForkSectionSystem">Systeem en updates</string>
     <string name="WebSocketTransport">Verbinden via WebSocket</string>
-    <string name="WebSocketTransportInfo">Tunnelt DevGram-verkeer via een versleutelde WebSocket-verbinding (WSS). Kan helpen wanneer de normale verbinding wordt vertraagd of geblokkeerd. Laat het domeinveld leeg om automatisch bijgewerkte openbare relays te gebruiken, of voer je eigen domein in voor meer betrouwbaarheid. Schakel uit als de verbinding niet meer werkt.</string>
+    <string name="WebSocketTransportInfo">Tunnelt Telegram-verkeer via een versleutelde WebSocket-verbinding (WSS). Kan helpen wanneer de normale verbinding wordt vertraagd of geblokkeerd. Laat het domeinveld leeg om automatisch bijgewerkte openbare relays te gebruiken, of voer je eigen domein in voor meer betrouwbaarheid. Openbare relays worden beheerd door derden en kunnen je IP-adres en verbindingsmetadata zien, maar niet de inhoud van je berichten. Schakel uit als de verbinding niet meer werkt.</string>
     <string name="WebSocketDomain">WebSocket-domein</string>
     <string name="WebSocketDomainAuto">Automatisch</string>
     <string name="ForkSectionBackup">Back-up</string>
@@ -108,6 +108,10 @@
     <string name="RearVideoMessages">Achtercamera in video-berichten</string>
     <string name="ReplaceForward">Originele doorstuur vervangen</string>
     <string name="HideSensitiveData">Gevoelige gegevens verbergen</string>
+    <string name="HideSensitivePhone">Telefoonnummer verbergen</string>
+    <string name="HideSensitiveUsername">Gebruikersnaam verbergen</string>
+    <string name="HideSensitiveBio">Bio verbergen</string>
+    <string name="HideSensitiveId">Account-ID verbergen</string>
     <string name="SystemCamera">Systeemcamera gebruiken voor foto</string>
     <string name="SystemCameraInfo">Alleen in het bijlagen dialoog</string>
     <string name="MentionByName">Gebruiker bij naam noemen</string>

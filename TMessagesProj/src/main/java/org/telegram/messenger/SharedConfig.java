@@ -148,19 +148,19 @@ public class SharedConfig {
                 .apply();
     }
 
-    public static void setUnifiedPushGateway(String value) {
-        unifiedPushGateway = value;
-        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
-                .edit()
-                .putString("unifiedPushGateway", unifiedPushGateway)
-                .apply();
-    }
-
     public static void toggleDisableUnifiedPush() {
         disableUnifiedPush = !disableUnifiedPush;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
                 .edit()
                 .putBoolean("disableUnifiedPush", disableUnifiedPush)
+                .apply();
+    }
+
+    public static void setUnifiedPushGateway(String value) {
+        unifiedPushGateway = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putString("unifiedPushGateway", unifiedPushGateway)
                 .apply();
     }
 
@@ -1828,6 +1828,26 @@ public class SharedConfig {
             return true;
         }
         return MessagesController.getGlobalMainSettings().getBoolean("hideSensitiveData", false);
+    }
+
+    public static boolean hideSensitivePhone() {
+        return hideSensitiveData() && hideSensitivePart("hideSensitivePhone");
+    }
+
+    public static boolean hideSensitiveUsername() {
+        return hideSensitiveData() && hideSensitivePart("hideSensitiveUsername");
+    }
+
+    public static boolean hideSensitiveBio() {
+        return hideSensitiveData() && hideSensitivePart("hideSensitiveBio");
+    }
+
+    public static boolean hideSensitiveId() {
+        return hideSensitiveData() && hideSensitivePart("hideSensitiveId");
+    }
+
+    private static boolean hideSensitivePart(String key) {
+        return MessagesController.getGlobalMainSettings().getBoolean(key, true);
     }
 
     public static boolean isUserOwner() {

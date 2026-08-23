@@ -16,7 +16,7 @@
     <string name="ForkSectionBots">Bots e navegador</string>
     <string name="ForkSectionSystem">Sistema e atualizações</string>
     <string name="WebSocketTransport">Conectar via WebSocket</string>
-    <string name="WebSocketTransportInfo">Encaminha o tráfego do DevGram por uma conexão WebSocket criptografada (WSS). Pode ajudar quando a conexão normal está limitada ou bloqueada. Deixe o domínio vazio para usar retransmissores públicos atualizados automaticamente, ou insira seu próprio domínio para mais confiabilidade. Desative se a conexão parar de funcionar.</string>
+    <string name="WebSocketTransportInfo">Encaminha o tráfego do Telegram por uma conexão WebSocket criptografada (WSS). Pode ajudar quando a conexão normal está limitada ou bloqueada. Deixe o domínio vazio para usar retransmissores públicos atualizados automaticamente, ou insira seu próprio domínio para mais confiabilidade. Os retransmissores públicos são operados por terceiros e podem ver seu endereço IP e os metadados da conexão, mas não o conteúdo das suas mensagens. Desative se a conexão parar de funcionar.</string>
     <string name="WebSocketDomain">Domínio WebSocket</string>
     <string name="WebSocketDomainAuto">Automático</string>
     <string name="ForkSectionBackup">Backup</string>
@@ -108,6 +108,10 @@
     <string name="RearVideoMessages">Câmera traseira em mensagens de vídeo</string>
     <string name="ReplaceForward">Substituir encaminhamento original</string>
     <string name="HideSensitiveData">Ocultar dados sensíveis</string>
+    <string name="HideSensitivePhone">Ocultar número de telefone</string>
+    <string name="HideSensitiveUsername">Ocultar nome de usuário</string>
+    <string name="HideSensitiveBio">Ocultar biografia</string>
+    <string name="HideSensitiveId">Ocultar ID da conta</string>
     <string name="SystemCamera">Usar câmera do sistema para fotos</string>
     <string name="SystemCameraInfo">Apenas no diálogo de anexos</string>
     <string name="MentionByName">Mencionar usuário pelo nome</string>

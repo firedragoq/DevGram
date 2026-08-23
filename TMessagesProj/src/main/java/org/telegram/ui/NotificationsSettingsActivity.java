@@ -27,7 +27,6 @@ import android.text.TextUtils;
 import android.util.LongSparseArray;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -55,6 +54,7 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
+import org.telegram.messenger.forkgram.ForkDialogs;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
@@ -181,7 +181,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
     private boolean highlightUnifiedPush;
 
     public NotificationsSettingsActivity highlightUnifiedPush() {
-        highlightUnifiedPush = true;
+        this.highlightUnifiedPush = true;
         return this;
     }
 
@@ -887,16 +887,12 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                 dialogRef.set(dialog);
                 showDialog(dialog);
             } else if (position == unifiedPushGatewayRow) {
-                final EditText input = new EditText(getParentActivity());
-                input.setText(SharedConfig.unifiedPushGateway);
-                input.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-                input.setHintTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-                Dialog dialog = new AlertDialog.Builder(getParentActivity())
-                        .setTitle(LocaleController.getString("UnifiedPushGateway", R.string.UnifiedPushGateway))
-                        .setMessage(LocaleController.getString("UnifiedPushGatewayInfo", R.string.UnifiedPushGatewayInfo))
-                        .setView(input)
-                        .setPositiveButton(LocaleController.getString("OK", R.string.OK), (di, w) -> {
-                            String value = String.valueOf(input.getText());
+                ForkDialogs.createFieldAlert(
+                        getParentActivity(),
+                        LocaleController.getString(R.string.UnifiedPushGateway),
+                        SharedConfig.unifiedPushGateway,
+                        (result) -> {
+                            String value = result;
                             if (!value.isEmpty() && !value.endsWith("/")) {
                                 value += "/";
                             }
@@ -905,9 +901,9 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                             ApplicationLoader.startPushService();
                             updateUnifiedPushGateway = true;
                             adapter.notifyItemChanged(position);
-                        }).setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null)
-                        .create();
-                showDialog(dialog);
+                            return null;
+                        },
+                        LocaleController.getString(R.string.UnifiedPushGatewayInfo));
             }
             if (view instanceof TextCheckCell) {
                 ((TextCheckCell) view).setChecked(!enabled);

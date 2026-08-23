@@ -470,7 +470,12 @@ public class UserInfoActivity extends UniversalFragment implements NotificationC
 
     @Override
     protected void onClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == BUTTON_ADD_ACCOUNT) {
+        if (item.instanceOf(SettingsActivity.AccountCell.Factory.class)) {
+            final int account = item.intValue;
+            if (LaunchActivity.instance != null) {
+                LaunchActivity.instance.switchToAccount(account, true);
+            }
+        } else if (item.id == BUTTON_ADD_ACCOUNT) {
             int freeAccounts = 0;
             Integer availableAccount = null;
             for (int a = UserConfig.MAX_ACCOUNT_COUNT - 1; a >= 0; a--) {
@@ -488,11 +493,6 @@ public class UserInfoActivity extends UniversalFragment implements NotificationC
                 presentFragment(new LoginActivity(availableAccount));
             } else if (!UserConfig.hasPremiumOnAccounts()) {
                 showDialog(new LimitReachedBottomSheet(this, getContext(), TYPE_ACCOUNTS, currentAccount, null));
-            }
-        } else if (item.instanceOf(SettingsActivity.AccountCell.Factory.class)) {
-            final int account = item.intValue;
-            if (LaunchActivity.instance != null) {
-                LaunchActivity.instance.switchToAccount(account, true);
             }
         } else if (item.id == BUTTON_BIRTHDAY || item.id == INFO_BIRTHDAY) {
             showDialog(AlertsCreator.createBirthdayPickerDialog(

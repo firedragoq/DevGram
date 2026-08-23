@@ -686,6 +686,13 @@ public class ConnectionsManager extends BaseController {
                 refreshWebSocketDomains(false);
             }
         }
+        if (preferences.getBoolean("webSocketTransport", false)) {
+            String wsDomain = preferences.getString("webSocketDomain", "").trim();
+            native_setWebSocketConfig(currentAccount, true, wsDomain, TextUtils.isEmpty(wsDomain) ? buildWebSocketPool() : "");
+            if (TextUtils.isEmpty(wsDomain)) {
+                refreshWebSocketDomains(false);
+            }
+        }
         String installer = "";
         try {
             Context context = ApplicationLoader.applicationContext;
@@ -961,6 +968,9 @@ public class ConnectionsManager extends BaseController {
     }
 
     public static void getHostByName(String hostName, long address) {
+        if (resolveWebSocketHostAsync(hostName, address)) {
+            return;
+        }
         AndroidUtilities.runOnUIThread(() -> {
             ResolvedDomain resolvedDomain = dnsCache.get(hostName);
             if (resolvedDomain != null && SystemClock.elapsedRealtime() - resolvedDomain.ttl < 5 * 60 * 1000) {
@@ -1046,12 +1056,45 @@ public class ConnectionsManager extends BaseController {
         "https://raw.githack.com/Flowseal/tg-ws-proxy/main/.github/cfproxy-domains.txt"
     };
     private static final long WEBSOCKET_DOMAINS_TTL = 12L * 60L * 60L * 1000L;
+    private static final long WEBSOCKET_DOMAINS_RETRY = 30L * 60L * 1000L;
+    private static final int WEBSOCKET_DOMAINS_MAX_SIZE = 64 * 1024;
+    private static final long WEBSOCKET_DOMAINS_DEADLINE = 20L * 1000L;
     private static final String[] WEBSOCKET_FALLBACK_DOMAINS = {
         "virkgj.com", "vmmzovy.com", "mkuosckvso.com", "zaewayzmplad.com", "twdmbzcm.com",
         "awzwsldi.com", "clngqrflngqin.com", "tjacxbqtj.com", "bxaxtxmrw.com", "dmohrsgmohcrwb.com",
         "vwbmtmoi.com", "khgrre.com", "ulihssf.com", "tmhqsdqmfpmk.com", "xwuwoqbm.com"
     };
     private static volatile boolean webSocketDomainsRefreshing = false;
+
+    public static String normalizeWebSocketDomain(String value) {
+        if (value == null) {
+            return "";
+        }
+        String domain = value.trim().toLowerCase();
+        int schemeEnd = domain.indexOf("://");
+        if (schemeEnd >= 0) {
+            domain = domain.substring(schemeEnd + 3);
+        }
+        int slash = domain.indexOf('/');
+        if (slash >= 0) {
+            domain = domain.substring(0, slash);
+        }
+        if (domain.isEmpty() || domain.length() > 253 || domain.indexOf('.') < 0) {
+            return "";
+        }
+        for (String label : domain.split("\\.", -1)) {
+            if (label.isEmpty() || label.length() > 63 || label.startsWith("-") || label.endsWith("-")) {
+                return "";
+            }
+            for (int a = 0; a < label.length(); a++) {
+                char c = label.charAt(a);
+                if (!(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-')) {
+                    return "";
+                }
+            }
+        }
+        return domain;
+    }
 
     public static void setWebSocketEnabled(boolean enabled, String domain) {
         if (domain == null) {
@@ -1142,13 +1185,20 @@ public class ConnectionsManager extends BaseController {
         if (!force && haveCache && System.currentTimeMillis() - prefs.getLong("webSocketDomainsCacheTime", 0) < WEBSOCKET_DOMAINS_TTL) {
             return;
         }
+        if (!force && System.currentTimeMillis() - prefs.getLong("webSocketDomainsFailTime", 0) < WEBSOCKET_DOMAINS_RETRY) {
+            return;
+        }
         if (webSocketDomainsRefreshing) {
             return;
         }
         webSocketDomainsRefreshing = true;
-        Utilities.globalQueue.postRunnable(() -> {
+        Utilities.externalNetworkQueue.postRunnable(() -> {
             String valid = null;
+            long deadline = System.currentTimeMillis() + WEBSOCKET_DOMAINS_DEADLINE;
             for (String url : WEBSOCKET_DOMAINS_URLS) {
+                if (System.currentTimeMillis() > deadline) {
+                    break;
+                }
                 String body = fetchWebSocketDomains(url);
                 if (body == null) {
                     continue;
@@ -1161,35 +1211,173 @@ public class ConnectionsManager extends BaseController {
             }
             webSocketDomainsRefreshing = false;
             if (valid == null) {
+                MessagesController.getGlobalMainSettings().edit().putLong("webSocketDomainsFailTime", System.currentTimeMillis()).commit();
                 return;
             }
             SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
             editor.putString("webSocketDomainsCache", valid);
             editor.putLong("webSocketDomainsCacheTime", System.currentTimeMillis());
+            editor.remove("webSocketDomainsFailTime");
             editor.commit();
             AndroidUtilities.runOnUIThread(ConnectionsManager::pushWebSocketPool);
         });
     }
 
     private static String fetchWebSocketDomains(String url) {
+        InputStream is = null;
         try {
             URLConnection conn = new URL(url).openConnection();
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(8000);
             conn.setRequestProperty("User-Agent", "Mozilla/5.0");
-            InputStream is = conn.getInputStream();
+            is = conn.getInputStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buf = new byte[4096];
             int r;
             while ((r = is.read(buf)) != -1) {
+                if (bos.size() + r > WEBSOCKET_DOMAINS_MAX_SIZE) {
+                    return null;
+                }
                 bos.write(buf, 0, r);
             }
-            is.close();
             return new String(bos.toByteArray(), "UTF-8");
         } catch (Throwable e) {
             FileLog.e(e);
             return null;
+        } finally {
+            try {
+                if (is != null) {
+                    is.close();
+                }
+            } catch (Throwable ignore) {
+            }
         }
+    }
+
+    private static boolean isWebSocketHostName(String hostName) {
+        return hostName != null && hostName.startsWith("kws") && hostName.indexOf('.') > 3;
+    }
+
+    private static final HashMap<String, ResolvedDomain> webSocketDnsCache = new HashMap<>();
+    private static final HashMap<String, ArrayList<Long>> webSocketDnsWaiting = new HashMap<>();
+
+    private static boolean resolveWebSocketHostAsync(String hostName, long address) {
+        if (!isWebSocketHostName(hostName)) {
+            return false;
+        }
+        String cachedAddress = null;
+        boolean startResolve = false;
+        synchronized (webSocketDnsCache) {
+            ResolvedDomain cached = webSocketDnsCache.get(hostName);
+            if (cached != null && SystemClock.elapsedRealtime() - cached.ttl < 5 * 60 * 1000) {
+                cachedAddress = cached.getAddress();
+            } else {
+                ArrayList<Long> waiting = webSocketDnsWaiting.get(hostName);
+                if (waiting == null) {
+                    waiting = new ArrayList<>();
+                    webSocketDnsWaiting.put(hostName, waiting);
+                    startResolve = true;
+                }
+                if (!waiting.contains(address)) {
+                    waiting.add(address);
+                }
+            }
+        }
+        if (cachedAddress != null) {
+            native_onHostNameResolved(hostName, address, cachedAddress);
+            return true;
+        }
+        if (startResolve) {
+            DNS_THREAD_POOL_EXECUTOR.execute(() -> {
+                ResolvedDomain resolved = resolveWithSystemDns(hostName);
+                if (resolved == null) {
+                    resolved = resolveWebSocketHostWithRemoteDns(hostName);
+                }
+                ArrayList<Long> waiting;
+                synchronized (webSocketDnsCache) {
+                    if (resolved != null) {
+                        webSocketDnsCache.put(hostName, resolved);
+                    }
+                    waiting = webSocketDnsWaiting.remove(hostName);
+                }
+                if (waiting != null) {
+                    String result = resolved != null ? resolved.getAddress() : "";
+                    for (int a = 0, N = waiting.size(); a < N; a++) {
+                        native_onHostNameResolved(hostName, waiting.get(a), result);
+                    }
+                }
+            });
+        }
+        return true;
+    }
+
+    private static ResolvedDomain resolveWebSocketHostWithRemoteDns(String hostName) {
+        InputStream stream = null;
+        try {
+            URLConnection connection = new URL("https://www.google.com/resolve?name=" + hostName + "&type=A").openConnection();
+            connection.addRequestProperty("User-Agent", "Mozilla/5.0");
+            connection.addRequestProperty("Host", "dns.google.com");
+            connection.setConnectTimeout(1000);
+            connection.setReadTimeout(2000);
+            stream = connection.getInputStream();
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = stream.read(buffer)) > 0) {
+                if (body.size() + read > 32 * 1024) {
+                    return null;
+                }
+                body.write(buffer, 0, read);
+            }
+            JSONObject json = new JSONObject(new String(body.toByteArray(), "UTF-8"));
+            if (!json.has("Answer")) {
+                return null;
+            }
+            JSONArray answer = json.getJSONArray("Answer");
+            ArrayList<String> addresses = new ArrayList<>(answer.length());
+            for (int a = 0, N = answer.length(); a < N; a++) {
+                JSONObject record = answer.getJSONObject(a);
+                if (record.optInt("type", 0) == 1) {
+                    addresses.add(record.getString("data"));
+                }
+            }
+            if (!addresses.isEmpty()) {
+                return new ResolvedDomain(addresses, SystemClock.elapsedRealtime());
+            }
+        } catch (Throwable e) {
+            FileLog.e(e, false);
+        } finally {
+            try {
+                if (stream != null) {
+                    stream.close();
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+        return null;
+    }
+
+    private static ResolvedDomain resolveWithSystemDns(String hostName) {
+        try {
+            InetAddress[] resolved = InetAddress.getAllByName(hostName);
+            ArrayList<String> addresses = new ArrayList<>(resolved.length);
+            ArrayList<String> addressesIpv6 = new ArrayList<>(resolved.length);
+            for (InetAddress address : resolved) {
+                if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress() || address.isSiteLocalAddress() || address.isMulticastAddress()) {
+                    continue;
+                }
+                (address instanceof Inet6Address ? addressesIpv6 : addresses).add(address.getHostAddress());
+            }
+            if (addresses.isEmpty()) {
+                addresses = addressesIpv6;
+            }
+            if (!addresses.isEmpty()) {
+                return new ResolvedDomain(addresses, SystemClock.elapsedRealtime());
+            }
+        } catch (Throwable e) {
+            FileLog.e(e, false);
+        }
+        return null;
     }
 
     private static String parseWebSocketDomains(String body) {

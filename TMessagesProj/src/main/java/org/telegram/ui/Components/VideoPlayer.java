@@ -1088,8 +1088,8 @@ public class VideoPlayer implements Player.Listener, VideoListener, AnalyticsLis
                 final MediaCodecInfo info = MediaCodecList.getCodecInfoAt(i);
                 if (info.isEncoder()) continue;
                 final String[] supportedTypes = info.getSupportedTypes();
-                for (String supportedType : supportedTypes) {
-                    if (supportedType.equalsIgnoreCase(mime)) {
+                for (int j = 0; j < supportedTypes.length; ++j) {
+                    if (supportedTypes[j].equalsIgnoreCase(mime)) {
                         cachedSupportedAnyCodec.put(mime, true);
                         return true;
                     }

@@ -1862,7 +1862,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
                     TLRPC.TL_forumTopic keyTopic = selectedDialogTopics.get(selectedDialogs.valueAt(a));
    
                     if (!info.replyTo) {
-                        info.replyTo = (AsCopy.TakeReplyToDraft(key, keyTopic, account, false) != 0);
+                        info.replyTo = (AsCopy.takeReplyToDraft(key, keyTopic, account, false) != 0);
                     }
    
                     final boolean hasComment = (frameLayout2.getTag() != null
@@ -1900,12 +1900,12 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
                     if (groupAnyItems) {
                         boolean isMonoForum = MessagesController.getInstance(account).isMonoForum(key);
                         long monoForumPeerId = keyTopic != null && isMonoForum ? DialogObject.getPeerDialogId(keyTopic.from_id) : 0;
-                        TLRPC.InputReplyTo replyInput = AsCopy.TakeReplyInputToDraft(key, account);
-                        int replyId = AsCopy.TakeReplyToDraft(key, keyTopic, account, true);
+                        TLRPC.InputReplyTo replyInput = AsCopy.takeReplyInputToDraft(key, account);
+                        int replyId = AsCopy.takeReplyToDraft(key, keyTopic, account, true);
                         if (replyId == 0 && keyTopic != null && !isMonoForum) {
                             replyId = keyTopic.id;
                         }
-                        AsCopy.GroupItemsIntoAlbum(
+                        AsCopy.groupItemsIntoAlbum(
                             key,
                             replyId,
                             maybeReplaceText,
@@ -1923,7 +1923,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
                     }
                     boolean isMonoForum = MessagesController.getInstance(account).isMonoForum(key);
                     long monoForumPeerId = keyTopic != null && isMonoForum ? DialogObject.getPeerDialogId(keyTopic.from_id) : 0;
-                    AsCopy.PerformForwardFromMyName(
+                    AsCopy.performForwardFromMyName(
                         key,
                         keyTopic,
                         maybeReplaceText,
@@ -1935,7 +1935,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
                 }
                 final TLRPC.TL_forumTopic sentTopic = selectedDialogTopics.get(selectedDialogs.valueAt(0));
                 final int perDialog = sendingMessageObjects.size()
-                        + (frameLayout2.getTag() != null && commentTextView.length() > 0 ? 1 : 0);
+                    + (frameLayout2.getTag() != null && commentTextView.length() > 0 ? 1 : 0);
                 if (!deleteOriginalsThenNotify(perDialog, info, selectedDialogs.size(), sentTopic)) {
                     onSend(selectedDialogs, selectedDialogs.size(), sentTopic, info);
                 }

@@ -59,6 +59,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.collection.LongSparseArray;
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.RecyclerView;
@@ -508,6 +509,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     @Override
     public void onResume() {
         super.onResume();
+
         if (listView != null) {
             listView.adapter.update(true);
         }
@@ -570,7 +572,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     public static CharSequence spoilerIfSensitive(CharSequence text) {
-        if (!SharedConfig.hideSensitiveData() || TextUtils.isEmpty(text)) {
+        if (!SharedConfig.hideSensitivePhone() || TextUtils.isEmpty(text)) {
             return text;
         }
         final SpannableStringBuilder spannable = SpannableStringBuilder.valueOf(text);
@@ -1038,8 +1040,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
     @NonNull
     private WindowInsetsCompat onApplyWindowInsets(@NonNull View v, @NonNull WindowInsetsCompat insets) {
-        final int statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
-        navigationBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
+        final Insets systemInsets = AndroidUtilities.getDefaultWindowInsets(insets, false);
+        navigationBarHeight = systemInsets.bottom;
+        final int statusBarHeight = systemInsets.top;
         listView.setPadding(0, statusBarHeight + dp(12), 0, navigationBarHeight + additionNavigationBarHeight);
         return WindowInsetsCompat.CONSUMED;
     }
@@ -1147,6 +1150,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
             counterView.setBackground(Theme.createRoundRectDrawable(dp(10), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
             arrowView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
+            emojiStatusDrawable.setColor(Theme.getColor(Theme.key_profile_verifiedBackground, resourcesProvider));
             reorderView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_stickers_menu, resourcesProvider), PorterDuff.Mode.SRC_IN));
         }
 

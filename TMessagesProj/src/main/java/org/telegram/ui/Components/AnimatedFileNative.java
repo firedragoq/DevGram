@@ -13,6 +13,7 @@ import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AnimatedFileNative {
@@ -32,6 +33,38 @@ public class AnimatedFileNative {
             return null;
         }
         return new AnimatedFileNative(ptr, params);
+    }
+
+    public int getWidth() {
+        return mMetaData[0];
+    }
+
+    public int getHeight() {
+        return mMetaData[1];
+    }
+
+    public int getRotation() {
+        return mMetaData[2];
+    }
+
+    public int getProgress(TimeUnit timeUnit) {
+        return (int) timeUnit.convert(mMetaData[3], TimeUnit.MILLISECONDS);
+    }
+
+    public int getDuration(TimeUnit timeUnit) {
+        return (int) timeUnit.convert(mMetaData[4], TimeUnit.MILLISECONDS);
+    }
+
+    public int getFps() {
+        return mMetaData[5];
+    }
+
+    public boolean isLastFrameOpaque() {
+        return mMetaData[6] == 1;
+    }
+
+    public boolean isStaticVideoDetected() {
+        return mMetaData[7] == 1;
     }
 
     public void stopDecoder() {
@@ -158,14 +191,14 @@ public class AnimatedFileNative {
     public static void getVideoInfo(String src, int[] params, long fileOffset) {
         Trace.beginSection("AnimatedFileNative#getVideoInfo");
         try {
-            nGetVideoInfo(Build.VERSION.SDK_INT, src, params, fileOffset, getMaxAv1DecodePixels());
+            nGetVideoInfo(src, params, fileOffset, getMaxAv1DecodePixels());
         } finally {
             Trace.endSection();
         }
     }
 
     private static final String AV1_MIME = "video/av01";
-    private static final int[][] AV1_SIZES = {{3840, 2160}, {2560, 1440}, {1920, 1080}, {1280, 720}};
+    private static final int[][] AV1_SIZES = { { 3840, 2160 }, { 2560, 1440 }, { 1920, 1080 }, { 1280, 720 } };
     private static final int AV1_UNDECLARED_MAX_PIXELS = 1920 * 1080;
     private static volatile int maxAv1DecodePixels = -1;
 
@@ -258,5 +291,5 @@ public class AnimatedFileNative {
 
     private static native void nPrepareToSeek(long ptr);
 
-    private static native void nGetVideoInfo(int sdkVersion, String src, int[] params, long fileOffset, int maxAv1DecodePixels);
+    private static native void nGetVideoInfo(String src, int[] params, long fileOffset, int maxAv1DecodePixels);
 }

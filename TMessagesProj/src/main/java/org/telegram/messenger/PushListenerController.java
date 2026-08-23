@@ -4,17 +4,18 @@ import static org.telegram.messenger.LocaleController.getString;
 
 import android.os.SystemClock;
 import android.text.TextUtils;
-
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.messaging.FirebaseMessaging;
 import android.util.Base64;
 import android.util.SparseBooleanArray;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Keep;
 import androidx.collection.LongSparseArray;
+
+// DevGram: FCM через свой rewrite-шлюз (см. GooglePushListenerServiceProvider.onRequestPushToken)
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -1666,33 +1667,10 @@ public class PushListenerController {
     @Keep
     public interface IPushListenerServiceProvider {
         boolean hasServices();
-        boolean needsPushToken();
         String getLogTitle();
         void onRequestPushToken();
         @PushType
         int getPushType();
-    }
-
-    private static boolean hasUnregisteredAccount() {
-        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            UserConfig userConfig = UserConfig.getInstance(a);
-            if (userConfig.isClientActivated() && !userConfig.registeredForPush) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean isUnifiedPushActive() {
-        if (SharedConfig.disableUnifiedPush) {
-            return false;
-        }
-        try {
-            IPushListenerServiceProvider provider = ApplicationLoader.getPushProvider();
-            return provider instanceof UnifiedPushListenerServiceProvider && provider.hasServices() && !provider.needsPushToken() && UnifiedPushService.isRegistrationFresh();
-        } catch (Throwable e) {
-            return false;
-        }
     }
 
     public final static class GooglePushListenerServiceProvider implements IPushListenerServiceProvider {
@@ -1703,17 +1681,13 @@ public class PushListenerController {
         private GooglePushListenerServiceProvider() {}
 
         @Override
-        public boolean needsPushToken() {
-            return TextUtils.isEmpty(SharedConfig.pushString) || hasUnregisteredAccount();
-        }
-
-        @Override
         public String getLogTitle() {
             return "Google Play Services";
         }
 
         @Override
         public int getPushType() {
+            // DevGram: FCM-токен уходит через наш rewrite-шлюз как SIMPLE, а не напрямую в Firebase
             return PUSH_TYPE_SIMPLE;
         }
 
@@ -1758,6 +1732,7 @@ public class PushListenerController {
 
         @Override
         public boolean hasServices() {
+        	return false;/*
             if (hasServices == null) {
                 try {
                     int resultCode = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ApplicationLoader.applicationContext);
@@ -1767,7 +1742,7 @@ public class PushListenerController {
                     hasServices = false;
                 }
             }
-            return hasServices;
+            return hasServices;*/
         }
     }
     public final static class UnifiedPushListenerServiceProvider implements IPushListenerServiceProvider {
@@ -1779,21 +1754,6 @@ public class PushListenerController {
         @Override
         public boolean hasServices() {
             return !UnifiedPush.getDistributors(ApplicationLoader.applicationContext).isEmpty();
-        }
-
-        @Override
-        public boolean needsPushToken() {
-            if (SharedConfig.disableUnifiedPush) {
-                return false;
-            }
-            try {
-                if (UnifiedPush.getAckDistributor(ApplicationLoader.applicationContext) == null) {
-                    return true;
-                }
-            } catch (Throwable e) {
-                return true;
-            }
-            return TextUtils.isEmpty(SharedConfig.pushString) || hasUnregisteredAccount();
         }
 
         @Override
@@ -1833,9 +1793,8 @@ public class PushListenerController {
                         UnifiedPush.register(
                                 ApplicationLoader.applicationContext,
                                 "default",
-                                "DevGram Simple Push",
+                                "Telegram Simple Push",
                                 null);
-                        UnifiedPushService.awaitRegistrationAnswer();
                     } catch (Throwable e) {
                         FileLog.e(e);
                     }

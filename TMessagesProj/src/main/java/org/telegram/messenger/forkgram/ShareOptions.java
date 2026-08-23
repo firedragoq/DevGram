@@ -114,7 +114,7 @@ public class ShareOptions {
         private int pending;
 
         private SentWatcher(ArrayList<Long> targetDialogIds, int pending, IntConsumer onDeleted) {
-            dialogIds.addAll(targetDialogIds);
+            this.dialogIds.addAll(targetDialogIds);
             this.pending = pending;
             this.onDeleted = onDeleted;
         }
@@ -187,8 +187,8 @@ public class ShareOptions {
         for (int a = 0; a < groups.size(); a++) {
             final long dialogId = groups.keyAt(a);
             final TLRPC.EncryptedChat encryptedChat = DialogObject.isEncryptedDialog(dialogId)
-                    ? controller.getEncryptedChat(DialogObject.getEncryptedChatId(dialogId))
-                    : null;
+                ? controller.getEncryptedChat(DialogObject.getEncryptedChatId(dialogId))
+                : null;
             final ArrayList<Integer> ids = new ArrayList<>();
             ArrayList<Long> randomIds = null;
             for (MessageObject message : groups.valueAt(a)) {
@@ -206,7 +206,7 @@ public class ShareOptions {
 
     private boolean canDelete(MessageObject message) {
         return message != null
-                && message.canDeleteMessage(chatMode == ChatActivity.MODE_SCHEDULED, chatOf(message));
+            && message.canDeleteMessage(chatMode == ChatActivity.MODE_SCHEDULED, chatOf(message));
     }
 
     private boolean canRevoke(MessageObject message) {
@@ -236,7 +236,7 @@ public class ShareOptions {
     private TLRPC.Chat chatOf(MessageObject message) {
         final long dialogId = message.getDialogId();
         return DialogObject.isChatDialog(dialogId)
-                ? MessagesController.getInstance(currentAccount).getChat(-dialogId)
-                : null;
+            ? MessagesController.getInstance(currentAccount).getChat(-dialogId)
+            : null;
     }
 }
