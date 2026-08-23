@@ -392,32 +392,32 @@ if customRunCommand:
         finish(1)
     finish(0)
 
-stage('dav1d', """
-    git submodule init && git submodule update
-    cd dav1d && git reset --hard HEAD && cd ..
-    export NDK={ndk}
-    export NINJA_PATH=`which ninja`
-    ./build_dav1d_clang.sh {archesStr}
-    echo "Built archs: {archesStr}"
-""".format(ndk=ndkPath,archesStr=' '.join(arches)))
-
-stage('libvpx', """
-    git submodule init && git submodule update
-    cd libvpx && git reset --hard HEAD && cd ..
-    export NDK={ndk}
-    export NINJA_PATH=`which ninja`
-    ./build_libvpx_clang.sh {archesStr}
-    echo "Built archs: {archesStr}"
-""".format(ndk=ndkPath,archesStr=' '.join(arches)))
+abiByArch = {
+    'arm': 'armeabi-v7a',
+    'arm64': 'arm64-v8a',
+    'x86': 'x86',
+    'x86_64': 'x86_64',
+}
+abis = [abiByArch[arch] for arch in arches]
 
 stage('ffmpeg', """
     git submodule init && git submodule update
-    cd ffmpeg && git reset --hard HEAD && cd ..
-    export NDK={ndk}
-    ./build_ffmpeg_clang.sh {archesStr}
-    ./patch_ffmpeg.sh
+    git checkout -- ffmpeg
+    export ANDROID_NDK_HOME={ndk}
+    export ABIS="{abisStr}"
+    ./ffmpeg/build_opus.sh
+    ./ffmpeg/build_ffmpeg_libvpx_dav1d_android_ndk27_merged.sh
+    echo "Built archs: {abisStr}"
+""".format(ndk=ndkPath,abisStr=' '.join(abis)))
+
+stage('tlottie_lib', """
+    git submodule init && git submodule update
+    git checkout -- tlottie_lib
+    export CARGO_TARGET_DIR=`pwd`/tlottie_lib/build
+    mkdir -p tlottie_lib/arm64-v8a tlottie_lib/armeabi-v7a tlottie_lib/x86 tlottie_lib/x86_64
+    ./tlottie_lib/build.sh
     echo "Built archs: {archesStr}"
-""".format(ndk=ndkPath,archesStr=' '.join(arches)))
+""".format(archesStr=' '.join(arches)))
 
 stage('boringssl', """
     git submodule init && git submodule update
