@@ -60,7 +60,22 @@ public class DevGramWeatherCitySheet extends BottomSheet {
         title.setPadding(AndroidUtilities.dp(22), AndroidUtilities.dp(16), AndroidUtilities.dp(22), 0);
         container.addView(title, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
 
-        editText = new EditText(context);
+        // Клавиатура надёжно открывается по тапу (в т.ч. повторному после скрытия) —
+        // приём из SelectChatUserSheet: на ACTION_DOWN пробуем showKeyboard, если система
+        // проигнорировала (SHOW_IMPLICIT капризен в BottomSheet) — сбрасываем и берём фокус заново.
+        editText = new EditText(context) {
+            @Override
+            public boolean onTouchEvent(android.view.MotionEvent event) {
+                if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                    if (!AndroidUtilities.showKeyboard(this)) {
+                        clearFocus();
+                        requestFocus();
+                        AndroidUtilities.showKeyboard(this);
+                    }
+                }
+                return super.onTouchEvent(event);
+            }
+        };
         editText.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
         editText.setHintTextColor(getThemedColor(Theme.key_dialogTextHint));
         editText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
@@ -70,11 +85,6 @@ public class DevGramWeatherCitySheet extends BottomSheet {
         editText.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(12), AndroidUtilities.dp(14), AndroidUtilities.dp(12));
         editText.setSingleLine(true);
         editText.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        // Клавиатура при любом тапе по полю (в т.ч. повторном после скрытия).
-        editText.setOnClickListener(v -> AndroidUtilities.showKeyboard(editText));
-        editText.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) AndroidUtilities.showKeyboard(editText);
-        });
         container.addView(editText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
                 Gravity.TOP, 16, 52, 16, 0));
 
