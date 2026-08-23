@@ -2,6 +2,7 @@ package org.telegram.ui;
 
 import android.content.Context;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -39,6 +40,7 @@ public class DevGramWeatherCitySheet extends BottomSheet {
     private final List<Weather.CityResult> results = new ArrayList<>();
     private final Adapter adapter;
     private final TextView hintView;
+    private EditText editText;
     private String lastQuery = "";
     private final Runnable searchRunnable;
 
@@ -58,7 +60,7 @@ public class DevGramWeatherCitySheet extends BottomSheet {
         title.setPadding(AndroidUtilities.dp(22), AndroidUtilities.dp(16), AndroidUtilities.dp(22), 0);
         container.addView(title, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
 
-        EditText editText = new EditText(context);
+        editText = new EditText(context);
         editText.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
         editText.setHintTextColor(getThemedColor(Theme.key_dialogTextHint));
         editText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
@@ -68,6 +70,11 @@ public class DevGramWeatherCitySheet extends BottomSheet {
         editText.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(12), AndroidUtilities.dp(14), AndroidUtilities.dp(12));
         editText.setSingleLine(true);
         editText.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        // Клавиатура при любом тапе по полю (в т.ч. повторном после скрытия).
+        editText.setOnClickListener(v -> AndroidUtilities.showKeyboard(editText));
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) AndroidUtilities.showKeyboard(editText);
+        });
         container.addView(editText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
                 Gravity.TOP, 16, 52, 16, 0));
 
@@ -92,7 +99,7 @@ public class DevGramWeatherCitySheet extends BottomSheet {
             if (onChosen != null) onChosen.run();
             dismiss();
         });
-        container.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 360, Gravity.TOP));
+        container.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 460, Gravity.TOP));
 
         searchRunnable = () -> doSearch(lastQuery);
         editText.addTextChangedListener(new TextWatcher() {
@@ -164,17 +171,19 @@ public class DevGramWeatherCitySheet extends BottomSheet {
             titleView.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
             titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             titleView.setMaxLines(1);
+            titleView.setEllipsize(TextUtils.TruncateAt.END);
             addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
-                    Gravity.TOP, 0, 2, 0, 0));
+                    Gravity.TOP, 0, 6, 0, 0));
 
             subtitleView = new TextView(context);
             subtitleView.setTextColor(getThemedColor(Theme.key_dialogTextGray3));
             subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
             subtitleView.setMaxLines(1);
+            subtitleView.setEllipsize(TextUtils.TruncateAt.END);
             addView(subtitleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
-                    Gravity.TOP, 0, 24, 0, 0));
+                    Gravity.TOP, 0, 29, 0, 0));
 
-            setLayoutParams(new RecyclerView.LayoutParams(LayoutHelper.MATCH_PARENT, AndroidUtilities.dp(52)));
+            setLayoutParams(new RecyclerView.LayoutParams(LayoutHelper.MATCH_PARENT, AndroidUtilities.dp(60)));
         }
 
         void bind(Weather.CityResult r) {
