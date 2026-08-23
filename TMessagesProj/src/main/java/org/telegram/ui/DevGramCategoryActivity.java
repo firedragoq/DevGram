@@ -993,39 +993,20 @@ public class DevGramCategoryActivity extends BaseFragment {
         return org.telegram.messenger.LocaleController.getString(org.telegram.messenger.DevGramDisguise.current().title);
     }
 
-    // DevGram: диалог выбора маскировки (иконка + имя приложения).
+    // DevGram: красивое меню-каталог маскировок (карточки с реальными иконками приложений).
     private void showDisguiseDialog() {
         if (getParentActivity() == null) return;
-        java.util.List<LauncherIconController.LauncherIcon> masks = org.telegram.messenger.DevGramDisguise.masks();
-        LauncherIconController.LauncherIcon cur = org.telegram.messenger.DevGramDisguise.current();
-        boolean disguised = org.telegram.messenger.DevGramDisguise.isDisguised();
-        // Пункт 0 — снять маскировку; далее по одному на каждую маску. «• » помечает активную.
-        String[] titles = new String[masks.size() + 1];
-        titles[0] = (disguised ? "" : "• ") + org.telegram.messenger.LocaleController.getString(R.string.DevGramDisguiseNone);
-        for (int i = 0; i < masks.size(); i++) {
-            String name = org.telegram.messenger.LocaleController.getString(masks.get(i).title);
-            titles[i + 1] = (masks.get(i) == cur ? "• " : "") + name;
-        }
-        org.telegram.ui.ActionBar.AlertDialog.Builder b =
-                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity());
-        b.setTitle(org.telegram.messenger.LocaleController.getString(R.string.DevGramDisguise));
-        b.setItems(titles, (dialog, which) -> {
-            if (which == 0) {
-                org.telegram.messenger.DevGramDisguise.clear();
-            } else {
-                org.telegram.messenger.DevGramDisguise.apply(masks.get(which - 1));
-            }
+        DevGramDisguiseSheet sheet = new DevGramDisguiseSheet(getParentActivity(), () -> {
             refreshListImmediately();
-            String plain = which == 0
-                    ? org.telegram.messenger.LocaleController.getString(R.string.DevGramDisguiseNone)
-                    : org.telegram.messenger.LocaleController.getString(masks.get(which - 1).title);
+            boolean disguised = org.telegram.messenger.DevGramDisguise.isDisguised();
             org.telegram.ui.Components.BulletinFactory.of(this)
                     .createSimpleBulletin(R.raw.done,
-                            which == 0 ? "Маскировка снята" : "Приложение замаскировано под «" + plain + "»")
+                            disguised
+                                    ? "Приложение замаскировано под «" + disguiseCurrentTitle() + "»"
+                                    : "Маскировка снята")
                     .show();
         });
-        b.setNegativeButton(org.telegram.messenger.LocaleController.getString(R.string.Cancel), null);
-        showDialog(b.create());
+        showDialog(sheet);
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
