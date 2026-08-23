@@ -44,7 +44,11 @@ public class LauncherIconController {
         NOX("NoxIcon", R.mipmap.icon_2_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconNox, true),
         // DevGram: маскировка — alias с собственным android:label (меняет и иконку, и имя приложения).
         // disguise=true => не показывается в стоковом premium-селекторе иконок, только в разделе «Маскировка».
-        CALCULATOR("CalculatorIcon", R.drawable.devgram_mask_calc_bg, R.drawable.devgram_mask_calc_fg, R.string.DevGramMaskCalculator, false, true);
+        CALCULATOR("CalculatorIcon", R.drawable.devgram_mask_calc_bg, R.drawable.devgram_mask_calc_fg, R.string.DevGramMaskCalculator, false, true),
+        NOTES("NotesIcon", R.drawable.devgram_mask_notes_bg, R.drawable.devgram_mask_notes_fg, R.string.DevGramMaskNotes, false, true),
+        WEATHER("WeatherIcon", R.drawable.devgram_mask_weather_bg, R.drawable.devgram_mask_weather_fg, R.string.DevGramMaskWeather, false, true),
+        CLOCK("ClockIcon", R.drawable.devgram_mask_clock_bg, R.drawable.devgram_mask_clock_fg, R.string.DevGramMaskClock, false, true),
+        SETTINGS_MASK("SettingsIcon", R.drawable.devgram_mask_settings_bg, R.drawable.devgram_mask_settings_fg, R.string.DevGramMaskSettings, false, true);
 
         public final String key;
         public final int background;

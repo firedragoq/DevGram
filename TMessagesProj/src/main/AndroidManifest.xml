@@ -259,7 +259,7 @@
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
 
-        <!-- DevGram: маскировка «Калькулятор» — свои иконка И имя (android:label) в лаунчере -->
+        <!-- DevGram: маскировки — у каждой свои иконка И имя (android:label) в лаунчере -->
         <activity-alias
             android:enabled="false"
             android:name="org.telegram.messenger.CalculatorIcon"
@@ -268,7 +268,66 @@
             android:roundIcon="@mipmap/devgram_mask_calc"
             android:label="@string/DevGramMaskCalculator"
             android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.NotesIcon"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:icon="@mipmap/devgram_mask_notes"
+            android:roundIcon="@mipmap/devgram_mask_notes"
+            android:label="@string/DevGramMaskNotes"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.WeatherIcon"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:icon="@mipmap/devgram_mask_weather"
+            android:roundIcon="@mipmap/devgram_mask_weather"
+            android:label="@string/DevGramMaskWeather"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.ClockIcon"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:icon="@mipmap/devgram_mask_clock"
+            android:roundIcon="@mipmap/devgram_mask_clock"
+            android:label="@string/DevGramMaskClock"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:enabled="false"
+            android:name="org.telegram.messenger.SettingsIcon"
+            android:targetActivity="org.telegram.ui.LaunchActivity"
+            android:icon="@mipmap/devgram_mask_settings"
+            android:roundIcon="@mipmap/devgram_mask_settings"
+            android:label="@string/DevGramMaskSettings"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

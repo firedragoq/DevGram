@@ -1,0 +1,9 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="18dp"/>
+            <solid android:color="#8E8E93"/>
+        </shape>
+    </item>
+    <item android:drawable="@drawable/devgram_mask_settings_fg"/>
+</layer-list>

@@ -1,0 +1,9 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="18dp"/>
+            <solid android:color="#1C1C1E"/>
+        </shape>
+    </item>
+    <item android:drawable="@drawable/devgram_mask_clock_fg"/>
+</layer-list>

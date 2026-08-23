@@ -6008,6 +6008,10 @@
     <string name="DevGramDisguiseInfo">Подмените иконку и название приложения в списке приложений. Например, DevGram будет выглядеть как «Калькулятор».</string>
     <string name="DevGramDisguiseNone">Без маскировки (DevGram)</string>
     <string name="DevGramMaskCalculator">Калькулятор</string>
+    <string name="DevGramMaskNotes">Заметки</string>
+    <string name="DevGramMaskWeather">Погода</string>
+    <string name="DevGramMaskClock">Часы</string>
+    <string name="DevGramMaskSettings">Настройки</string>
     <string name="FileTooLarge">File Too Large</string>
     <string name="PremiumPreviewAppIcon">Premium App Icon</string>
     <string name="PremiumPreviewAppIconDescription">Choose from a selection of DevGram app icons for your homescreen.</string>
