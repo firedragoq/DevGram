@@ -91,8 +91,8 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     }
 
     private BlurredBackgroundDrawable glassDrawable;
-    private Drawable glassDrawableBack;
-    private Drawable glassDrawableMenu;
+    private BlurredBackgroundDrawable glassDrawableBack;
+    private BlurredBackgroundDrawable glassDrawableMenu;
     private boolean glassAvatarSquare;
     private INavigationLayout.BackButtonState backButtonState = INavigationLayout.BackButtonState.BACK;
     public ImageView backButtonImageView;
@@ -366,6 +366,10 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         } else if (drawable instanceof BitmapDrawable || drawable instanceof VectorDrawable) {
             backButtonImageView.setColorFilter(new PorterDuffColorFilter(itemsColor, PorterDuff.Mode.SRC_IN));
         }
+        if (mAlwaysApplyColorFilterToBackButton) {
+            backButtonImageView.setColorFilter(new PorterDuffColorFilter(itemsColor, PorterDuff.Mode.SRC_IN));
+        }
+
         checkBackButtonLayerType();
     }
 
@@ -517,6 +521,12 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         backButtonImageView.setImageResource(resource);
         backButtonImageView.setColorFilter(new PorterDuffColorFilter(itemsColor, PorterDuff.Mode.SRC_IN));
         checkBackButtonLayerType();
+    }
+
+    private boolean mAlwaysApplyColorFilterToBackButton;
+
+    public void alwaysApplyColorFilterToBackButton() {
+        mAlwaysApplyColorFilterToBackButton = true;
     }
 
     private void createSubtitleTextView() {
@@ -1494,6 +1504,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         for (int i = 0; i < 2; i++) {
             if (titleTextView[0] != null && titleTextView[0].getVisibility() != GONE || subtitleTextView != null && subtitleTextView.getVisibility() != GONE) {
                 int availableWidth = width - (menu != null ? menu.getMeasuredWidth() : 0) - dp(16) - textLeft - titleRightMargin;
+                availableWidth = Math.max(availableWidth, 0);
 
                 if (((fromBottom && i == 0) || (!fromBottom && i == 1)) && overlayTitleAnimation && titleAnimationRunning) {
                     titleTextView[i].setTextSize(glassMode ? 17 : !AndroidUtilities.isTablet() && getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE ? 18 : 20);
@@ -1893,6 +1904,10 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 menu.updateItemsColor();
             }
         }
+
+        if (backButtonImageView != null && mAlwaysApplyColorFilterToBackButton) {
+            backButtonImageView.setColorFilter(new PorterDuffColorFilter(itemsColor, PorterDuff.Mode.SRC_IN));
+        }
     }
 
     public void setCastShadows(boolean value) {
@@ -2225,6 +2240,8 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
     }
 
+    public boolean doNotDrawGlassMenu;
+
     @Override
     protected void dispatchDraw(Canvas canvas) {
         final int p = dp(6);
@@ -2295,8 +2312,8 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             // при выделении сообщений (save/edit/copy/forward/delete и т.д., до 9 иконок),
             // а аватарка на время выделения сама скрывается (checkUi_avatarContainerVisibility
             // в ChatActivity) — прикрывать там нечего, и без этой проверки весь ряд иконок
-            // остался бы без подложки.
-            if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack && !(hideGlassMenuPill && !actionModeVisible)) {
+            // остался бы без подложки. + 12.9.7: учитываем штатный doNotDrawGlassMenu.
+            if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack && !doNotDrawGlassMenu && !(hideGlassMenuPill && !actionModeVisible)) {
                 glassDrawableMenu.setBounds(getWidth() - Math.max(s, menuWidth) - p * 2, t, getWidth(), b);
                 glassDrawableMenu.setAlpha(hasForcedMenuWidth ? 255 : (int) (255 * animatorHasMenuItems.getFloatValue()));
                 glassDrawableMenu.draw(canvas);
@@ -2365,6 +2382,15 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     @Override
     public void updateColors() {
         adaptive_updateColor();
+        if (glassDrawable != null) {
+            glassDrawable.updateColors();
+        }
+        if (glassDrawableMenu != null) {
+            glassDrawableMenu.updateColors();
+        }
+        if (glassDrawableBack != null) {
+            glassDrawableBack.updateColors();
+        }
         if (additionalSubTitleOverlayContainer != null) {
             additionalSubTitleOverlayContainer.updateColors();
         }

@@ -21,6 +21,7 @@ import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DevGramDoubleTapUtils;
+import org.telegram.ui.ActionBar.MessageDrawable;
 import org.telegram.ui.ActionBar.Theme;
 
 // DevGram: превью двойного нажатия как у exteraGram — два схематичных пузыря (входящий/исходящий)
@@ -33,7 +34,7 @@ public class DevGramDoubleTapCell extends LinearLayout {
     private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint bubblePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint[] circleOutlinePaint = new Paint[2];
-    private final Theme.MessageDrawable[] messages;
+    private final MessageDrawable[] messages;
     private final FrameLayout preview;
 
     private final int[] actionIcon = new int[2];
@@ -45,9 +46,9 @@ public class DevGramDoubleTapCell extends LinearLayout {
 
     public DevGramDoubleTapCell(final Context context) {
         super(context);
-        messages = new Theme.MessageDrawable[]{
-                new Theme.MessageDrawable(0, false, false),
-                new Theme.MessageDrawable(0, true, false)
+        messages = new MessageDrawable[]{
+                new MessageDrawable(0, false, false),
+                new MessageDrawable(0, true, false)
         };
         setWillNotDraw(false);
         setOrientation(VERTICAL);

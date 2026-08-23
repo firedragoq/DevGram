@@ -102,7 +102,6 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 
 import com.google.zxing.EncodeHintType;
-import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import com.googlecode.mp4parser.boxes.apple.AppleNameBox;
 
@@ -133,6 +132,7 @@ import org.telegram.messenger.PushListenerController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SRPHelper;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.TelegramQRCodeWriter;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
@@ -4157,9 +4157,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         private void applyLottieColors(RLottieDrawable drawable) {
             if (drawable != null) {
-                drawable.setLayerColor("Bubble.**", Theme.getColor(Theme.key_chats_actionBackground));
-                drawable.setLayerColor("Phone.**", Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-                drawable.setLayerColor("Note.**", Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+                drawable.setLayerColor("Bubble", Theme.getColor(Theme.key_chats_actionBackground));
+                drawable.setLayerColor("Phone", Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+                drawable.setLayerColor("Note", Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             }
         }
 
@@ -10620,7 +10620,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 HashMap<EncodeHintType, Object> hints = new HashMap<>();
                 hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
                 hints.put(EncodeHintType.MARGIN, 0);
-                QRCodeWriter writer = new QRCodeWriter();
+                TelegramQRCodeWriter writer = new TelegramQRCodeWriter();
                 qrBitmap = writer.encode(url, 768, 768, hints, qrBitmap);
                 qrImageSize = writer.getImageSize();
                 qrImageView.setImageBitmap(qrBitmap);

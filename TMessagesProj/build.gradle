@@ -1,9 +1,22 @@
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 
 apply plugin: 'com.android.library'
+apply plugin: 'idea'
 apply from: '../utils.gradle'
 apply plugin: 'kotlin-android'
 apply plugin: 'com.chaquo.python' // DevGram: Python-плагины
+
+idea {
+    module {
+        excludeDirs += [
+            file('jni/third_party'),
+            file('jni/ffmpeg'),
+            file('jni/tlottie'),
+            file('jni/boringssl'),
+            file('jni/sqlite')
+        ]
+    }
+}
 
 repositories {
     mavenCentral()
@@ -48,6 +61,7 @@ dependencies {
     implementation 'androidx.biometric:biometric:1.1.0'
 
     implementation "androidx.mediarouter:mediarouter:1.7.0"
+    implementation 'com.google.zxing:core:3.5.4'
 
     implementation 'androidx.car.app:app:1.4.0'
     implementation 'androidx.car.app:app-projected:1.4.0'
@@ -76,7 +90,10 @@ dependencies {
     implementation "io.noties.markwon:ext-tables:4.6.2"
     implementation "io.noties.markwon:html:4.6.2"
     implementation "io.noties.markwon:inline-parser:4.6.2"
-    implementation "io.noties.markwon:ext-latex:4.6.2"
+    implementation("io.noties.markwon:ext-latex:4.6.2") {
+        exclude group: 'ru.noties', module: 'jlatexmath-android'
+    }
+    api project(':jlatexmath')
 
     constraints {
         implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0") {
@@ -213,11 +230,11 @@ android {
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "true"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "0"
         }
 
         HA_private {
+            matchingFallbacks = ['release']
             jniDebuggable false
             minifyEnabled true
             multiDexEnabled true
@@ -228,11 +245,11 @@ android {
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "true"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "1"
         }
 
         HA_public {
+            matchingFallbacks = ['release']
             jniDebuggable false
             minifyEnabled true
             multiDexEnabled true
@@ -243,11 +260,11 @@ android {
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "4"
         }
 
         HA_hardcore {
+            matchingFallbacks = ['release']
             jniDebuggable false
             minifyEnabled true
             multiDexEnabled true
@@ -259,11 +276,11 @@ android {
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "true"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "5"
         }
 
         standalone {
+            matchingFallbacks = ['release']
             jniDebuggable false
             minifyEnabled true
             multiDexEnabled true
@@ -274,7 +291,6 @@ android {
             buildConfigField "boolean", "DEBUG_VERSION", "false"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "6"
         }
 
@@ -290,7 +306,6 @@ android {
             buildConfigField "boolean", "DEBUG_VERSION", "false"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "7"
         }
     }

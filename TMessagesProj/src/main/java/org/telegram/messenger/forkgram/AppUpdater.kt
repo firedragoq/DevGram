@@ -77,7 +77,7 @@ object AppUpdater {
     ) {
 
         try {
-            val updateInterval = MessagesController.getGlobalMainSettings().getLong("updateForCHECK_INTERVAL", 30 * 60 * 1000L)
+            val updateInterval = MessagesController.getGlobalMainSettings().getLong("updateForkCheckInterval", 30 * 60 * 1000L)
             if (!manual && (updateInterval == 0L || System.currentTimeMillis() - lastTimestampOfCheck < updateInterval)) {
                 return
             }
@@ -199,7 +199,7 @@ object AppUpdater {
 
                     lastTimestampOfCheck = System.currentTimeMillis()
 
-                    if (newVersion <= currentVersion) {
+                    if (compareVersions(newVersion, currentVersion) <= 0) {
                         if (manual) {
                             AndroidUtilities.runOnUIThread {
                                 Toast.makeText(context, "No updates", Toast.LENGTH_SHORT).show()
@@ -291,6 +291,19 @@ object AppUpdater {
         }
     }
 
+    private fun compareVersions(left: String, right: String): Int {
+        val leftParts = left.split(".")
+        val rightParts = right.split(".")
+        for (i in 0 until maxOf(leftParts.size, rightParts.size)) {
+            val leftPart = leftParts.getOrNull(i)?.trim()?.toIntOrNull() ?: 0
+            val rightPart = rightParts.getOrNull(i)?.trim()?.toIntOrNull() ?: 0
+            if (leftPart != rightPart) {
+                return leftPart.compareTo(rightPart)
+            }
+        }
+        return 0
+    }
+
     private fun checkUpdateFromGitHub(
         parentActivity: Activity,
         context: Context,
@@ -316,7 +329,7 @@ object AppUpdater {
                     val root = JSONObject(response)
                     val tag = root.optString("tag_name")
 
-                    if (tag <= currentVersion) {
+                    if (compareVersions(tag, currentVersion) <= 0) {
                         if (manual) {
                             Toast.makeText(context, "No updates", Toast.LENGTH_SHORT).show()
                         }
@@ -330,19 +343,25 @@ object AppUpdater {
                         return@httpRequest
                     }
 
-                    val assetIndex = if (BuildVars.DEBUG_VERSION) 0 else 1
-                    if (assets.length() <= assetIndex) {
-                        android.util.Log.w("Fork Client", "Not enough assets in release (need index $assetIndex)")
-                        return@httpRequest
-                    }
+                    val apks = (0 until assets.length())
+                        .mapNotNull { assets.optJSONObject(it) }
+                        .filter { it.optString("name").endsWith(".apk", ignoreCase = true) }
 
-                    val asset = assets.optJSONObject(assetIndex) ?: run {
-                        android.util.Log.w("Fork Client", "Asset at index $assetIndex is null")
-                        return@httpRequest
-                    }
+                    val asset = apks.firstOrNull { it.optString("name").contains("compressed", ignoreCase = true) }
+                        ?: apks.lastOrNull()
+                        ?: run {
+                            android.util.Log.w("Fork Client", "No apk asset in release")
+                            if (manual) {
+                                Toast.makeText(context, "No installable asset in release", Toast.LENGTH_SHORT).show()
+                            }
+                            return@httpRequest
+                        }
 
                     val url = asset.optString("browser_download_url").takeIf { it.isNotEmpty() } ?: run {
                         android.util.Log.w("Fork Client", "Empty download URL")
+                        if (manual) {
+                            Toast.makeText(context, "Empty download URL", Toast.LENGTH_SHORT).show()
+                        }
                         return@httpRequest
                     }
 

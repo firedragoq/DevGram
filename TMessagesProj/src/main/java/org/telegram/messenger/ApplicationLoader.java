@@ -473,20 +473,8 @@ public class ApplicationLoader extends Application {
             pendingIntentFlags = PendingIntent.FLAG_MUTABLE;
         }
         if (enabled) {
-            // DevGram: если активен UnifiedPush-дистрибьютор — держать собственный watchdog
-            // не нужно, соединение переключается на UnifiedPush (порт фичи Forkgram
-            // «automatic switching between UnifiedPush and the background connection»).
-            // Иначе решает тумблер «Keep-Alive Service»: foreground-сервис держит соединение
-            // и фоновые загрузки. Старые повторяющиеся будильники в любом случае снимаем.
-            // 12.9.3: активность UnifiedPush определяем штатно — по наличию ack-дистрибьютора
-            // (с учётом нашего тумблера отключения UnifiedPush).
-            boolean unifiedPushActive = false;
-            if (!SharedConfig.disableUnifiedPush) {
-                try {
-                    unifiedPushActive = org.unifiedpush.android.connector.UnifiedPush.getAckDistributor(applicationContext) != null;
-                } catch (Throwable ignore) {
-                }
-            }
+            // 12.9.7: активность UnifiedPush определяется штатным методом Forkgram
+            final boolean unifiedPushActive = PushListenerController.isUnifiedPushActive();
             cancelLegacyKeepAliveAlarms(pendingIntentFlags);
             if (unifiedPushActive) {
                 Log.d("DevGram", "UnifiedPush is active, skipping push service watchdog");

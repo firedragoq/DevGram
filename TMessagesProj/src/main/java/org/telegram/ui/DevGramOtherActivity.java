@@ -223,11 +223,12 @@ public class DevGramOtherActivity extends BaseFragment {
                 return false;
             }
             long did = dids.get(0).dialogId;
+            // 12.9.7: 17-арг (…, Uri, String mime, String caption, long dialogId, …, InputContentInfoCompat, SendMessageChatArguments, boolean)
             org.telegram.messenger.SendMessagesHelper.prepareSendingDocument(
                     org.telegram.messenger.AccountInstance.getInstance(currentAccount),
-                    f.getAbsolutePath(), f.getAbsolutePath(), null, null,
-                    "application/octet-stream", did, null, null, null, null, null,
-                    true, 0, null, null, 0, false);
+                    f.getAbsolutePath(), f.getAbsolutePath(), null,
+                    "application/octet-stream", null, did, null, null, null, null, null,
+                    true, 0, null, null, false);
             Bundle a = new Bundle();
             if (did > 0) {
                 a.putLong("user_id", did);

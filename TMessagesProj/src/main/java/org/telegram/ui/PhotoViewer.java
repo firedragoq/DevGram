@@ -140,7 +140,7 @@ import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.LinearSmoothScrollerEnd;
+import org.telegram.ui.recyclerview.LinearSmoothScrollerEnd;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.exoplayer2.C;
@@ -9878,25 +9878,23 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         }
         if (roundVideoRequested) {
             videoEditedInfo.roundVideo = true;
-            int rw = videoEditedInfo.resultWidth;
-            int rh = videoEditedInfo.resultHeight;
-            int minDim = Math.min(rw, rh);
-            int roundSide = Math.min(minDim, 640);
-            if (minDim > 0 && minDim != roundSide) {
-                float scale = roundSide / (float) minDim;
-                rw = Math.round(rw * scale);
-                rh = Math.round(rh * scale);
-                videoEditedInfo.resultWidth = rw;
-                videoEditedInfo.resultHeight = rh;
-                minDim = Math.min(rw, rh);
+            final boolean roundRotated = videoEditedInfo.rotationValue == 90 || videoEditedInfo.rotationValue == 270;
+            int roundDisplayWidth = Math.max(1, roundRotated ? videoEditedInfo.resultHeight : videoEditedInfo.resultWidth);
+            int roundDisplayHeight = Math.max(1, roundRotated ? videoEditedInfo.resultWidth : videoEditedInfo.resultHeight);
+            MediaController.CropState roundCrop = videoEditedInfo.cropState != null ? videoEditedInfo.cropState.clone() : new MediaController.CropState();
+            float roundSide = Math.max(1, Math.min(roundDisplayWidth * roundCrop.cropPw, roundDisplayHeight * roundCrop.cropPh));
+            if (roundSide > 640) {
+                float scale = 640 / roundSide;
+                videoEditedInfo.resultWidth = Math.max(1, Math.round(videoEditedInfo.resultWidth * scale));
+                videoEditedInfo.resultHeight = Math.max(1, Math.round(videoEditedInfo.resultHeight * scale));
+                roundDisplayWidth = roundRotated ? videoEditedInfo.resultHeight : videoEditedInfo.resultWidth;
+                roundDisplayHeight = roundRotated ? videoEditedInfo.resultWidth : videoEditedInfo.resultHeight;
+                roundSide = Math.max(1, Math.min(roundDisplayWidth * roundCrop.cropPw, roundDisplayHeight * roundCrop.cropPh));
             }
-            MediaController.CropState roundCrop = new MediaController.CropState();
-            roundCrop.cropPw = minDim / (float) rw;
-            roundCrop.cropPh = minDim / (float) rh;
-            int[] roundSize = fixVideoWidthHeight((int) (rw * roundCrop.cropPw), (int) (rh * roundCrop.cropPh));
-            roundCrop.transformWidth = roundSize[0];
-            roundCrop.transformHeight = roundSize[1];
-            roundCrop.transformRotation = 0;
+            roundCrop.cropPw = roundSide / roundDisplayWidth;
+            roundCrop.cropPh = roundSide / roundDisplayHeight;
+            int[] roundSize = fixVideoWidthHeight(Math.round(roundSide), Math.round(roundSide));
+            roundCrop.transformWidth = roundCrop.transformHeight = Math.max(roundSize[0], roundSize[1]);
             videoEditedInfo.cropState = roundCrop;
             final long roundTargetBytes = 9L * 1024 * 1024;
             final int roundAudioBitrate = 128 * 1024;
@@ -15319,13 +15317,6 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 countView.updateShow(size > 1, true);
                 countView.set(switchingToIndex + 1, size);
             }
-            if (BuildVars.LOGS_ENABLED) {
-                FileLog.d("[richmedia] switchToIndex " + switchingToIndex
-                    + " currentAnimation=" + (currentAnimation != null)
-                    + " isVideo(switching)=" + pageBlocksAdapter.isVideo(switchingToIndex)
-                    + " isVideo(index)=" + pageBlocksAdapter.isVideo(index)
-                    + " hw=" + pageBlocksAdapter.isHardwarePlayer(index));
-            }
             if (currentAnimation != null || (!pageBlocksAdapter.isVideo(index) && pageBlocksAdapter.isHardwarePlayer(index))) {
                 galleryButton.setVisibility(View.GONE);
                 galleryGap.setVisibility(View.GONE);
@@ -17468,15 +17459,15 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                             }
                             if (photoEntry.isVideo) {
                                 if (videoEditedInfo != null) {
-                                    SendMessagesHelper.prepareSendingVideo(parentChatActivity.getAccountInstance(), photoEntry.path, videoEditedInfo, null, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.ttl, editingMessageObject, notify, scheduleDate, scheduleRepeatPeriod, forceDocument, photoEntry.hasSpoiler, photoEntry.caption, parentChatActivity.quickReplyShortcut, parentChatActivity.getQuickReplyId(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
+                                    SendMessagesHelper.prepareSendingVideo(parentChatActivity.getAccountInstance(), photoEntry.path, videoEditedInfo, null, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.ttl, editingMessageObject, notify, scheduleDate, scheduleRepeatPeriod, forceDocument, photoEntry.hasSpoiler, photoEntry.caption, parentChatActivity.getMessageChatSendParams(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
                                 } else {
-                                    SendMessagesHelper.prepareSendingVideo(parentChatActivity.getAccountInstance(), photoEntry.path, null, null, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.ttl, editingMessageObject, notify, scheduleDate, scheduleRepeatPeriod, forceDocument, photoEntry.hasSpoiler, photoEntry.caption, parentChatActivity.quickReplyShortcut, parentChatActivity.getQuickReplyId(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
+                                    SendMessagesHelper.prepareSendingVideo(parentChatActivity.getAccountInstance(), photoEntry.path, null, null, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.ttl, editingMessageObject, notify, scheduleDate, scheduleRepeatPeriod, forceDocument, photoEntry.hasSpoiler, photoEntry.caption, parentChatActivity.getMessageChatSendParams(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
                                 }
                             } else {
                                 if (photoEntry.imagePath != null) {
-                                    SendMessagesHelper.prepareSendingPhoto(parentChatActivity.getAccountInstance(), photoEntry.imagePath, photoEntry.thumbPath, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.stickers, null, photoEntry.ttl, editingMessageObject, videoEditedInfo, notify, scheduleDate, scheduleRepeatPeriod, 0, forceDocument, photoEntry.caption, parentChatActivity.quickReplyShortcut, parentChatActivity.getQuickReplyId(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
+                                    SendMessagesHelper.prepareSendingPhoto(parentChatActivity.getAccountInstance(), photoEntry.imagePath, photoEntry.thumbPath, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.stickers, null, photoEntry.ttl, editingMessageObject, videoEditedInfo, notify, scheduleDate, scheduleRepeatPeriod, 0, forceDocument, photoEntry.caption, parentChatActivity.getMessageChatSendParams(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
                                 } else if (photoEntry.path != null) {
-                                    SendMessagesHelper.prepareSendingPhoto(parentChatActivity.getAccountInstance(), photoEntry.path, photoEntry.thumbPath, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.stickers, null, photoEntry.ttl, editingMessageObject, videoEditedInfo, notify, scheduleDate, scheduleRepeatPeriod, 0, forceDocument, photoEntry.caption, parentChatActivity.quickReplyShortcut, parentChatActivity.getQuickReplyId(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
+                                    SendMessagesHelper.prepareSendingPhoto(parentChatActivity.getAccountInstance(), photoEntry.path, photoEntry.thumbPath, null, parentChatActivity.getDialogId(), replyToMsg, parentChatActivity.getThreadMessage(), null, replyQuote, photoEntry.entities, photoEntry.stickers, null, photoEntry.ttl, editingMessageObject, videoEditedInfo, notify, scheduleDate, scheduleRepeatPeriod, 0, forceDocument, photoEntry.caption, parentChatActivity.getMessageChatSendParams(), 0, 0, parentChatActivity.getSendMonoForumPeerId(), parentChatActivity.getSendMessageSuggestionParams());
                                 }
                             }
                         }
@@ -17724,14 +17715,6 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 }
             } else if (pageBlocksAdapter != null) {
                 currentAnimation = object.allowTakeAnimation ? object.imageReceiver.getAnimation() : null;
-                if (BuildVars.LOGS_ENABLED) {
-                    TLObject m = pageBlocksAdapter.getMedia(index);
-                    FileLog.d("[richmedia] openPhoto pageBlocks index=" + index
-                        + " isVideo=" + pageBlocksAdapter.isVideo(index)
-                        + " allowTake=" + object.allowTakeAnimation
-                        + " cellAnimation=" + (object.imageReceiver.getAnimation() != null)
-                        + " media=" + (m == null ? "null" : m.getClass().getSimpleName() + (m instanceof TLRPC.Document ? " id=" + ((TLRPC.Document) m).id + " mime=" + ((TLRPC.Document) m).mime_type + " attrs=" + attrsToString((TLRPC.Document) m) : "")));
-                }
                 if (currentAnimation != null && pageBlocksAdapter.isVideo(index)) {
                     object.imageReceiver.setAllowStartAnimation(false);
                     object.imageReceiver.stopAnimation();

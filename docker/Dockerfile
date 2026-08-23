@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     unzip \
     ninja-build \
+    cmake \
     make \
     yasm \
     nasm \
@@ -68,9 +69,18 @@ RUN yes | sdkmanager --licenses > /dev/null 2>&1 && \
       "ndk;27.2.12479018" \
       "cmake;3.10.2.4988404"
 
-# Make SDK cmake available as system cmake (Gradle needs 3.10.2 for AndroidNdkModules)
-# Also provide cmake3 alias for tde2e build
-RUN ln -sf /opt/android-sdk/cmake/3.10.2.4988404/bin/cmake /usr/local/bin/cmake && \
-    ln -sf /opt/android-sdk/cmake/3.10.2.4988404/bin/cmake /usr/local/bin/cmake3
+# Provide cmake3 alias for the tde2e build. The system cmake stays the apt one:
+# build_opus.sh generates a project requiring CMake 3.18, which SDK cmake 3.10.2
+# cannot configure. Gradle and build_boringssl.sh pick their cmake from the SDK.
+RUN ln -sf /opt/android-sdk/cmake/3.10.2.4988404/bin/cmake /usr/local/bin/cmake3
+
+# ============================================================
+# Rust toolchain (tlottie is a Rust staticlib, see jni/tlottie_lib/build.sh)
+# ============================================================
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
+ENV PATH="${CARGO_HOME}/bin:${PATH}"
+RUN wget -qO- https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable && \
+    rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 
 WORKDIR /project

@@ -707,8 +707,17 @@ public class SharedConfig {
             photoLiveDefault = preferences.getBoolean("photoLiveDefault", false);
             disableUnifiedPush = preferences.getBoolean("disableUnifiedPush", false);
             unifiedPushGateway = preferences.getString("unifiedPushGateway", "");
-            if ("https://p2p.belloworld.it/".equals(unifiedPushGateway)) {
-                unifiedPushGateway = "";
+            // Dropping the old default gateway is a one-time migration, not a filter. Running it on
+            // every load also wiped the value for anyone picking that gateway on purpose, so it could
+            // never survive a restart. Clear it once, persist the result so the stored preference
+            // matches, and never touch the user's own choice again.
+            if (!preferences.getBoolean("unifiedPushGatewayMigrated", false)) {
+                SharedPreferences.Editor editor = preferences.edit().putBoolean("unifiedPushGatewayMigrated", true);
+                if ("https://p2p.belloworld.it/".equals(unifiedPushGateway)) {
+                    unifiedPushGateway = "";
+                    editor.putString("unifiedPushGateway", unifiedPushGateway);
+                }
+                editor.apply();
             }
 
             loadDebugConfig(preferences);

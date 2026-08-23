@@ -5,7 +5,7 @@ set(CMAKE_C_FLAGS "-w -std=c11 -DANDROID -D_LARGEFILE_SOURCE=1 -g -Wno-error=imp
 set(CMAKE_ASM_FLAGS "${CFLAGS} -x assembler-with-cpp")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections -fvisibility=hidden -flto=full")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffunction-sections -fdata-sections -fvisibility=hidden -fvisibility-inlines-hidden -flto=full")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -flto=full -Wl,--gc-sections -Wl,--icf=safe -Wl,-Bsymbolic -Wl,--exclude-libs,libtgvoip.a,libtgcalls.a,libtgcalls_tp.a,libtgnet.a,libflac.a,librlottie.a,libsqlite.a,
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -flto=full -Wl,--gc-sections -Wl,--icf=safe -Wl,-Bsymbolic -Wl,--exclude-libs,libtgvoip.a,libtgcalls.a,libtgcalls_tp.a,libtgnet.a,libflac.a,libsqlite.a,
 ${CMAKE_HOME_DIRECTORY}/ffmpeg/build/${ANDROID_ABI}/lib/libswscale.a,
 ${CMAKE_HOME_DIRECTORY}/ffmpeg/build/${ANDROID_ABI}/lib/libavformat.a,
 ${CMAKE_HOME_DIRECTORY}/ffmpeg/build/${ANDROID_ABI}/lib/libavcodec.a,
@@ -217,64 +217,11 @@ target_link_libraries(tgnet
         ssl
         crypto)
 
-#rlottie
-add_library(rlottie STATIC
-        rlottie/src/lottie/lottieanimation.cpp
-        rlottie/src/lottie/lottieitem.cpp
-        rlottie/src/lottie/lottiekeypath.cpp
-        rlottie/src/lottie/lottieloader.cpp
-        rlottie/src/lottie/lottiemodel.cpp
-        rlottie/src/lottie/lottieparser.cpp
-        rlottie/src/lottie/lottieproxymodel.cpp
-        rlottie/src/vector/freetype/v_ft_math.cpp
-        rlottie/src/vector/freetype/v_ft_raster.cpp
-        rlottie/src/vector/freetype/v_ft_stroker.cpp
-        rlottie/src/vector/pixman/vregion.cpp
-        rlottie/src/vector/stb/stb_image.cpp
-        rlottie/src/vector/vbezier.cpp
-        rlottie/src/vector/vbitmap.cpp
-        rlottie/src/vector/vbrush.cpp
-        rlottie/src/vector/vcompositionfunctions.cpp
-        rlottie/src/vector/vdasher.cpp
-        rlottie/src/vector/vdebug.cpp
-        rlottie/src/vector/vdrawable.cpp
-        rlottie/src/vector/vdrawhelper.cpp
-        rlottie/src/vector/vdrawhelper_neon.cpp
-        rlottie/src/vector/velapsedtimer.cpp
-        rlottie/src/vector/vimageloader.cpp
-        rlottie/src/vector/vinterpolator.cpp
-        rlottie/src/vector/vmatrix.cpp
-        rlottie/src/vector/vpainter.cpp
-        rlottie/src/vector/vpath.cpp
-        rlottie/src/vector/vpathmesure.cpp
-        rlottie/src/vector/vraster.cpp
-        rlottie/src/vector/vrect.cpp
-        rlottie/src/vector/vrle.cpp)
-target_compile_options(rlottie PUBLIC
-        -Wall -fno-rtti -finline-functions -ffast-math -Oz -fno-unwind-tables -fno-asynchronous-unwind-tables -Wnon-virtual-dtor -Woverloaded-virtual -Wno-unused-parameter -fvisibility=hidden)
-set_target_properties(rlottie PROPERTIES
-        ANDROID_ARM_MODE arm)
-target_compile_definitions(rlottie PUBLIC
-        HAVE_PTHREAD NDEBUG)
-target_include_directories(rlottie PUBLIC
-        ./
-        rlottie/inc
-        rlottie/src/vector/
-        rlottie/src/vector/pixman
-        rlottie/src/vector/freetype
-        rlottie/src/vector/stb)
-
-if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
-    target_compile_definitions(rlottie PUBLIC
-            USE_ARM_NEON)
-    target_sources(rlottie PRIVATE
-            rlottie/src/vector/pixman/pixman-arm-neon-asm.S)
-elseif(${ANDROID_ABI} STREQUAL "arm64-v8a")
-    target_compile_definitions(rlottie PUBLIC
-            USE_ARM_NEON __ARM64_NEON__)
-    target_sources(rlottie PRIVATE
-            rlottie/src/vector/pixman/pixman-arma64-neon-asm.S)
-endif()
+# tlottie (prebuilt Rust static library) — заменил rlottie в 12.10.0.
+# libtlottie.a собирается из submodule jni/tlottie через jni/tlottie_lib/build.sh (cargo).
+add_library(tlottie STATIC IMPORTED)
+set_target_properties(tlottie PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_HOME_DIRECTORY}/tlottie_lib/${ANDROID_ABI}/libtlottie.a)
 
 
 #flac
@@ -631,7 +578,7 @@ target_include_directories(${NATIVE_LIB} PUBLIC
         exoplayer/include
         exoplayer/libFLAC/include
         intro
-        rlottie/inc
+        tlottie/include
         tgcalls/
         webrtc/
         tde2e/include
@@ -647,7 +594,7 @@ target_link_libraries(${NATIVE_LIB}
 #        mozjpeg
         tgnet
         flac
-        rlottie
+        tlottie
         sqlite
         swscale
         avformat

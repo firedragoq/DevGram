@@ -655,8 +655,9 @@ public class DevGramPlugins {
         AndroidUtilities.runOnUIThread(() -> {
             try {
                 AccountInstance ai = AccountInstance.getInstance(UserConfig.selectedAccount);
+                // 12.9.7: 17-арг сигнатура (…, int payStars, SendMessageChatArguments)
                 SendMessagesHelper.prepareSendingPhoto(ai, path, null, dialogId, null, null, null,
-                        caption, entities, null, null, 0, null, true, 0, 0, null, 0);
+                        caption, entities, null, null, 0, null, true, 0, 0, null);
             } catch (Throwable e) {
                 FileLog.e(e);
             }
@@ -669,8 +670,9 @@ public class DevGramPlugins {
         AndroidUtilities.runOnUIThread(() -> {
             try {
                 AccountInstance ai = AccountInstance.getInstance(UserConfig.selectedAccount);
-                SendMessagesHelper.prepareSendingDocument(ai, path, path, null, caption, null, dialogId,
-                        null, null, null, null, null, true, 0, null, null, 0, false);
+                // 12.9.7: 17-арг (…, String mime, String caption, long dialogId, …, InputContentInfoCompat, SendMessageChatArguments, boolean)
+                SendMessagesHelper.prepareSendingDocument(ai, path, path, null, null, caption, dialogId,
+                        null, null, null, null, null, true, 0, null, null, false);
             } catch (Throwable e) {
                 FileLog.e(e);
             }
