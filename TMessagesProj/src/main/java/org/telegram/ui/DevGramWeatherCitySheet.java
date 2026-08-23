@@ -43,8 +43,9 @@ public class DevGramWeatherCitySheet extends BottomSheet {
     private final Runnable searchRunnable;
 
     public DevGramWeatherCitySheet(Context context, OnChosen onChosen) {
-        super(context, false);
+        super(context, true); // needFocus=true — окно принимает ввод, клавиатура открывается
         this.onChosen = onChosen;
+        smoothKeyboardAnimationEnabled = true;
         fixNavigationBar();
 
         FrameLayout container = new FrameLayout(context);
