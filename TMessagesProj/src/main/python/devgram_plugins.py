@@ -491,6 +491,30 @@ def menu_click(plugin_id, label, message_text, dialog_id):
             return
 
 
+def link_menu_items(url):
+    """Пункты меню ссылки от всех включённых плагинов: строки 'pluginId␟label'."""
+    res = []
+    for p in _plugins:
+        if not getattr(p, "enabled", True):
+            continue
+        try:
+            for label in (p.link_menu_items(url) or []):
+                res.append(_SEP.join([str(p.id), str(label)]))
+        except Exception:
+            _log("link_menu_items error: " + traceback.format_exc())
+    return res
+
+
+def link_menu_click(plugin_id, label, url, dialog_id):
+    for p in _plugins:
+        if str(p.id) == str(plugin_id):
+            try:
+                p.on_link_menu_click(label, url, dialog_id)
+            except Exception:
+                _log("on_link_menu_click error: " + traceback.format_exc())
+            return
+
+
 _last_settings_objects = {}  # plugin_id -> «сырые» Setting-объекты последнего вызова
                               # plugin_settings() (нужно, чтобы potом отдать Java живой
                               # View для devgram.ui.Custom — его нельзя засунуть в строку).

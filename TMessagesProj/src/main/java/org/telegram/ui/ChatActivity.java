@@ -33604,7 +33604,14 @@ public class ChatActivity extends BaseFragment implements
             }
             final int finalPopupX = scrimPopupX = popupX;
             final int finalPopupY = scrimPopupY = popupY;
-            scrimPopupContainerLayout.setMaxHeight(maxY + height - popupY);
+            // DevGram: при edge-to-edge contentView включает область под жест-навбаром,
+            // из-за чего длинное меню (с нашими доп-пунктами + плагинами) не долистывалось —
+            // последний пункт уходил под навбар. Оставляем ему отступ снизу.
+            int scrimMaxHeight = maxY + height - popupY;
+            if (AndroidUtilities.navigationBarHeight > 0) {
+                scrimMaxHeight -= AndroidUtilities.navigationBarHeight + AndroidUtilities.dp(8);
+            }
+            scrimPopupContainerLayout.setMaxHeight(scrimMaxHeight);
             ReactionsContainerLayout finalReactionsLayout = reactionsLayout;
             Runnable showMenu = () -> {
                 if (scrimPopupWindow == null || fragmentView == null || scrimPopupWindow.isShowing() || !AndroidUtilities.isActivityRunning(getParentActivity())) {
@@ -46094,6 +46101,22 @@ public class ChatActivity extends BaseFragment implements
             options.add(R.drawable.outline_saved_24, getString(R.string.WebBookmarkAdd), () -> {
                 ArticleViewer.addBookmark(str, currentAccount, contentView, null, themeDelegate);
             });
+        }
+
+        // DevGram: пункты меню ссылки от плагинов (напр. «Скачать медиа» у загрузчика).
+        if (!isHashtag && !isMail) {
+            try {
+                final long linkDialogId = getDialogId();
+                for (String s : org.telegram.messenger.DevGramPlugins.linkMenuItems(str)) {
+                    String[] parts = s.split("\u001f", -1);
+                    final String pluginId = parts.length > 0 ? parts[0] : "";
+                    final String label = parts.length > 1 ? parts[1] : "?";
+                    options.add(R.drawable.msg_download, label, () ->
+                            org.telegram.messenger.DevGramPlugins.linkMenuClick(pluginId, label, str, linkDialogId));
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
         }
 
         dialog.setItemOptions(options);

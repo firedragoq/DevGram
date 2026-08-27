@@ -947,6 +947,31 @@ public class DevGramPlugins {
         }
     }
 
+    // ---- пункты меню длинного тапа по ССЫЛКЕ ----
+    public static List<String> linkMenuItems(String url) {
+        List<String> res = new ArrayList<>();
+        if (!loaded || isSafeMode()) {
+            return res;
+        }
+        try {
+            PyObject list = loader().callAttr("link_menu_items", url == null ? "" : url);
+            for (PyObject o : list.asList()) {
+                res.add(o.toString());
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return res;
+    }
+
+    public static void linkMenuClick(String pluginId, String label, String url, long dialogId) {
+        try {
+            loader().callAttr("link_menu_click", pluginId, label, url == null ? "" : url, dialogId);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
     // ---- перехват сырых TL-апдейтов ----
     public static boolean wantsUpdates() {
         return loaded && !isSafeMode() && wantsUpdatesFlag;
