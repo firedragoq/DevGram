@@ -11599,10 +11599,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         MediaController mediaController = MediaController.getInstance();
         if (getPlayingProfileMusic() == null) {
             mediaController.cleanup();
+            // DevGram: через setPlaylist — иначе плейлист не листается (только первый трек).
+            // loadMusic=false: листаем по saved-music профиля, без подгрузки музыки из ЛС.
+            // currentSavedMusicList ставим ПОСЛЕ setPlaylist (он его сбрасывает как «чат-плейлист»).
+            mediaController.setPlaylist(new ArrayList<>(list.list), list.list.get(0), 0, false, null);
             mediaController.currentSavedMusicList = list;
-            mediaController.getPlaylist().clear();
-            mediaController.getPlaylist().addAll(list.list);
-            mediaController.playMessage(list.list.get(0));
         }
         updateProfileMusicPlayback();
         return true;

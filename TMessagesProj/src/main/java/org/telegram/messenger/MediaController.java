@@ -2895,6 +2895,10 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             }
             return playMessage(current);
         }
+        // DevGram: новый плейлист (из чата/поиска) сбрасывает контекст профильной музыки,
+        // иначе догрузка (currentSavedMusicList.load → musicListLoaded) подменяла плейлист
+        // чата сохранённой музыкой профиля и следующий трек прыгал «в рандом».
+        currentSavedMusicList = null;
         forceLoopCurrentPlaylist = !loadMusic;
         playlistMergeDialogId = mergeDialogId;
         playMusicAgain = !playlist.isEmpty();
