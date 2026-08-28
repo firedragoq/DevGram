@@ -528,6 +528,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- DevGram: подтверждение закрепления ярлыка-маски (маскировка приложения) -->
+        <receiver
+            android:name=".DevGramDisguiseReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.telegram.messenger.DISGUISE_PINNED"/>
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".CopyCodeReceiver"
             android:exported="false">

@@ -60,21 +60,22 @@ public class DevGramDisguiseSheet extends BottomSheet {
         TextView subtitle = new TextView(context);
         subtitle.setTextColor(getThemedColor(Theme.key_dialogTextGray3));
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-        subtitle.setText("Как приложение выглядит в списке приложений");
+        subtitle.setText("Иконка и имя берутся с твоего телефона — 1-в-1 с настоящим приложением. Система попросит подтвердить добавление ярлыка.");
+        subtitle.setMaxLines(2);
         subtitle.setPadding(AndroidUtilities.dp(22), AndroidUtilities.dp(44), AndroidUtilities.dp(22), AndroidUtilities.dp(8));
         container.addView(subtitle, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
 
         RecyclerListView listView = new RecyclerListView(context);
         GridLayoutManager layoutManager = new GridLayoutManager(context, 3);
         listView.setLayoutManager(layoutManager);
-        listView.setPadding(AndroidUtilities.dp(10), AndroidUtilities.dp(74), AndroidUtilities.dp(10), AndroidUtilities.dp(16));
+        listView.setPadding(AndroidUtilities.dp(10), AndroidUtilities.dp(96), AndroidUtilities.dp(10), AndroidUtilities.dp(16));
         listView.setClipToPadding(false);
         listView.setAdapter(new Adapter());
         listView.setOnItemClickListener((view, position) -> {
             if (position == 0) {
                 DevGramDisguise.clear();
             } else {
-                DevGramDisguise.apply(masks.get(position - 1));
+                DevGramDisguise.apply(getContext(), masks.get(position - 1));
             }
             if (onChosen != null) onChosen.run();
             dismiss();
