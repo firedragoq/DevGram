@@ -42976,8 +42976,15 @@ public class ChatActivity extends BaseFragment implements
                             locFile = f;
                         }
                     }
-                    if (locFile != null && locFile.exists() && locFile.length() < 2 * 1024 * 1024) {
+                    // Без лимита размера: карточку открываем для любого скачанного файла плагина
+                    // (.dgplugin с вложенными wheels может весить много; сам валидатор проверит пакет).
+                    if (locFile != null && locFile.exists()) {
                         try {
+                            // Для .dgplugin архив не читаем в память — showPackage работает по пути.
+                            if (devgramDocName.endsWith(".dgplugin")) {
+                                DevGramPluginInstallSheet.showPackage(ChatActivity.this, locFile.getAbsolutePath(), getDialogId());
+                                return;
+                            }
                             byte[] data = new byte[(int) locFile.length()];
                             java.io.FileInputStream fis = new java.io.FileInputStream(locFile);
                             int off = 0, r;
@@ -42985,10 +42992,6 @@ public class ChatActivity extends BaseFragment implements
                                 off += r;
                             }
                             fis.close();
-                            if (devgramDocName.endsWith(".dgplugin")) {
-                                DevGramPluginInstallSheet.showPackage(ChatActivity.this, locFile.getAbsolutePath(), getDialogId());
-                                return;
-                            }
                             String src = new String(data, java.nio.charset.StandardCharsets.UTF_8);
                             // .plugin — всегда показываем лист; .py — только если это плагин DevGram
                             boolean forcePlugin = devgramDocName.endsWith(".plugin");
