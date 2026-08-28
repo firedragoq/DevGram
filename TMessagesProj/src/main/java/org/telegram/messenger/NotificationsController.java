@@ -1086,6 +1086,11 @@ public class NotificationsController extends BaseController implements Notificat
 
             for (int a = 0; a < messageObjects.size(); a++) {
                 MessageObject messageObject = messageObjects.get(a);
+                // DevGram: не показывать уведомления от скрытых (заблокированных) чатов
+                if (DevGramLockedChats.hideNotifications() && !DevGramLockedChats.isRevealed()
+                        && DevGramLockedChats.isLocked(currentAccount, messageObject.getDialogId())) {
+                    continue;
+                }
                 if (messageObject.messageOwner != null && (messageObject.isImportedForward() ||
                         messageObject.messageOwner.action instanceof TLRPC.TL_messageActionSetMessagesTTL ||
                         messageObject.messageOwner.silent && (messageObject.messageOwner.action instanceof TLRPC.TL_messageActionContactSignUp || messageObject.messageOwner.action instanceof TLRPC.TL_messageActionUserJoined)) ||

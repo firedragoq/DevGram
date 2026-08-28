@@ -6852,6 +6852,15 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } catch (Throwable ignore) {
         }
         org.telegram.messenger.DevGramPlugins.onMainPause(); // штатный уход — снять boot-флаг (краш сюда не доходит)
+        // DevGram: при сворачивании снова прячем скрытые чаты
+        if (org.telegram.messenger.DevGramLockedChats.isRevealed()) {
+            org.telegram.messenger.DevGramLockedChats.setRevealed(false);
+            try {
+                org.telegram.messenger.NotificationCenter.getInstance(org.telegram.messenger.UserConfig.selectedAccount)
+                        .postNotificationName(org.telegram.messenger.NotificationCenter.dialogsNeedReload);
+            } catch (Throwable ignore) {
+            }
+        }
         pipActivityHandler.onPause();
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.stopAllHeavyOperations, 4096);
         ApplicationLoader.mainInterfacePaused = true;

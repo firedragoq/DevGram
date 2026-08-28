@@ -163,6 +163,7 @@ public class DevGramCategoryActivity extends BaseFragment {
     private static final int ID_GLASS_OUTLINE = 61;
     private static final int ID_PILL_STACK = 62;
     private static final int ID_DISGUISE = 63; // DevGram: маскировка (иконка + имя приложения)
+    private static final int ID_LOCKED_CHATS = 64; // DevGram: скрытые запароленные чаты
 
     // Варианты для строк-селекторов (как в exteraGram)
     private static final String[] ACTIONBAR_TITLE_OPTIONS = {"Название приложения", "Имя пользователя", "Имя", "Чаты"};
@@ -631,6 +632,13 @@ public class DevGramCategoryActivity extends BaseFragment {
             items.add(UItem.asButton(ID_DISGUISE, "Иконка и название", disguiseCurrentTitle()));
             items.add(UItem.asShadow("В списке приложений DevGram будет выглядеть как выбранное приложение "
                     + "(например, «Калькулятор»). Само приложение не меняется."));
+
+            // — Скрытые чаты — прячем выбранные чаты за пасскодом/биометрией.
+            items.add(UItem.asHeader(org.telegram.messenger.LocaleController.getString(R.string.DevGramLockedChats)));
+            items.add(UItem.asButton(ID_LOCKED_CHATS,
+                    org.telegram.messenger.LocaleController.getString(R.string.DevGramLockedChats),
+                    lockedChatsSubtitle()));
+            items.add(UItem.asShadow(org.telegram.messenger.LocaleController.getString(R.string.DevGramLockedChatsInfo)));
         } else if (category == CATEGORY_CHATS) {
             // Порядок и состав повторяют ChatsPreferencesActivity ExteraGram.
             items.add(UItem.asHeader("Стикеры"));
@@ -993,6 +1001,15 @@ public class DevGramCategoryActivity extends BaseFragment {
         return org.telegram.messenger.LocaleController.getString(org.telegram.messenger.DevGramDisguise.current().title);
     }
 
+    // DevGram: подпись под пунктом «Скрытые чаты».
+    private CharSequence lockedChatsSubtitle() {
+        if (!org.telegram.messenger.DevGramLockedChats.hasPasscode()) {
+            return "Пасскод не задан";
+        }
+        int n = org.telegram.messenger.DevGramLockedChats.count();
+        return n == 0 ? "Нет скрытых чатов" : (n + (n % 10 == 1 && n % 100 != 11 ? " чат" : " чат."));
+    }
+
     // DevGram: красивое меню-каталог маскировок (карточки с реальными иконками приложений).
     private void showDisguiseDialog() {
         if (getParentActivity() == null) return;
@@ -1131,6 +1148,10 @@ public class DevGramCategoryActivity extends BaseFragment {
             DevGramConfig.setForceSnow(!DevGramConfig.forceSnow);
         } else if (item.id == ID_DISGUISE) {
             showDisguiseDialog();
+            return;
+        } else if (item.id == ID_LOCKED_CHATS) {
+            org.telegram.messenger.DevGramLockedChatsGate.prompt(getParentActivity(),
+                    () -> presentFragment(new DevGramLockedChatsActivity()));
             return;
         } else if (item.id == ID_CHAT_BLUR) {
             org.telegram.messenger.SharedConfig.toggleChatBlur();

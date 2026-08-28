@@ -588,6 +588,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int add_member = 18;
     private final static int statistics = 19;
     private final static int start_secret_chat = 20;
+    private final static int dg_lock_chat = 9910; // DevGram: скрыть/показать чат
     private final static int gallery_menu_save = 21;
     private final static int view_discussion = 22;
     private final static int delete_topic = 23;
@@ -2574,6 +2575,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         return;
                     }
                     finishFragment();
+                } else if (id == dg_lock_chat) {
+                    onDgLockChatClicked();
                 } else if (id == block_contact) {
                     onBlockContactClicked(false);
                 } else if (id == add_contact) {
@@ -6218,6 +6221,38 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             } else {
                 VoIPHelper.startCall(currentChat, null, null, false, getParentActivity(), ProfileActivity.this, getAccountInstance());
             }
+        }
+    }
+
+    // DevGram: скрыть/показать чат (скрытые запароленные чаты)
+    private void onDgLockChatClicked() {
+        long did = getDialogId();
+        if (did == 0 || getParentActivity() == null) {
+            return;
+        }
+        boolean locked = org.telegram.messenger.DevGramLockedChats.isLocked(currentAccount, did);
+        if (!locked) {
+            if (!org.telegram.messenger.DevGramLockedChats.hasPasscode()) {
+                AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
+                b.setTitle(LocaleController.getString(R.string.DevGramLockedChats));
+                b.setMessage(LocaleController.getString(R.string.DevGramLockedChatsNeedPasscode));
+                b.setPositiveButton(LocaleController.getString(R.string.DevGramLockedChatsSetPasscode),
+                        (d, w) -> presentFragment(new DevGramLockedChatsActivity()));
+                b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+                showDialog(b.create());
+                return;
+            }
+            org.telegram.messenger.DevGramLockedChats.setLocked(currentAccount, did, true);
+            createActionBarMenu(true);
+            getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_mute,
+                    LocaleController.getString(R.string.DevGramLockedChatsHidden)).show();
+        } else {
+            org.telegram.messenger.DevGramLockedChats.setLocked(currentAccount, did, false);
+            createActionBarMenu(true);
+            getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_unmute,
+                    LocaleController.getString(R.string.DevGramLockedChatsShown)).show();
         }
     }
 
@@ -12919,6 +12954,16 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             }
         }
+        // DevGram: «Скрыть/Показать чат» (скрытые запароленные чаты)
+        try {
+            long dgDid = getDialogId();
+            if (otherItem != null && dgDid != 0 && dgDid != getUserConfig().getClientUserId()
+                    && !DialogObject.isEncryptedDialog(dgDid)) {
+                boolean locked = org.telegram.messenger.DevGramLockedChats.isLocked(currentAccount, dgDid);
+                otherItem.addSubItem(dg_lock_chat, R.drawable.msg_secret,
+                        LocaleController.getString(locked ? R.string.DevGramLockedChatsShow : R.string.DevGramLockedChatsHide));
+            }
+        } catch (Throwable ignore) {}
         if (sharedMediaLayout != null) {
             sharedMediaLayout.getSearchItem().requestLayout();
         }
