@@ -9,11 +9,6 @@ import org.telegram.messenger.R;
 
 public class LauncherIconController {
     public static void tryFixLauncherIconIfNeeded() {
-        // DevGram: при маскировке через ярлык все alias намеренно выключены (иконка
-        // приложения спрятана, в лаунчере — только ярлык-маска). Не «чиним» это.
-        if (org.telegram.messenger.DevGramDisguise.isDisguised()) {
-            return;
-        }
         for (LauncherIcon icon : LauncherIcon.values()) {
             if (isEnabled(icon)) {
                 return;
