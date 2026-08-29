@@ -67,12 +67,19 @@ public class DevGramOtherActivity extends BaseFragment {
         });
 
         FrameLayout contentView = new FrameLayout(context);
-        listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, null);
+        listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, this::onItemLongClick);
         listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         actionBar.setAdaptiveBackground(listView);
 
+        DevGramSettingsLink.consumeHighlight(listView);
         return fragmentView = contentView;
+    }
+
+    // DevGram: зажатие пункта → «копировать / поделиться ссылкой»
+    private boolean onItemLongClick(UItem item, View view, int position, float x, float y) {
+        if (item == null || item.id <= 0) return false;
+        return DevGramSettingsLink.showLinkOptions(this, view, "other", item.id);
     }
 
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {

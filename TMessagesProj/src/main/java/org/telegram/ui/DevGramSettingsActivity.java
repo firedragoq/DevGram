@@ -68,7 +68,7 @@ public class DevGramSettingsActivity extends BaseFragment {
         headerView = createHeader(context);
 
         FrameLayout contentView = new FrameLayout(context);
-        listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, null);
+        listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, this::onItemLongClick);
         listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         actionBar.setAdaptiveBackground(listView);
@@ -146,6 +146,19 @@ public class DevGramSettingsActivity extends BaseFragment {
             items.add(UItem.asButton(ID_BADGES, R.drawable.devgram_supporter, "Значки DevGram"));
             items.add(UItem.asShadow("Выдача значков пользователям и чатам по ID."));
         }
+    }
+
+    // DevGram: зажатие категории/раздела → «копировать / поделиться ссылкой»
+    private boolean onItemLongClick(UItem item, View view, int position, float x, float y) {
+        String code = null;
+        if (item.id == ID_CAT_GENERAL) code = "general";
+        else if (item.id == ID_CAT_GHOST) code = "ghost";
+        else if (item.id == ID_CAT_SPY) code = "spy";
+        else if (item.id == ID_CAT_APPEARANCE) code = "appearance";
+        else if (item.id == ID_CAT_CHATS) code = "chats";
+        else if (item.id == ID_OTHER) code = "other";
+        if (code == null) return false;
+        return DevGramSettingsLink.showLinkOptions(this, view, code, 0);
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {

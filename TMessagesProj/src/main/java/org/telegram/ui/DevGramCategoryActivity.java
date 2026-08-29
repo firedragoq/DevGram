@@ -430,11 +430,12 @@ public class DevGramCategoryActivity extends BaseFragment {
         });
 
         FrameLayout contentView = new FrameLayout(context);
-        listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, null);
+        listView = new UniversalRecyclerView(this, this::fillItems, this::onItemClick, this::onItemLongClick);
         listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         actionBar.setAdaptiveBackground(listView);
 
+        DevGramSettingsLink.consumeHighlight(listView); // подсветить пункт, если открыто по ссылке
         return fragmentView = contentView;
     }
 
@@ -1024,6 +1025,14 @@ public class DevGramCategoryActivity extends BaseFragment {
                     .show();
         });
         showDialog(sheet);
+    }
+
+    // DevGram: зажатие настройки → «копировать / поделиться ссылкой» на неё
+    private boolean onItemLongClick(UItem item, View view, int position, float x, float y) {
+        if (item == null || item.id <= 0) return false;
+        // только у настраиваемых строк (у header/shadow id == 0)
+        return DevGramSettingsLink.showLinkOptions(this,
+                view, DevGramSettingsLink.codeForCategory(category), item.id);
     }
 
     private void onItemClick(UItem item, View view, int position, float x, float y) {
