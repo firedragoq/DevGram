@@ -970,6 +970,15 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     private boolean onLongClick(UItem item, View view, int position, float x, float y) {
+        // DevGram: пасхалка — зажатие пункта DevGram открывает рикролл 🙃
+        if (item.id == 250) {
+            try {
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            } catch (Throwable ignore) {}
+            org.telegram.messenger.browser.Browser.openUrl(getContext(),
+                    "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+            return true;
+        }
         if (item.object instanceof TLRPC.TL_attachMenuBot) {
             TLRPC.TL_attachMenuBot attachMenuBot = (TLRPC.TL_attachMenuBot) item.object;
             BotWebViewSheet.deleteBot(currentAccount, attachMenuBot.bot_id, () -> listView.adapter.update(true));
