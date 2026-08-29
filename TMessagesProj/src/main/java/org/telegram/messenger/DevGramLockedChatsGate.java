@@ -107,39 +107,8 @@ public final class DevGramLockedChatsGate {
             cb.onSuccess();
             return;
         }
-        final EditTextBoldCursor input = new EditTextBoldCursor(ctx);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 18);
-        input.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
-        input.setCursorColor(Theme.getColor(Theme.key_dialogTextBlack));
-        input.setHintText(LocaleController.getString(R.string.DevGramLockedChatsEnterPasscode));
-        input.setHintColor(Theme.getColor(Theme.key_dialogTextHint));
-        input.setBackgroundDrawable(Theme.createEditTextDrawable(ctx, true));
-
-        FrameLayout container = new FrameLayout(ctx);
-        container.addView(input, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
-                LayoutHelper.WRAP_CONTENT, 0, 24, 4, 24, 12));
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
-        builder.setTitle(LocaleController.getString(R.string.DevGramLockedChats));
-        builder.setView(container);
-        builder.setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> {
-            String pin = input.getText() == null ? "" : input.getText().toString();
-            if (DevGramLockedChats.checkPasscode(pin)) {
-                cb.onSuccess();
-            } else {
-                if (LaunchActivity.instance != null) {
-                    Toast.makeText(ctx, LocaleController.getString(R.string.DevGramLockedChatsWrongPasscode),
-                            Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-        AlertDialog dlg = builder.create();
-        dlg.show();
-        dlg.setOnShowListener(d -> AndroidUtilities.runOnUIThread(() -> {
-            input.requestFocus();
-            AndroidUtilities.showKeyboard(input);
-        }, 80));
+        org.telegram.ui.DevGramPasscodeSheet.showEnter(ctx,
+                DevGramLockedChats::checkPasscode,
+                cb::onSuccess);
     }
 }

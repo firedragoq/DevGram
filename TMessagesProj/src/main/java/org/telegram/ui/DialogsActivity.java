@@ -14140,6 +14140,21 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             });
         });
         io.addGap();
+        // DevGram: быстрый доступ к скрытым чатам — виден только если есть хоть один скрытый
+        if (org.telegram.messenger.DevGramLockedChats.hasAny(currentAccount)) {
+            io.add(R.drawable.msg_secret, LocaleController.getString(R.string.DevGramLockedChats), () -> {
+                if (org.telegram.messenger.DevGramLockedChats.isRevealed()) {
+                    org.telegram.messenger.DevGramLockedChats.setRevealed(false);
+                } else {
+                    org.telegram.messenger.DevGramLockedChatsGate.prompt(getParentActivity(), () -> {
+                        org.telegram.messenger.DevGramLockedChats.setRevealed(true);
+                        getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+                    });
+                    return;
+                }
+                getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+            });
+        }
         io.add(R.drawable.outline_saved_24, getString(R.string.SavedMessages), () -> {
             Bundle args = new Bundle();
             args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());

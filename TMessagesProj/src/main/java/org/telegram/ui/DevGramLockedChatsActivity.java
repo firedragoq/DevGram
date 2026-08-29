@@ -31,6 +31,7 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.EditTextBoldCursor;
+import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
@@ -207,7 +208,12 @@ public class DevGramLockedChatsActivity extends BaseFragment {
     private void onItemClick(UItem item, View view, int position, float x, float y) {
         int id = item.id;
         if (id == ID_SET_PASSCODE) {
-            showPasscodeDialog();
+            DevGramPasscodeSheet.showSet(getContext(), pin -> {
+                DevGramLockedChats.setPasscode(pin);
+                listView.adapter.update(true);
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,
+                        LocaleController.getString(R.string.DevGramLockedChatsPasscodeSaved)).show();
+            });
         } else if (id == ID_REMOVE_PASSCODE) {
             AlertDialog.Builder b = new AlertDialog.Builder(getContext());
             b.setTitle(LocaleController.getString(R.string.DevGramLockedChatsRemovePasscode));
@@ -230,29 +236,25 @@ public class DevGramLockedChatsActivity extends BaseFragment {
             getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
         } else if (id >= ID_CHAT_BASE && id - ID_CHAT_BASE < chatIds.size()) {
             long did = chatIds.get(id - ID_CHAT_BASE);
-            showChatActions(did);
+            showChatActions(did, view);
         }
     }
 
-    private void showChatActions(long did) {
-        AlertDialog.Builder b = new AlertDialog.Builder(getContext());
-        b.setTitle(dialogTitle(did));
-        b.setItems(new CharSequence[]{
-                LocaleController.getString(R.string.Open),
-                LocaleController.getString(R.string.DevGramLockedChatsShow)
-        }, (dialog, which) -> {
-            if (which == 0) {
-                openChat(did);
-            } else {
-                DevGramLockedChats.setLocked(currentAccount, did, false);
-                listView.adapter.update(true);
-                getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_unmute,
-                        LocaleController.getString(R.string.DevGramLockedChatsShown)).show();
-            }
-        });
-        b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-        showDialog(b.create());
+    // Красивое контекст-меню по тапу на скрытый чат (современный ItemOptions с иконками).
+    private void showChatActions(long did, View anchor) {
+        ItemOptions.makeOptions(this, anchor)
+                .add(R.drawable.msg_openprofile, LocaleController.getString(R.string.Open),
+                        () -> openChat(did))
+                .add(R.drawable.devgram_deleted_eye, LocaleController.getString(R.string.DevGramLockedChatsShow),
+                        () -> {
+                            DevGramLockedChats.setLocked(currentAccount, did, false);
+                            listView.adapter.update(true);
+                            getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+                            BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_unmute,
+                                    LocaleController.getString(R.string.DevGramLockedChatsShown)).show();
+                        })
+                .setGravity(Gravity.RIGHT)
+                .show();
     }
 
     private void openChat(long did) {
@@ -269,59 +271,4 @@ public class DevGramLockedChatsActivity extends BaseFragment {
         }
     }
 
-    private void showPasscodeDialog() {
-        Context ctx = getContext();
-        LinearLayout ll = new LinearLayout(ctx);
-        ll.setOrientation(LinearLayout.VERTICAL);
-
-        EditTextBoldCursor first = makePinInput(ctx, LocaleController.getString(R.string.DevGramLockedChatsNewPasscode));
-        EditTextBoldCursor second = makePinInput(ctx, LocaleController.getString(R.string.DevGramLockedChatsRepeatPasscode));
-        ll.addView(first, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 8, 24, 4));
-        ll.addView(second, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 4, 24, 12));
-
-        AlertDialog.Builder b = new AlertDialog.Builder(ctx);
-        b.setTitle(LocaleController.getString(hasTitleChange()));
-        b.setView(ll);
-        b.setPositiveButton(LocaleController.getString(R.string.Save), (dialog, which) -> {
-            String p1 = first.getText() == null ? "" : first.getText().toString();
-            String p2 = second.getText() == null ? "" : second.getText().toString();
-            if (p1.length() < 4) {
-                BulletinFactory.of(this).createErrorBulletin(LocaleController.getString(R.string.DevGramLockedChatsPasscodeShort)).show();
-                return;
-            }
-            if (!p1.equals(p2)) {
-                BulletinFactory.of(this).createErrorBulletin(LocaleController.getString(R.string.DevGramLockedChatsPasscodeMismatch)).show();
-                return;
-            }
-            DevGramLockedChats.setPasscode(p1);
-            listView.adapter.update(true);
-            BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,
-                    LocaleController.getString(R.string.DevGramLockedChatsPasscodeSaved)).show();
-        });
-        b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-        AlertDialog dlg = b.create();
-        dlg.show();
-        dlg.setOnShowListener(d -> AndroidUtilities.runOnUIThread(() -> {
-            first.requestFocus();
-            AndroidUtilities.showKeyboard(first);
-        }, 80));
-    }
-
-    private int hasTitleChange() {
-        return DevGramLockedChats.hasPasscode()
-                ? R.string.DevGramLockedChatsChangePasscode
-                : R.string.DevGramLockedChatsSetPasscode;
-    }
-
-    private EditTextBoldCursor makePinInput(Context ctx, String hint) {
-        EditTextBoldCursor e = new EditTextBoldCursor(ctx);
-        e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        e.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
-        e.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
-        e.setCursorColor(Theme.getColor(Theme.key_dialogTextBlack));
-        e.setHintText(hint);
-        e.setHintColor(Theme.getColor(Theme.key_dialogTextHint));
-        e.setBackgroundDrawable(Theme.createEditTextDrawable(ctx, true));
-        return e;
-    }
 }
