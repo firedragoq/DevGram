@@ -8240,9 +8240,50 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
+    private boolean dgBypassBioGate = false;
+
+    // DevGram: объект по позиции клика (для проверки «нужен отпечаток на вход»)
+    private Object dgItemForClick(RecyclerListView.Adapter adapter, int position) {
+        try {
+            if (adapter instanceof DialogsAdapter) {
+                return ((DialogsAdapter) adapter).getItem(position);
+            } else if (searchViewPager != null && adapter == searchViewPager.dialogsSearchAdapter) {
+                return searchViewPager.dialogsSearchAdapter.getItem(position);
+            }
+        } catch (Throwable ignore) {}
+        return null;
+    }
+
+    private long dgDialogIdOf(Object object) {
+        if (object instanceof TLRPC.User) return ((TLRPC.User) object).id;
+        if (object instanceof TLRPC.Chat) return -((TLRPC.Chat) object).id;
+        if (object instanceof TLRPC.EncryptedChat) return DialogObject.makeEncryptedDialogId(((TLRPC.EncryptedChat) object).id);
+        if (object instanceof TLRPC.Dialog && !(object instanceof TLRPC.TL_dialogFolder)) return ((TLRPC.Dialog) object).id;
+        return 0;
+    }
+
     private void onItemClick(View view, int position, RecyclerListView.Adapter adapter, float x, float y) {
         if (getParentActivity() == null) {
             return;
+        }
+        // DevGram: отпечаток на открытие защищённого чата/архива/«Избранного»/секретного
+        if (!dgBypassBioGate && !actionBar.isActionModeShowed(null)) {
+            Object clickObj = dgItemForClick(adapter, position);
+            boolean isArchiveFolder = clickObj instanceof TLRPC.TL_dialogFolder;
+            long clickDid = dgDialogIdOf(clickObj);
+            boolean needBio = (isArchiveFolder && org.telegram.messenger.DevGramLockedChats.bioArchive())
+                    || (clickDid != 0 && org.telegram.messenger.DevGramLockedChats.needsBioToOpen(currentAccount, clickDid));
+            if (needBio) {
+                org.telegram.messenger.DevGramLockedChatsGate.prompt(getParentActivity(), () -> {
+                    dgBypassBioGate = true;
+                    try {
+                        onItemClick(view, position, adapter, x, y);
+                    } finally {
+                        dgBypassBioGate = false;
+                    }
+                });
+                return;
+            }
         }
         long dialogId = 0;
         long topicId = 0;
@@ -8861,6 +8902,21 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
         BulletinFactory.of(this).createSimpleBulletin(locked ? R.raw.ic_unmute : R.raw.ic_mute,
                 LocaleController.getString(locked ? R.string.DevGramLockedChatsShown : R.string.DevGramLockedChatsHidden)).show();
+    }
+
+    // DevGram: авто-скрытие раскрытых чатов по истечении TTL (для таймерных режимов)
+    private void dgScheduleAutoHide() {
+        long delay = org.telegram.messenger.DevGramLockedChats.revealAutoHideDelay();
+        if (delay <= 0) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            if (!org.telegram.messenger.DevGramLockedChats.isRevealed()) {
+                getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+            } else {
+                dgScheduleAutoHide(); // ещё не истёк (или продлили) — перепланировать
+            }
+        }, delay + 50);
     }
 
     public boolean showChatPreview(DialogCell cell) {
@@ -9573,8 +9629,24 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         performSelectedDialogsAction(selectedDialogs, action, alert, longPress, null);
     }
 
+    private boolean dgBypassBioDelete = false;
+
     private void performSelectedDialogsAction(ArrayList<Long> selectedDialogs, int action, boolean alert, boolean longPress, HashSet<Long> dialogsIdsToRevoke) {
         if (getParentActivity() == null) {
+            return;
+        }
+        // DevGram: отпечаток на удаление чата
+        if (!dgBypassBioDelete && action == delete && org.telegram.messenger.DevGramLockedChats.bioBeforeDelete()) {
+            final ArrayList<Long> selCopy = new ArrayList<>(selectedDialogs);
+            final HashSet<Long> revokeCopy = dialogsIdsToRevoke == null ? null : new HashSet<>(dialogsIdsToRevoke);
+            org.telegram.messenger.DevGramLockedChatsGate.prompt(getParentActivity(), () -> {
+                dgBypassBioDelete = true;
+                try {
+                    performSelectedDialogsAction(selCopy, action, alert, longPress, revokeCopy);
+                } finally {
+                    dgBypassBioDelete = false;
+                }
+            });
             return;
         }
         MessagesController.DialogFilter filter;
@@ -14194,6 +14266,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     org.telegram.messenger.DevGramLockedChatsGate.prompt(getParentActivity(), () -> {
                         org.telegram.messenger.DevGramLockedChats.setRevealed(true);
                         getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+                        dgScheduleAutoHide();
                     });
                 }
             });

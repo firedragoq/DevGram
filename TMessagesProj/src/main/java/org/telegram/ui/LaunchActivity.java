@@ -3444,39 +3444,32 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     private void openDevGramSettingsSection(String section) {
-        switch (section) {
+        // код экрана без суффикса __<id> — для спец-кейсов ниже
+        String code = section;
+        int sep = section.indexOf("__");
+        if (sep > 0) {
+            code = section.substring(0, sep);
+        }
+        switch (code) {
             case "plugins":
                 presentFragment(new DevGramPluginsActivity());
                 break;
             case "catalog":
                 presentFragment(new DevGramPluginCatalogActivity());
                 break;
-            case "fonts":
-            case "appearance":
-                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_APPEARANCE));
-                break;
-            case "ghost":
-                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GHOST));
-                break;
-            case "spy":
-                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_SPY));
-                break;
-            case "chats":
-                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_CHATS));
-                break;
-            case "general":
-                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_GENERAL));
-                break;
             case "support":
                 DevGramOtherActivity other = new DevGramOtherActivity();
                 presentFragment(other);
                 AndroidUtilities.runOnUIThread(() -> DevGramSupportSheet.show(other), 350L);
                 break;
-            case "other":
-                presentFragment(new DevGramOtherActivity());
+            case "fonts":
+                presentFragment(new DevGramCategoryActivity(DevGramCategoryActivity.CATEGORY_APPEARANCE));
                 break;
             default:
-                presentFragment(new DevGramSettingsActivity());
+                // general/ghost/spy/appearance/chats/ai/other/locked/main + подсветка пункта по __id
+                if (!DevGramSettingsLink.open(section)) {
+                    presentFragment(new DevGramSettingsActivity());
+                }
                 break;
         }
     }
@@ -6852,8 +6845,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } catch (Throwable ignore) {
         }
         org.telegram.messenger.DevGramPlugins.onMainPause(); // штатный уход — снять boot-флаг (краш сюда не доходит)
-        // DevGram: при сворачивании снова прячем скрытые чаты
-        if (org.telegram.messenger.DevGramLockedChats.isRevealed()) {
+        // DevGram: при сворачивании снова прячем скрытые чаты (если выбран режим «до сворачивания»)
+        if (org.telegram.messenger.DevGramLockedChats.hideOnBackground()
+                && org.telegram.messenger.DevGramLockedChats.isRevealed()) {
             org.telegram.messenger.DevGramLockedChats.setRevealed(false);
             try {
                 org.telegram.messenger.NotificationCenter.getInstance(org.telegram.messenger.UserConfig.selectedAccount)

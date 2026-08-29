@@ -48,6 +48,11 @@ public class DevGramLockedChatsActivity extends BaseFragment {
     private static final int ID_BIOMETRIC = 3;
     private static final int ID_HIDE_NOTIFY = 4;
     private static final int ID_REVEAL = 5;
+    private static final int ID_TTL = 6;
+    private static final int ID_BIO_ARCHIVE = 7;
+    private static final int ID_BIO_SAVED = 8;
+    private static final int ID_BIO_SECRET = 9;
+    private static final int ID_BIO_DELETE = 10;
     private static final int ID_CHAT_BASE = 1000;
 
     private UniversalRecyclerView listView;
@@ -70,6 +75,7 @@ public class DevGramLockedChatsActivity extends BaseFragment {
         listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
         content.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         actionBar.setAdaptiveBackground(listView);
+        DevGramSettingsLink.consumeHighlight(listView);
         return fragmentView = content;
     }
 
@@ -108,7 +114,20 @@ public class DevGramLockedChatsActivity extends BaseFragment {
         }
         items.add(UItem.asCheck(ID_HIDE_NOTIFY, LocaleController.getString(R.string.DevGramLockedChatsHideNotify))
                 .setChecked(DevGramLockedChats.hideNotifications()));
+        items.add(UItem.asButton(ID_TTL, LocaleController.getString(R.string.DevGramLockedChatsTtl), ttlTitle()));
         items.add(UItem.asShadow(LocaleController.getString(R.string.DevGramLockedChatsHideNotifyInfo)));
+
+        // — Отпечаток на открытие / удаление
+        items.add(UItem.asGraySection(LocaleController.getString(R.string.DevGramLockedChatsBioSection)));
+        items.add(UItem.asCheck(ID_BIO_ARCHIVE, LocaleController.getString(R.string.DevGramLockedChatsBioArchive))
+                .setChecked(DevGramLockedChats.bioArchive()));
+        items.add(UItem.asCheck(ID_BIO_SAVED, LocaleController.getString(R.string.DevGramLockedChatsBioSaved))
+                .setChecked(DevGramLockedChats.bioSaved()));
+        items.add(UItem.asCheck(ID_BIO_SECRET, LocaleController.getString(R.string.DevGramLockedChatsBioSecret))
+                .setChecked(DevGramLockedChats.bioSecret()));
+        items.add(UItem.asCheck(ID_BIO_DELETE, LocaleController.getString(R.string.DevGramLockedChatsBioDelete))
+                .setChecked(DevGramLockedChats.bioBeforeDelete()));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.DevGramLockedChatsBioInfo)));
 
         chatIds = DevGramLockedChats.getAll(currentAccount);
         String sectionTitle = LocaleController.getString(R.string.DevGramLockedChatsList)
@@ -230,6 +249,20 @@ public class DevGramLockedChatsActivity extends BaseFragment {
         } else if (id == ID_HIDE_NOTIFY) {
             DevGramLockedChats.setHideNotifications(!DevGramLockedChats.hideNotifications());
             listView.adapter.update(true);
+        } else if (id == ID_TTL) {
+            showTtlDialog();
+        } else if (id == ID_BIO_ARCHIVE) {
+            DevGramLockedChats.setBioArchive(!DevGramLockedChats.bioArchive());
+            listView.adapter.update(true);
+        } else if (id == ID_BIO_SAVED) {
+            DevGramLockedChats.setBioSaved(!DevGramLockedChats.bioSaved());
+            listView.adapter.update(true);
+        } else if (id == ID_BIO_SECRET) {
+            DevGramLockedChats.setBioSecret(!DevGramLockedChats.bioSecret());
+            listView.adapter.update(true);
+        } else if (id == ID_BIO_DELETE) {
+            DevGramLockedChats.setBioBeforeDelete(!DevGramLockedChats.bioBeforeDelete());
+            listView.adapter.update(true);
         } else if (id == ID_REVEAL) {
             DevGramLockedChats.setRevealed(!DevGramLockedChats.isRevealed());
             listView.adapter.update(true);
@@ -238,6 +271,41 @@ public class DevGramLockedChatsActivity extends BaseFragment {
             long did = chatIds.get(id - ID_CHAT_BASE);
             showChatActions(did, view);
         }
+    }
+
+    private int[] ttlValues() {
+        return new int[]{
+                DevGramLockedChats.TTL_ON_BACKGROUND, DevGramLockedChats.TTL_1_MIN,
+                DevGramLockedChats.TTL_5_MIN, DevGramLockedChats.TTL_15_MIN,
+                DevGramLockedChats.TTL_UNTIL_RESTART};
+    }
+
+    private String ttlTitleFor(int v) {
+        switch (v) {
+            case DevGramLockedChats.TTL_1_MIN: return LocaleController.getString(R.string.DevGramLockedChatsTtl1Min);
+            case DevGramLockedChats.TTL_5_MIN: return LocaleController.getString(R.string.DevGramLockedChatsTtl5Min);
+            case DevGramLockedChats.TTL_15_MIN: return LocaleController.getString(R.string.DevGramLockedChatsTtl15Min);
+            case DevGramLockedChats.TTL_UNTIL_RESTART: return LocaleController.getString(R.string.DevGramLockedChatsTtlUntilRestart);
+            default: return LocaleController.getString(R.string.DevGramLockedChatsTtlOnBackground);
+        }
+    }
+
+    private CharSequence ttlTitle() {
+        return ttlTitleFor(DevGramLockedChats.getTtl());
+    }
+
+    private void showTtlDialog() {
+        int[] vals = ttlValues();
+        CharSequence[] labels = new CharSequence[vals.length];
+        for (int i = 0; i < vals.length; i++) labels[i] = ttlTitleFor(vals[i]);
+        AlertDialog.Builder b = new AlertDialog.Builder(getContext());
+        b.setTitle(LocaleController.getString(R.string.DevGramLockedChatsTtl));
+        b.setItems(labels, (dialog, which) -> {
+            DevGramLockedChats.setTtl(vals[which]);
+            listView.adapter.update(true);
+        });
+        b.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(b.create());
     }
 
     // Красивое контекст-меню по тапу на скрытый чат (современный ItemOptions с иконками).

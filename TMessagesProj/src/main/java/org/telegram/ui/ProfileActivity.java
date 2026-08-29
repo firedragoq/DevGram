@@ -589,6 +589,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int statistics = 19;
     private final static int start_secret_chat = 20;
     private final static int dg_lock_chat = 9910; // DevGram: скрыть/показать чат
+    private final static int dg_protect_chat = 9911; // DevGram: отпечаток на вход в чат
     private final static int gallery_menu_save = 21;
     private final static int view_discussion = 22;
     private final static int delete_topic = 23;
@@ -2577,6 +2578,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     finishFragment();
                 } else if (id == dg_lock_chat) {
                     onDgLockChatClicked();
+                } else if (id == dg_protect_chat) {
+                    onDgProtectChatClicked();
                 } else if (id == block_contact) {
                     onBlockContactClicked(false);
                 } else if (id == add_contact) {
@@ -6222,6 +6225,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 VoIPHelper.startCall(currentChat, null, null, false, getParentActivity(), ProfileActivity.this, getAccountInstance());
             }
         }
+    }
+
+    // DevGram: включить/выключить «отпечаток на вход» для этого чата
+    private void onDgProtectChatClicked() {
+        long did = getDialogId();
+        if (did == 0 || getParentActivity() == null) {
+            return;
+        }
+        boolean prot = org.telegram.messenger.DevGramLockedChats.isProtected(currentAccount, did);
+        org.telegram.messenger.DevGramLockedChats.setProtected(currentAccount, did, !prot);
+        createActionBarMenu(true);
+        BulletinFactory.of(this).createSimpleBulletin(prot ? R.raw.unlock_icon : R.raw.passcode_lock,
+                LocaleController.getString(prot
+                        ? R.string.DevGramLockedChatsUnprotected
+                        : R.string.DevGramLockedChatsProtected)).show();
     }
 
     // DevGram: скрыть/показать чат (скрытые запароленные чаты)
@@ -12962,6 +12980,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 boolean locked = org.telegram.messenger.DevGramLockedChats.isLocked(currentAccount, dgDid);
                 otherItem.addSubItem(dg_lock_chat, R.drawable.msg_secret,
                         LocaleController.getString(locked ? R.string.DevGramLockedChatsShow : R.string.DevGramLockedChatsHide));
+                boolean prot = org.telegram.messenger.DevGramLockedChats.isProtected(currentAccount, dgDid);
+                otherItem.addSubItem(dg_protect_chat, R.drawable.fingerprint,
+                        LocaleController.getString(prot ? R.string.DevGramLockedChatsUnprotect : R.string.DevGramLockedChatsProtect));
             }
         } catch (Throwable ignore) {}
         if (sharedMediaLayout != null) {

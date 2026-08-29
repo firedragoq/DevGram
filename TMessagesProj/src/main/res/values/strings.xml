@@ -6012,6 +6012,10 @@
     <string name="DevGramMaskWeather">Погода</string>
     <string name="DevGramMaskClock">Часы</string>
     <string name="DevGramMaskSettings">Настройки</string>
+    <!-- DevGram: deep-ссылки на настройки -->
+    <string name="DevGramCopyLink">Копировать ссылку</string>
+    <string name="DevGramShareLink">Поделиться ссылкой</string>
+    <string name="DevGramNoSuchSetting">Такой настройки нет</string>
     <!-- DevGram: скрытые (запароленные) чаты -->
     <string name="DevGramLockedChats">Скрытые чаты</string>
     <string name="DevGramLockedChatsInfo">Спрячьте выбранные чаты из списка. Они откроются только после разблокировки — по пасскоду или отпечатку/лицу.</string>
@@ -6041,6 +6045,22 @@
     <string name="DevGramLockedChatsReveal">Показать скрытые чаты в списке</string>
     <string name="DevGramLockedChatsQuickShow">Показать скрытые чаты</string>
     <string name="DevGramLockedChatsQuickHide">Скрыть скрытые чаты</string>
+    <string name="DevGramLockedChatsProtect">Отпечаток на вход</string>
+    <string name="DevGramLockedChatsUnprotect">Убрать отпечаток на вход</string>
+    <string name="DevGramLockedChatsProtected">Вход в чат — по отпечатку</string>
+    <string name="DevGramLockedChatsUnprotected">Отпечаток на вход снят</string>
+    <string name="DevGramLockedChatsTtl">Держать разблокировку</string>
+    <string name="DevGramLockedChatsTtlOnBackground">До сворачивания</string>
+    <string name="DevGramLockedChatsTtl1Min">1 минуту</string>
+    <string name="DevGramLockedChatsTtl5Min">5 минут</string>
+    <string name="DevGramLockedChatsTtl15Min">15 минут</string>
+    <string name="DevGramLockedChatsTtlUntilRestart">До перезапуска</string>
+    <string name="DevGramLockedChatsBioSection">Отпечаток на открытие</string>
+    <string name="DevGramLockedChatsBioArchive">Отпечаток на архив</string>
+    <string name="DevGramLockedChatsBioSaved">Отпечаток на «Избранное»</string>
+    <string name="DevGramLockedChatsBioSecret">Отпечаток на секретные чаты</string>
+    <string name="DevGramLockedChatsBioDelete">Отпечаток на удаление</string>
+    <string name="DevGramLockedChatsBioInfo">Спрашивать отпечаток/лицо при открытии выбранного и при удалении. Конкретные чаты помечаются в профиле → меню → «Отпечаток на вход».</string>
     <string name="FileTooLarge">File Too Large</string>
     <string name="PremiumPreviewAppIcon">Premium App Icon</string>
     <string name="PremiumPreviewAppIconDescription">Choose from a selection of DevGram app icons for your homescreen.</string>
