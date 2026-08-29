@@ -169,6 +169,38 @@ public final class DevGramLockedChats {
         return out == null ? list : out;
     }
 
+    // dialog id для объекта результата поиска (User/Chat), иначе 0
+    public static long dialogIdOf(Object obj) {
+        if (obj instanceof TLRPC.User) return ((TLRPC.User) obj).id;
+        if (obj instanceof TLRPC.Chat) return -((TLRPC.Chat) obj).id;
+        return 0;
+    }
+
+    // true, если объект поиска (User/Chat) — скрытый чат и мы не в режиме «раскрыто»
+    public static boolean isLockedSearchObject(Object obj, int account) {
+        if (revealed) return false;
+        long did = dialogIdOf(obj);
+        return did != 0 && isLocked(account, did);
+    }
+
+    // Отфильтровать результаты поиска (список User/Chat), убрав скрытые чаты
+    public static ArrayList<Object> filterSearch(ArrayList<Object> list, int account) {
+        if (revealed || list == null || list.isEmpty()) return list;
+        HashSet<Long> c;
+        synchronized (LOCK) {
+            c = cache(account);
+            if (c.isEmpty()) return list;
+            c = new HashSet<>(c);
+        }
+        ArrayList<Object> out = new ArrayList<>(list.size());
+        for (Object o : list) {
+            long did = dialogIdOf(o);
+            if (did != 0 && c.contains(did)) continue;
+            out.add(o);
+        }
+        return out;
+    }
+
     // ------------------------------ пасскод ------------------------------
     public static boolean hasPasscode() {
         return !TextUtils.isEmpty(prefs().getString(KEY_PASS_HASH, ""));

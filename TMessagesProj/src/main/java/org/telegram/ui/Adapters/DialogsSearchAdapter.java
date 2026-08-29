@@ -1053,6 +1053,15 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 }
             }
             MessagesController.getInstance(currentAccount).putUsers(encUsers, true);
+            // DevGram: убрать скрытые (запароленные) чаты из результатов поиска (и параллельный names)
+            if (!org.telegram.messenger.DevGramLockedChats.isRevealed()) {
+                for (int a = result.size() - 1; a >= 0; a--) {
+                    if (org.telegram.messenger.DevGramLockedChats.isLockedSearchObject(result.get(a), currentAccount)) {
+                        result.remove(a);
+                        if (names != null && a < names.size()) names.remove(a);
+                    }
+                }
+            }
             searchResult = result;
             searchResultNames = names;
          //   searchContacts = contacts;
@@ -2334,6 +2343,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 if (delegate != null && delegate.getSearchForumDialogId() == recentSearchObjects.get(i).did || !filter(recentSearchObjects.get(i).object)) {
                     continue;
                 }
+                // DevGram: не показывать скрытые (запароленные) чаты в недавних
+                if (!org.telegram.messenger.DevGramLockedChats.isRevealed()
+                        && org.telegram.messenger.DevGramLockedChats.isLocked(currentAccount, recentSearchObjects.get(i).did)) {
+                    continue;
+                }
                 filteredRecentSearchObjects.add(recentSearchObjects.get(i));
             }
             return;
@@ -2346,6 +2360,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 continue;
             }
             if (delegate != null && delegate.getSearchForumDialogId() == obj.did || !filter(recentSearchObjects.get(i).object)) {
+                continue;
+            }
+            // DevGram: не показывать скрытые чаты в недавних (с поисковым запросом)
+            if (!org.telegram.messenger.DevGramLockedChats.isRevealed()
+                    && org.telegram.messenger.DevGramLockedChats.isLocked(currentAccount, obj.did)) {
                 continue;
             }
             String title = null, username = null;

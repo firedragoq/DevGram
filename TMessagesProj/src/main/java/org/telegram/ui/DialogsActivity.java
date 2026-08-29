@@ -8840,6 +8840,29 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return null;
     }
 
+    // DevGram: скрыть/показать чат (скрытые запароленные чаты). Если пасскода ещё нет —
+    // сначала предлагаем задать его на красивом PIN-экране, затем прячем чат.
+    private void dgToggleLockChat(long did) {
+        if (did == 0 || getParentActivity() == null) {
+            return;
+        }
+        boolean locked = org.telegram.messenger.DevGramLockedChats.isLocked(currentAccount, did);
+        if (!locked && !org.telegram.messenger.DevGramLockedChats.hasPasscode()) {
+            DevGramPasscodeSheet.showSet(getParentActivity(), pin -> {
+                org.telegram.messenger.DevGramLockedChats.setPasscode(pin);
+                org.telegram.messenger.DevGramLockedChats.setLocked(currentAccount, did, true);
+                getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_mute,
+                        LocaleController.getString(R.string.DevGramLockedChatsHidden)).show();
+            });
+            return;
+        }
+        org.telegram.messenger.DevGramLockedChats.setLocked(currentAccount, did, !locked);
+        getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+        BulletinFactory.of(this).createSimpleBulletin(locked ? R.raw.ic_unmute : R.raw.ic_mute,
+                LocaleController.getString(locked ? R.string.DevGramLockedChatsShown : R.string.DevGramLockedChatsHidden)).show();
+    }
+
     public boolean showChatPreview(DialogCell cell) {
         final boolean isCommunityCell = cell.isDialogCommunity();
         if (isCommunityCell) {
@@ -9192,6 +9215,22 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             previewMenu[0].addView(deleteItem);
         }
 
+        // DevGram: скрыть/показать чат прямо из превью-меню (скрытые запароленные чаты)
+        if (previewMenu[0] != null && dialogId != 0 && dialogId != getUserConfig().getClientUserId()
+                && !DialogObject.isEncryptedDialog(dialogId)) {
+            boolean dgLocked = org.telegram.messenger.DevGramLockedChats.isLocked(currentAccount, dialogId);
+            ActionBarMenuSubItem lockItem = new ActionBarMenuSubItem(getParentActivity(), false, false);
+            lockItem.setTextAndIcon(
+                    LocaleController.getString(dgLocked ? R.string.DevGramLockedChatsShow : R.string.DevGramLockedChatsHide),
+                    dgLocked ? R.drawable.devgram_deleted_eye : R.drawable.msg_secret);
+            lockItem.setMinimumWidth(160);
+            final long lockDid = dialogId;
+            lockItem.setOnClickListener(e -> {
+                finishPreviewFragment();
+                AndroidUtilities.runOnUIThread(() -> dgToggleLockChat(lockDid), 150);
+            });
+            previewMenu[0].addView(lockItem);
+        }
 
         if (isCommunityCell) {
             if (searchString != null) {
@@ -14140,19 +14179,23 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             });
         });
         io.addGap();
-        // DevGram: быстрый доступ к скрытым чатам — виден только если есть хоть один скрытый
+        // DevGram: быстрый доступ к скрытым чатам — виден только если есть хоть один скрытый.
+        // Подпись/иконка переключаются: «Показать скрытые чаты» ↔ «Скрыть скрытые чаты».
         if (org.telegram.messenger.DevGramLockedChats.hasAny(currentAccount)) {
-            io.add(R.drawable.msg_secret, LocaleController.getString(R.string.DevGramLockedChats), () -> {
-                if (org.telegram.messenger.DevGramLockedChats.isRevealed()) {
+            final boolean lockedRevealed = org.telegram.messenger.DevGramLockedChats.isRevealed();
+            io.add(lockedRevealed ? R.drawable.msg_secret : R.drawable.devgram_deleted_eye,
+                    LocaleController.getString(lockedRevealed
+                            ? R.string.DevGramLockedChatsQuickHide
+                            : R.string.DevGramLockedChatsQuickShow), () -> {
+                if (lockedRevealed) {
                     org.telegram.messenger.DevGramLockedChats.setRevealed(false);
+                    getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
                 } else {
                     org.telegram.messenger.DevGramLockedChatsGate.prompt(getParentActivity(), () -> {
                         org.telegram.messenger.DevGramLockedChats.setRevealed(true);
                         getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
                     });
-                    return;
                 }
-                getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
             });
         }
         io.add(R.drawable.outline_saved_24, getString(R.string.SavedMessages), () -> {

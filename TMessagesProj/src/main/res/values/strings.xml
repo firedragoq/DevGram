@@ -6039,6 +6039,8 @@
     <string name="DevGramLockedChatsEmpty">Пока нет скрытых чатов. Откройте чат → меню → «Скрыть чат».</string>
     <string name="DevGramLockedChatsNeedPasscode">Сначала задайте пасскод для скрытых чатов</string>
     <string name="DevGramLockedChatsReveal">Показать скрытые чаты в списке</string>
+    <string name="DevGramLockedChatsQuickShow">Показать скрытые чаты</string>
+    <string name="DevGramLockedChatsQuickHide">Скрыть скрытые чаты</string>
     <string name="FileTooLarge">File Too Large</string>
     <string name="PremiumPreviewAppIcon">Premium App Icon</string>
     <string name="PremiumPreviewAppIconDescription">Choose from a selection of DevGram app icons for your homescreen.</string>
