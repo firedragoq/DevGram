@@ -116,13 +116,24 @@ public final class DevGramSettingsLink {
         final int id = pendingHighlight;
         pendingHighlight = 0;
         if (id <= 0 || listView == null) return;
-        AndroidUtilities.runOnUIThread(() -> listView.highlightRow(() -> {
-            if (listView.adapter == null) return -1;
-            for (int i = 0; i < listView.adapter.getItemCount(); i++) {
-                UItem it = listView.adapter.getItem(i);
-                if (it != null && it.id == id) return i;
-            }
-            return -1;
-        }), 260);
+        AndroidUtilities.runOnUIThread(() -> {
+            int pos = positionOf(listView, id);
+            if (pos < 0) return;
+            // сперва проматываем к пункту (highlightRow подсвечивает только видимые строки,
+            // иначе анимация ждёт, пока пользователь сам долистает), затем подсвечиваем
+            try {
+                listView.layoutManager.scrollToPositionWithOffset(pos, AndroidUtilities.dp(80));
+            } catch (Throwable ignore) {}
+            AndroidUtilities.runOnUIThread(() -> listView.highlightRow(() -> positionOf(listView, id)), 160);
+        }, 240);
+    }
+
+    private static int positionOf(UniversalRecyclerView listView, int id) {
+        if (listView.adapter == null) return -1;
+        for (int i = 0; i < listView.adapter.getItemCount(); i++) {
+            UItem it = listView.adapter.getItem(i);
+            if (it != null && it.id == id) return i;
+        }
+        return -1;
     }
 }
